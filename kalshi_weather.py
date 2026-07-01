@@ -65,6 +65,7 @@ CITIES = {
 }
 MON={"JAN":1,"FEB":2,"MAR":3,"APR":4,"MAY":5,"JUN":6,"JUL":7,"AUG":8,"SEP":9,"OCT":10,"NOV":11,"DEC":12}
 TODAY=dt.date.today()
+DOT="\u00b7"   # middot, kept out of f-string expressions for py3.11 safety
 
 # ----------------------------- helpers -----------------------------
 def fget(url, tries=3):
@@ -530,7 +531,7 @@ def render_results(rep,updated):
     raw="".join(f'<tr><td>{esc(CITIES[r["code"]][3])}</td><td>{"H" if r["kind"]=="HIGH" else "L"} {r["target"][5:]}</td>'
                 f'<td>{esc(r["sub"])}</td><td>{unit_str(r["units"])}</td><td class="pl">{r["side"]}@{r["entry"]*100:.0f}\u00a2</td>'
                 f'<td class="n">{r["actual"]}\u00b0</td><td>{"WON" if r["won"] else "LOST"}</td>'
-                f'<td class="n">{("%+.1f"%r["margin"]) if r["margin"] is not None else "\u00b7"}\u00b0</td>'
+                f'<td class="n">{("%+.1f"%r["margin"]) if r["margin"] is not None else DOT}\u00b0</td>'
                 f'<td class="n {"up" if r["pnl"]>=0 else "red"}">${r["pnl"]:+.2f}</td></tr>'
                 for r in rep.get("recent",[])[:60])
     html=(head("results",updated)+
