@@ -26,6 +26,10 @@ from collections import defaultdict
 BANKROLL      = 500.0
 BASE_UNIT_USD = round(BANKROLL * 0.02, 2)     # 1u = 2% of bankroll ($10 at $500)
 UNIT_MAP      = {"S": 2.0, "A": 1.5, "B": 1.0, "C": 0.0}   # tier -> units (0 = no bet)
+# Win-probability caps. A bet you rarely WIN is high-variance no matter how big
+# the edge, so cap its size. A long price is already its own reward. p_win is the
+# model prob the *position* wins (mp for YES, 1-mp for NO). Tunable.
+WINPROB_CAP   = [(0.55, 2.0), (0.42, 1.5), (0.00, 1.0)]   # p_win >= x -> max units
 MIN_OI        = 300
 PLAY_NET_EDGE = 0.04
 MAX_LEAD_DAYS = 4
@@ -203,6 +207,17 @@ def tier_for(net,lead,sd,skill):
 
 def units_of(t): return UNIT_MAP.get(t,0.0)
 
+def size_play(tier, p_win):
+    """Tier sets the ceiling; win-probability caps it so low-prob bets stay small."""
+    base=UNIT_MAP.get(tier,0.0)
+    if base<=0: return 0.0, ""
+    cap=WINPROB_CAP[-1][1]
+    for thr,u in WINPROB_CAP:
+        if p_win>=thr: cap=u; break
+    units=min(base,cap)
+    reason=("longshot cap: win prob %.0f%%"%(p_win*100)) if units<base else ""
+    return units, reason
+
 # ----------------------------- scoring -----------------------------
 def score(state):
     ladders=pull_weather_markets()
@@ -234,14 +249,16 @@ def score(state):
             else:      side,entry,net="Buy NO",round(1-b["yb"],2),(-edge)-cost
             base=((not biased) and (not realized) and net>=PLAY_NET_EDGE and b["oi"]>=MIN_OI
                   and lead<=MAX_LEAD_DAYS and 0.02<mid<0.98)
-            tier=eff=None; units=0.0
+            tier=eff=None; units=0.0; p_win=None; size_reason=""
             if base:
-                tier,eff,_=tier_for(net,lead,sd,skill.get((code,kind))); units=units_of(tier)
+                tier,eff,_=tier_for(net,lead,sd,skill.get((code,kind)))
+                p_win = mp if side=="Buy YES" else 1-mp
+                units, size_reason = size_play(tier, p_win)
             is_play=base and units>0
             rec={"code":code,"label":CITIES[code][3],"kind":kind,"date":tdate,"lead":lead,
                  "bucket":b["sub"],"ticker":b["ticker"],"mid":mid,"mp":mp,"edge":edge,"side":side,
                  "entry":entry,"net":net,"oi":b["oi"],"sd":sd,"mean":mean,"overround":ov,
-                 "offset":offset,"biased":biased,"realized":realized,"tier":tier,"eff":eff,
+                 "offset":offset,"biased":biased,"realized":realized,"tier":tier,"eff":eff,"p_win":p_win,"size_reason":size_reason,
                  "units":units,"stake":round(units*BASE_UNIT_USD,2) if units else None}
             rows.append(rec)
             if is_play: plays.append(rec)
@@ -250,7 +267,7 @@ def score(state):
             if is_play:
                 ppl.append({"ticker":b["ticker"],"bid":bucket_id(b),"sub":b["sub"],"side":side,
                             "entry":entry,"net":net,"tier":tier,"units":units,
-                            "stake":round(units*BASE_UNIT_USD,2),"mp":mp,"mid":mid})
+                            "stake":round(units*BASE_UNIT_USD,2),"p_win":p_win,"mp":mp,"mid":mid})
         if not realized:
             preds[f"{code}|{kind}|{tdate.isoformat()}"]={"code":code,"kind":kind,"target":tdate.isoformat(),
                 "event_ticker":L["event_ticker"],"logged_at":dt.datetime.now().isoformat(timespec="minutes"),
@@ -372,6 +389,19 @@ tr.play td{background:rgba(70,192,138,.05)}
 .block{margin:14px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}.bh{padding:10px 12px;font-weight:600;border-bottom:1px solid var(--line)}.bm{padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mut);border-bottom:1px solid var(--line)}.block td,.block th{padding:8px 12px}
 .tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 0}.tab{flex:0 0 auto;background:transparent;border:1px solid transparent;color:var(--mut);font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}.tab:hover{color:var(--tx);background:var(--panel)}.tab.active{color:var(--tx);background:var(--panel);border-color:var(--line)}.panel{display:none}.panel.active{display:block}
 .empty{padding:20px;border:1px dashed var(--line);border-radius:10px;color:var(--mut);background:var(--panel)}.empty b{color:var(--tx)}
+.pcard{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-top:10px;overflow:hidden}
+.pcard.side-yes{border-left:4px solid var(--up)}.pcard.side-no{border-left:4px solid var(--red)}
+.ptop{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px}
+.pcity{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.prange{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;margin-top:3px;line-height:1.1}
+.pside{font-family:'IBM Plex Mono',monospace;font-weight:800;font-size:24px;padding:8px 14px;border-radius:10px;min-width:78px;text-align:center;line-height:1}
+.pside .psub{font-size:12px;font-weight:600;margin-top:3px;opacity:.85}
+.sb-yes{background:var(--up);color:#07130d}.sb-no{background:var(--red);color:#1c0707}
+.pbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 16px 8px}
+.pmoney{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600}
+.pwin{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut)}
+.pflag{font-size:11.5px;font-weight:600;color:var(--dn);background:rgba(227,162,60,.14);padding:2px 8px;border-radius:6px}
+.pdata{padding:8px 16px;font-size:11.5px;color:var(--dim);border-top:1px solid var(--line)}
 svg{max-width:100%;height:auto}.card{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;margin:10px 0}"""
 
 def esc(s): return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
@@ -422,29 +452,39 @@ def svg_bars(items,w=680,bar=26,gap=10,pad=90):
         out.append(f"<text x='{pad+wpx+6:.0f}' y='{y+bar/2+4:.0f}' fill='#8b97a6' font-size='11' font-family=monospace>{v:+.2f}</text>")
     out.append("</svg>"); return "".join(out)
 
+RATING_TXT={"2u":"an exceptional day. A proven-city edge worth your max size.",
+            "1.5u":"a strong day. Solid, higher-probability edges.",
+            "1u":"a decent day. Real but modest, or capped longshots.",
+            "NO BET":"a sit-out day. Nothing clears the bar; the right move is no bet."}
 RATING={"S":("2u","an exceptional day. A proven-city edge worth your max size."),
         "A":("1.5u","a strong day. Solid edges, good conditions."),
         "B":("1u","a decent day. Real but modest edges."),
         None:("NO BET","a sit-out day. Nothing clears the bar; the right move is no bet.")}
 
 def render_bets(rows,plays,updated):
-    best=plays[0]["tier"] if plays else None
-    rlab,rtxt=RATING.get(best,RATING[None])
+    best_u=max((p["units"] for p in plays),default=0)
+    rlab="2u" if best_u>=2 else "1.5u" if best_u>=1.5 else "1u" if best_u>=1 else "NO BET"
+    rtxt=RATING_TXT[rlab]
     ucls={"2u":"u2","1.5u":"u15","1u":"u1","NO BET":"u0"}[rlab]
     counts=defaultdict(int)
     for p in plays: counts[p["units"]]+=1
     cstr=", ".join(f'{counts[u]}x {unit_str(u)}' for u in sorted(counts,reverse=True)) or "none"
     if plays:
-        pr=""
+        ptab=""
         for r in plays[:30]:
-            pr+=(f'<tr class="play"><td>{unit_badge(r["units"])}</td><td class="mk"><div class="mt">{esc(r["label"])}</div>'
-                 f'<div class="me">{"High" if r["kind"]=="HIGH" else "Low"} {r["date"].strftime("%b %d")} &middot; {esc(r["bucket"])}</div></td>'
-                 f'<td class="n">{pct(r["mid"])}</td><td class="n model">{pct(r["mp"])}</td>'
-                 f'<td class="n edge">+{pct(abs(r["edge"]))}</td><td class="pl">{r["side"]} @ {r["entry"]*100:.0f}\u00a2</td>'
-                 f'<td class="n">+{r["net"]*100:.0f}\u00a2</td><td class="n">${r["stake"]:.0f}</td><td class="n">{fmt_oi(r["oi"])}</td></tr>')
-        ptab=(f'<table><thead><tr><th>Size</th><th>Market</th><th class="n">Mkt</th><th class="n">Model</th>'
-              f'<th class="n">Edge</th><th>Play</th><th class="n">Net</th><th class="n">Stake</th><th class="n">OI</th>'
-              f'</tr></thead><tbody>{pr}</tbody></table>')
+            yes=r["side"]=="Buy YES"
+            sc="side-yes" if yes else "side-no"; sb="sb-yes" if yes else "sb-no"; word="YES" if yes else "NO"
+            city=esc(r["label"].split(" (")[0]); mk="Highest temp" if r["kind"]=="HIGH" else "Lowest temp"
+            pw=("win prob %.0f%%"%(r["p_win"]*100)) if r.get("p_win") is not None else ""
+            flag=(f'<span class="pflag">{esc(r["size_reason"])}</span>') if r.get("size_reason") else ""
+            ptab+=(f'<div class="pcard {sc}"><div class="ptop">'
+                   f'<div><div class="pcity">{city} &middot; {mk} &middot; {r["date"].strftime("%b %d")}</div>'
+                   f'<div class="prange">{esc(r["bucket"])}</div></div>'
+                   f'<div class="pside {sb}">{word}<div class="psub">{r["entry"]*100:.0f}\u00a2</div></div></div>'
+                   f'<div class="pbar">{unit_badge(r["units"])}<span class="pmoney">${r["stake"]:.0f} stake</span>'
+                   f'<span class="pwin">{pw}</span>{flag}</div>'
+                   f'<div class="pdata">model {pct(r["mp"])} &middot; market {pct(r["mid"])} &middot; '
+                   f'edge +{pct(abs(r["edge"]))} &middot; net +{r["net"]*100:.0f}\u00a2 &middot; OI {fmt_oi(r["oi"])}</div></div>')
     else:
         ptab=('<div class="empty"><b>No bets today.</b> Run in the morning; same-day lows are already '
               'realized and same-day highs after ~2pm too. Realized / offset ladders under By city are '
