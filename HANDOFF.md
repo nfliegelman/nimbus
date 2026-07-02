@@ -2,7 +2,7 @@
 
 **Purpose of this file:** you are an AI assistant helping the owner (a hobbyist prediction-market bettor, not a professional developer) modify this program. This document tells you what the program is, how it is built, and which decisions are deliberate so you do not undo them while helping. Read it fully before proposing changes. The `README.md` is for the owner (setup instructions). `FUTURE.md` is the running list of planned improvements, known weaknesses, and the automation roadmap; read it too, and move shipped items from there into this changelog. This file is for you.
 
-**Doc version:** 2026-07-02 (v5.1). Update the changelog at the bottom whenever you change the code.
+**Doc version:** 2026-07-02 (v5.2). Update the changelog at the bottom whenever you change the code.
 
 ---
 
@@ -145,6 +145,8 @@ On GitHub the workflow commits these back so state persists across ephemeral run
 ---
 
 ## Changelog
+
+- **v5.2 (2026-07-02):** The dashboard header now shows `MODEL_VERSION` next to the timestamp, and the timestamp carries a timezone label (GitHub runners are UTC, so an unlabeled "05:58 AM" misled the owner). `MODEL_VERSION` itself was deliberately NOT bumped: it stamps logged bets and should only change when scoring, sizing, or calibration logic changes, never for cosmetics. Rule going forward: to check which version is live, read the header sub line; it must always match the constant at the top of the file.
 
 - **v5.1 (2026-07-02), docs only:** Added the file handback protocol (section 0b): the owner uploads via GitHub's web UI at the repo root, which cannot write into `.github/workflows/`, so `run.yml` is excluded from normal handbacks and workflow changes are delivered as paste-in content instead. No code changes.
 

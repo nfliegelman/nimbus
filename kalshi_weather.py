@@ -586,7 +586,7 @@ def head(active,updated,extra=""):
       "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap' rel='stylesheet'>"
       f"<style>{CSS}</style></head><body><header><div class='hd'>"
       "<div class='brand'><h1>Nimbus<span class='dot'> .</span></h1>"
-      f"<span class='sub'>{updated} &middot; calibrated ensemble {'+'.join(ENSEMBLE_MODELS)} &middot; settled by Kalshi</span></div>"
+      f"<span class='sub'>{updated} &middot; {MODEL_VERSION} &middot; calibrated ensemble {'+'.join(ENSEMBLE_MODELS)} &middot; settled by Kalshi</span></div>"
       f"<div class='nav'><a class='{a('bets')}' href='index.html'>Today's bets</a>"
       f"<a class='{a('results')}' href='results.html'>Results tracker</a></div>{extra}</div></header><div class='wrap'>")
 
@@ -829,7 +829,7 @@ def main():
     ladders,rows,plays=score(state)
     rep=compute_report(state)
     save_state(state)
-    updated=dt.datetime.now().astimezone().strftime("%b %d %Y, %I:%M %p")
+    updated=dt.datetime.now().astimezone().strftime("%b %d %Y, %I:%M %p %Z")
     render_bets(rows,plays,updated); render_results(rep,updated)
     print(f"\nPlays today: {len(plays)} | resolved: {rep.get('n_events',0)}")
     if rep.get("pnl"): print(f"Paper P&L: ${rep['pnl']['net']:+.2f} ({rep['pnl']['net_units']:+.1f}u, {rep['pnl']['wins']}/{rep['pnl']['n']})")
