@@ -40,3 +40,12 @@ Run workflow to wake it).
 Paper trade until the Results tab shows the model Brier consistently below the market Brier
 and green P&L over 100+ bets. A city cannot earn a 2u until it has proven itself there. At a
 sub-$500 bankroll this is skill-building, not income.
+
+## Your data is safe when you change the code
+All results live in `weather_state.json`, a SEPARATE file from the code. The zip you get never contains it, so replacing `kalshi_weather.py` or the dashboards never touches your history.
+- Never delete `weather_state.json`. It is your entire track record.
+- The workflow commits it back after every run, so your GitHub commit history is a full backup. If it is ever corrupted, restore the previous version from the repo history.
+- Every bet is stamped with the model version it was logged under, and new metrics read old records defensively, so a tune starts a fresh version alongside your old results instead of overwriting them.
+
+## What "today's results" means
+The Results tab fills in when a bet SETTLES on Kalshi, which is after the day ends. Today's picks show up there tomorrow, not the same evening. That is not lost data, it is just not settled yet.

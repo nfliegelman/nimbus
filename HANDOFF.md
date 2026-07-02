@@ -2,7 +2,7 @@
 
 **Purpose of this file:** you are an AI assistant helping the owner (a hobbyist prediction-market bettor, not a professional developer) modify this program. This document tells you what the program is, how it is built, and which decisions are deliberate so you do not undo them while helping. Read it fully before proposing changes. The `README.md` is for the owner (setup instructions). This file is for you.
 
-**Doc version:** 2026-07-01 (v2). Update the changelog at the bottom whenever you change the code.
+**Doc version:** 2026-07-01 (v3). Update the changelog at the bottom whenever you change the code.
 
 ---
 
@@ -70,25 +70,16 @@ Every one of these prevents a fake edge that looked real during development. If 
 
 ---
 
-## 5. Tier and unit sizing (DELIBERATE, the win-prob cap is the guardrail)
+## 5. Unit sizing (DELIBERATE, four guardrails)
 
-Two stages. Do not collapse them.
+`size_play(net, p_win, proven)` returns (units, reason). Sizing is driven by EDGE MAGNITUDE, then capped. Do not collapse these.
 
-**Stage 1: tier** (`tier_for`) = an effective-edge score = net edge x lead-time skill x ensemble sharpness x city track record.
-- `lead_w`: next-day/same-day 1.0, then decays (0.8, 0.6, 0.45).
-- `sharp_w`: tighter ensemble (smaller sd) scores higher.
-- `hist_w`: once a city has >= 20 resolved buckets, its realized Brier-edge multiplies the score (a proven city gets boosted, a losing one demoted).
-- Thresholds `TIER_CUTS` map the score to S/A/B/C. **A city cannot earn S until it is proven** (>= 20 resolved buckets); until then S is capped to A. B should be the common tier, S/A rare. If you are making S/A more common, you are going the wrong way.
+1. **Edge bands** set the base from net edge (model prob minus price, after spread and fee): `>= EDGE_2U (0.14)` gives 2u, `>= EDGE_1_5U (0.08)` gives 1.5u, `>= PLAY_NET_EDGE (0.04)` gives 1u, below gives no bet.
+2. **Plausibility cap (`SUSPECT_EDGE`, 0.20).** A net edge above 20 points is almost always the model being wrong or a thin/stale market, NOT free money. It is capped to 1u and flagged. This is the single most important lesson the owner learned (from a real "52% edge" that was noise): a bigger edge is not a green light past a point, it is a red flag. Do NOT invert this to size UP on huge edges.
+3. **Win-probability cap (`WINPROB_CAP`).** `p_win` is the model prob the POSITION wins (`mp` for YES, `1 - mp` for NO). Win < 42% of the time trims to 1.5u, < 30% to 1u; 2u needs p_win >= 0.55. A long price is already its own reward. This is why fading an overpriced YES longshot via NO (high p_win) can size up while buying the YES longshot (low p_win) cannot.
+4. **Proven-city gate.** 2u also requires the city to appear in `city_skill` (>= 20 resolved buckets with a positive Brier edge). Until then 2u is locked to 1.5u. Early on nothing is proven, so 1.5u is effectively the ceiling. Intended.
 
-**Stage 2: win-probability cap** (`size_play`). Tier sets the ceiling, then `WINPROB_CAP` caps units by `p_win` (the model probability the POSITION wins: `mp` for YES, `1 - mp` for NO):
-```
-WINPROB_CAP = [(0.55, 2.0), (0.42, 1.5), (0.00, 1.0)]
-```
-So a bet you win < 42% of the time is capped at 1u no matter how big the edge, and 2u requires p_win >= 0.55. **This is the guardrail the owner explicitly asked for:** edge alone was pushing 1.5u onto scary low-probability YES longshots. A long price is already its own reward; do not double down on variance. Capped plays carry a visible "longshot cap" flag on the card and are still shown at 1u (the owner wants to keep taking them, just small). Do NOT remove this cap or raise the low tier back to edge-only sizing without an explicit request.
-
-`UNIT_MAP` maps tier -> unit ceiling (S 2u, A 1.5u, B 1u, C none). All of `UNIT_MAP`, `TIER_CUTS`, and `WINPROB_CAP` are tunable constants at the top of the file; expect to retune them as the tracker calibrates.
-
----
+`SUSPECT_EDGE`, `EDGE_2U`, `EDGE_1_5U`, `WINPROB_CAP`, `PLAY_NET_EDGE` are tunable constants at the top of the file; retune them from the by-edge and by-unit tables on the Results tab as data accumulates. `tier_for`/`units_of` remain defined but no longer drive sizing (the S/A/B tag shown is derived from the final unit size). `city_skill` still uses realized Brier, not tier.
 
 ## 6. Data sources and quirks
 
@@ -107,6 +98,8 @@ Each run writes:
 - `weather_state.json`: `{"predictions": {...}, "resolved": [...]}`. Predictions are logged only for non-realized markets (genuine forecasts). Resolved records hold per-bucket hit, per-play win/pnl/margin, and forecast bias.
 
 On GitHub the workflow commits these back so state persists across ephemeral runs and time off. Do not move persistence to anything needing a database or paid service; the commit-back pattern is deliberate and free.
+
+**NEVER delete or overwrite `weather_state.json`**; it is the entire track record, and the zip handed to the owner deliberately excludes it. Every logged bet is stamped with `MODEL_VERSION` and stores its own edge, so retunes start a new version alongside old results rather than invalidating them. New report fields must read old records defensively (`.get`, guard `None`) so an upgrade never breaks or loses history. Git commit history of the state file is the backup of record.
 
 ---
 
@@ -131,6 +124,8 @@ On GitHub the workflow commits these back so state persists across ephemeral run
 ---
 
 ## Changelog
+
+- **v3 (2026-07-01):** Replaced tier-driven sizing with edge-band sizing plus a plausibility cap (`SUSPECT_EDGE`): a net edge above 20% is sized DOWN to 1u and flagged, because outsized edges are model or liquidity errors, not opportunity. Kept the win-probability and proven-city caps. Stamped every logged bet with `MODEL_VERSION` and stored per-bet edge so history survives tunes and can be compared. Added time-windowed win rates (past day, past week, overall) and a win-rate-by-edge table to the Results tab. Report functions now read old records defensively so upgrades never lose past data.
 
 - **v2 (2026-07-01):** Added the win-probability cap (`WINPROB_CAP`, `size_play`) so a large edge on a low-win-probability bet is capped at 1u instead of 1.5u+; capped plays show a "longshot cap" flag. Redesigned today's bets from a dense table into pick CARDS that lead with the exact temperature range and a large color-coded YES/NO (green/red, matching Kalshi) to stop yes/no mis-taps. Day headline now reflects max UNITS rather than tier. No change to the guards, ensemble math, settlement, or persistence.
 - **v1 (2026-07-01):** Initial GitHub-deployable build. Ensemble fair value (GEFS + ECMWF), timing and bias guards, tier system (edge x lead x sharpness x city track record, S locked until a city is proven), Kalshi-settlement resolution with margin of victory, edge dashboard + results tracker (SVG charts, per-city and per-unit breakdowns, Brier vs market), twice-daily GitHub Actions with commit-back persistence. Python pinned to 3.12 after an f-string backslash SyntaxError on 3.11.

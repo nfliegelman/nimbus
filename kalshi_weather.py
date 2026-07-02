@@ -30,6 +30,14 @@ UNIT_MAP      = {"S": 2.0, "A": 1.5, "B": 1.0, "C": 0.0}   # tier -> units (0 = 
 # the edge, so cap its size. A long price is already its own reward. p_win is the
 # model prob the *position* wins (mp for YES, 1-mp for NO). Tunable.
 WINPROB_CAP   = [(0.55, 2.0), (0.42, 1.5), (0.00, 1.0)]   # p_win >= x -> max units
+# Edge-band base sizing (net edge in probability, after spread+fee). Bigger edge
+# earns more size UP TO A POINT: an edge past SUSPECT_EDGE is almost always the
+# model being wrong or a thin market, not free money, so we size it DOWN and flag it.
+SUSPECT_EDGE  = 0.20     # net edge above this is treated as noise, capped to 1u + flagged
+EDGE_2U       = 0.14     # net edge for a 2u ceiling (also needs proven city + win prob >= .55)
+EDGE_1_5U     = 0.08     # net edge for a 1.5u ceiling
+# Stamp every logged bet so history survives model changes and tunes can be compared.
+MODEL_VERSION = "2026-07-02.v2-edgeband"
 MIN_OI        = 300
 PLAY_NET_EDGE = 0.04
 MAX_LEAD_DAYS = 4
@@ -207,15 +215,22 @@ def tier_for(net,lead,sd,skill):
 
 def units_of(t): return UNIT_MAP.get(t,0.0)
 
-def size_play(tier, p_win):
-    """Tier sets the ceiling; win-probability caps it so low-prob bets stay small."""
-    base=UNIT_MAP.get(tier,0.0)
-    if base<=0: return 0.0, ""
-    cap=WINPROB_CAP[-1][1]
+def size_play(net, p_win, proven):
+    """Size from edge magnitude, then cap by win-probability, plausibility, and city track record."""
+    if net < PLAY_NET_EDGE: return 0.0, ""
+    # plausibility: an outsized edge is a red flag, not a green light
+    if net >= SUSPECT_EDGE:
+        return 1.0, "edge %.0f%% is implausibly large (likely model error or thin market), sized down" % (net*100)
+    base = 2.0 if net>=EDGE_2U else 1.5 if net>=EDGE_1_5U else 1.0
+    # win-probability ceiling: a bet you rarely WIN is high-variance regardless of edge
+    wpc=WINPROB_CAP[-1][1]
     for thr,u in WINPROB_CAP:
-        if p_win>=thr: cap=u; break
-    units=min(base,cap)
-    reason=("longshot cap: win prob %.0f%%"%(p_win*100)) if units<base else ""
+        if p_win>=thr: wpc=u; break
+    units=min(base,wpc); reason=""
+    if wpc<base: reason="win prob %.0f%%, trimmed"%(p_win*100)
+    # a city must prove itself before it can earn max size
+    if units>=2.0 and not proven:
+        units=1.5; reason=reason or "city not yet proven, 2u locked"
     return units, reason
 
 # ----------------------------- scoring -----------------------------
@@ -249,11 +264,12 @@ def score(state):
             else:      side,entry,net="Buy NO",round(1-b["yb"],2),(-edge)-cost
             base=((not biased) and (not realized) and net>=PLAY_NET_EDGE and b["oi"]>=MIN_OI
                   and lead<=MAX_LEAD_DAYS and 0.02<mid<0.98)
-            tier=eff=None; units=0.0; p_win=None; size_reason=""
+            tier=None; eff=net; units=0.0; p_win=None; size_reason=""
             if base:
-                tier,eff,_=tier_for(net,lead,sd,skill.get((code,kind)))
                 p_win = mp if side=="Buy YES" else 1-mp
-                units, size_reason = size_play(tier, p_win)
+                proven = (code,kind) in skill
+                units, size_reason = size_play(net, p_win, proven)
+                tier = "S" if units>=2 else "A" if units>=1.5 else "B" if units>=1 else None
             is_play=base and units>0
             rec={"code":code,"label":CITIES[code][3],"kind":kind,"date":tdate,"lead":lead,
                  "bucket":b["sub"],"ticker":b["ticker"],"mid":mid,"mp":mp,"edge":edge,"side":side,
@@ -266,13 +282,13 @@ def score(state):
                         "cap":b["cap"],"stype":b["stype"],"mp":mp,"mid":mid,"yb":b["yb"],"ya":b["ya"],"oi":b["oi"]})
             if is_play:
                 ppl.append({"ticker":b["ticker"],"bid":bucket_id(b),"sub":b["sub"],"side":side,
-                            "entry":entry,"net":net,"tier":tier,"units":units,
+                            "entry":entry,"net":net,"edge":edge,"tier":tier,"units":units,
                             "stake":round(units*BASE_UNIT_USD,2),"p_win":p_win,"mp":mp,"mid":mid})
         if not realized:
             preds[f"{code}|{kind}|{tdate.isoformat()}"]={"code":code,"kind":kind,"target":tdate.isoformat(),
                 "event_ticker":L["event_ticker"],"logged_at":dt.datetime.now().isoformat(timespec="minutes"),
                 "lead":lead,"mean":mean,"sd":sd,"biased":biased,"offset":offset,"buckets":pbk,"plays":ppl}
-    plays.sort(key=lambda r:(TIER_RANK.get(r.get("tier"),9),-r.get("eff",0)))
+    plays.sort(key=lambda r:(-r["units"],-r.get("net",0)))
     return ladders,rows,plays
 
 # --------------------------- resolution ----------------------------
@@ -306,7 +322,8 @@ def resolve_pending(state):
             rec["plays"].append({"code":p["code"],"kind":p["kind"],"target":p["target"],"sub":pl["sub"],
                                  "side":pl["side"],"entry":entry,"tier":pl["tier"],"units":pl["units"],
                                  "stake":pl["stake"],"contracts":contracts,"won":won,"pnl":round(pnl,2),
-                                 "margin":mv,"actual":rec["actual"],"mp":pl["mp"],"mid":pl["mid"]})
+                                 "margin":mv,"actual":rec["actual"],"mp":pl["mp"],"mid":pl["mid"],
+                                 "edge":pl.get("edge"),"model_version":p.get("model_version","")})
         if ok and rec["buckets"]:
             resolved.append(rec); del preds[k]; n+=1
     print(f"Resolved {n} events from Kalshi settlement.")
@@ -350,6 +367,22 @@ def compute_report(state):
         for p in pls:
             a=byu[p["units"]]; a["n"]+=1; a["w"]+=1 if p["won"] else 0; a["pnl"]+=p["pnl"]
         rep["by_unit"]=sorted(((u,v["n"],v["w"],v["pnl"]) for u,v in byu.items()),key=lambda x:-x[0])
+        # time-windowed win rate, by target date
+        def _win(days):
+            cut=(TODAY-dt.timedelta(days=days)).isoformat()
+            sel=[x for x in pls if x["target"]>=cut]
+            if not sel: return None
+            w=sum(1 for x in sel if x["won"])
+            return {"n":len(sel),"w":w,"wr":w/len(sel),"u":sum(x["pnl"] for x in sel)/BASE_UNIT_USD}
+        rep["windows"]={"day":_win(1),"week":_win(7),"all":_win(100000)}
+        # win rate by edge magnitude (does a bigger edge actually win more?)
+        EB=[(0.0,0.08,"under 8%"),(0.08,0.15,"8-15%"),(0.15,0.25,"15-25%"),(0.25,9.0,"25%+")]
+        bye=[]
+        for lo,hi,lab in EB:
+            sel=[x for x in pls if x.get("edge") is not None and lo<=abs(x["edge"])<hi]
+            if sel:
+                w=sum(1 for x in sel if x["won"]); bye.append((lab,len(sel),w,sum(x["pnl"] for x in sel)))
+        rep["by_edge"]=bye
         # cumulative series (in $), ordered by target date
         ser=[]; run=0.0
         for p in sorted(pls,key=lambda x:x["target"]):
@@ -550,6 +583,17 @@ def render_results(rep,updated):
       f"<div class='kbox'><div class='v'>{p['avg_margin']:+.1f}\u00b0</div><div class='l'>avg margin</div></div>"
       f"<div class='kbox'><div class='v'>{rep['n_events']}</div><div class='l'>events</div></div></div>")
     chart=f"<div class='card'>{svg_line(rep.get('cum',[]))}</div>"
+    # time-windowed win rate row
+    W=rep.get("windows",{})
+    def _wk(lbl,d):
+        if not d: return f"<div class='kbox'><div class='v dim'>-</div><div class='l'>{lbl}</div></div>"
+        return f"<div class='kbox'><div class='v'>{d['wr']*100:.0f}%</div><div class='l'>{lbl} ({d['w']}/{d['n']})</div></div>"
+    winrow=("<div class='kpi'>"+_wk("win% past day",W.get("day"))+_wk("win% past week",W.get("week"))
+            +_wk("win% overall",W.get("all"))+"</div>")
+    # by edge magnitude
+    et="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
+               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td></tr>'
+               for lab,n,w,pn in rep.get("by_edge",[]))
     # by city
     ct="".join(f'<tr><td>{esc(l)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
                f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td></tr>'
@@ -575,11 +619,15 @@ def render_results(rep,updated):
                 f'<td class="n {"up" if r["pnl"]>=0 else "red"}">${r["pnl"]:+.2f}</td></tr>'
                 for r in rep.get("recent",[])[:60])
     html=(head("results",updated)+
-      "<h2 class='sec'>Performance</h2>"+kpis+chart+brier+
+      "<h2 class='sec'>Performance</h2>"+kpis+winrow+chart+brier+
       "<h2 class='sec'>By city</h2><div class='card'>"+city_bars+"</div>"
       "<table><thead><tr><th>City</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+ct+"</tbody></table>"
       "<h2 class='sec'>By unit size</h2>"
       "<table><thead><tr><th>Size</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+ut+"</tbody></table>"
+      "<h2 class='sec'>By edge size</h2>"
+      "<div class='note'>The calibration check that matters most: a bigger edge should win more often. "
+      "If the 25%+ row wins less than the 8-15% row, those fat edges are the model being wrong, not free money.</div>"
+      "<table><thead><tr><th>Edge</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+et+"</tbody></table>"
       "<h2 class='sec'>Every resolved bet</h2>"
       "<table><thead><tr><th>City</th><th>Mkt</th><th>Bucket</th><th>Size</th><th>Bet</th><th class='n'>Actual</th><th>Result</th><th class='n'>Margin</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+raw+"</tbody></table>"
       "</div></body></html>")
