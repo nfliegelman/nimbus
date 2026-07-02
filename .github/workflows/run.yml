@@ -1,4 +1,4 @@
-name: kalshi-weather-edge
+name: nimbus
 on:
   schedule:
     - cron: '0 12 * * *'   # ~7:00 AM Dallas (CDT) - morning bets
@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - name: Generate boards
         run: python kalshi_weather.py
       - name: Commit updated boards + state
