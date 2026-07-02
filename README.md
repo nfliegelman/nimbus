@@ -1,11 +1,13 @@
-# Kalshi Weather Edge
+# Nimbus
 
 Runs itself on GitHub (twice a day), so your office network never touches Kalshi.
 You just open two web pages on your phone.
 
 ## What you get
-- **Today's bets** (`index.html`): each play sized **2u / 1.5u / 1u / no bet** from a
-  confidence score (edge x forecast lead x ensemble tightness x that city's track record).
+- **Today's bets** (`index.html`): each play sized **2u / 1.5u / 1u / no bet**, listed
+  highest win probability first. Probabilities come from a ~143-member multi-model ensemble
+  (GFS + ECMWF + ICON + GEM) that self-calibrates: it learns each city's forecast bias and
+  error spread from Kalshi's own settlements and corrects for them automatically.
 - **Results tracker** (`results.html`): win/loss, P&L, ROI, Brier vs market, per-city and
   per-unit breakdowns, margin of victory, and a raw table. Wins come straight from Kalshi's
   official settlement, not a guess.
@@ -35,6 +37,8 @@ Run workflow to wake it).
 - `UNIT_MAP`   tier -> units (currently S=2u, A=1.5u, B=1u, C=no bet)
 - `TIER_CUTS`  score thresholds for S/A/B/C
 - `BANKROLL`, `BASE_UNIT_USD`, `PLAY_NET_EDGE`, `BIAS_TOL`, `MIN_OI`
+- `LEAD_CAP_DAYS` caps plays 3+ days out at 1u; `HICONF_PWIN` sets the high-confidence tag
+- Calibration knobs (`DRESS_SIGMA_*`, `BIAS_*`) rarely need touching; they learn on their own
 
 ## Honest use
 Paper trade until the Results tab shows the model Brier consistently below the market Brier

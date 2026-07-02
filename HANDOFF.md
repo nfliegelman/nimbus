@@ -1,8 +1,8 @@
-# Kalshi Weather Edge: AI Handoff / Technical Spec
+# Nimbus (Kalshi Weather Edge): AI Handoff / Technical Spec
 
-**Purpose of this file:** you are an AI assistant helping the owner (a hobbyist prediction-market bettor, not a professional developer) modify this program. This document tells you what the program is, how it is built, and which decisions are deliberate so you do not undo them while helping. Read it fully before proposing changes. The `README.md` is for the owner (setup instructions). This file is for you.
+**Purpose of this file:** you are an AI assistant helping the owner (a hobbyist prediction-market bettor, not a professional developer) modify this program. This document tells you what the program is, how it is built, and which decisions are deliberate so you do not undo them while helping. Read it fully before proposing changes. The `README.md` is for the owner (setup instructions). `FUTURE.md` is the running list of planned improvements, known weaknesses, and the automation roadmap; read it too, and move shipped items from there into this changelog. This file is for you.
 
-**Doc version:** 2026-07-01 (v3). Update the changelog at the bottom whenever you change the code.
+**Doc version:** 2026-07-02 (v4.1). Update the changelog at the bottom whenever you change the code.
 
 ---
 
@@ -26,7 +26,7 @@ Every time you change the code, hand the owner back BOTH the updated `kalshi_wea
 
 `kalshi_weather.py` is a single Python script that, on each run:
 1. Pulls open Kalshi daily high/low temperature markets across 20 US cities (`Climate and Weather`, series `KXHIGHT*` and `KXLOWT*`).
-2. Builds a fair-value probability for every temperature bucket from a pooled multi-model ENSEMBLE (Open-Meteo GEFS + ECMWF, ~80 members). Each member's daily high/low is rounded the way the NWS daily report rounds, then counted into buckets. That count / total = model probability.
+2. Builds a fair-value probability for every temperature bucket from a pooled multi-model ENSEMBLE (Open-Meteo GFS + ECMWF + ICON + GEM, ~143 members). Members are first CALIBRATED: shifted by a per-city bias correction learned from Kalshi settlements, then each member is dressed with a Gaussian kernel whose width is learned from realized errors (Wang-Bishop second-moment matching). Bucket probability = average kernel mass inside the bucket's real interval [floor-0.5, cap+0.5), matching NWS half-up rounding. Daily highs/lows are taken over the NWS Climate Report day (Local STANDARD Time year-round, so 1:00 AM to 12:59 AM clock time during DST), because that is the exact window Kalshi settles on.
 3. Flags edges (model prob minus Kalshi price, after spread and fee), guarded (section 4).
 4. Sizes each play in UNITS (2u / 1.5u / 1u / no bet) from a confidence score plus a win-probability cap (section 5).
 5. LOGS predictions, then RESOLVES past ones using Kalshi's own settled `result` and `expiration_value` (authoritative win/loss and margin of victory).
@@ -67,6 +67,16 @@ Every one of these prevents a fake edge that looked real during development. If 
 - **Single-winner buckets.** Kalshi temp buckets are exhaustive and mutually exclusive, so model probabilities across a ladder sum to ~1. This program only handles temp ladders. Do NOT copy this logic onto multi-winner or nested markets (album releases, "before date X" ladders) where probabilities do not sum to 1; that manufactured huge fake edges in earlier prediction-market work.
 - **Favorite-longshot direction.** Retail overpays for unlikely YES outcomes. Buying a YES longshot is the trap; taking the NO side of an overpriced longshot is the good, high-win-probability fade. The win-probability cap (section 5) encodes this so a big edge on a low-YES-probability bucket cannot get a big size.
 - **Cost gate.** A bucket is only a play when net edge (model prob minus price, minus half-spread minus Kalshi fee minus 1c buffer) clears `PLAY_NET_EDGE`, open interest clears `MIN_OI`, lead is within `MAX_LEAD_DAYS`, and price is not at the 0/100 rails.
+- **LST settlement window.** Daily highs/lows are computed over the NWS Climate Report day (Local Standard Time year-round). During DST that day is 1:00 AM to 12:59 AM local clock. This lives in `fetch_members` and is a settlement-correctness guard, not a style choice.
+
+### 4b. The calibration engine (DELIBERATE, self-learning)
+
+`calib_params(state)` learns, per (city, kind), from settled results:
+- **Bias correction (`corr`)**: negative of the rolling mean RAW forecast bias (last `BIAS_LOOKBACK` settlements), shrunk by `n/(n+BIAS_SHRINK_K)`, zero until `BIAS_MIN_N` settlements exist. RAW bias is reconstructed as logged `bias` plus the `bias_corr` that was applied at log time, so the learning target stays stable as corrections evolve. This is the honest fix for station-coordinate offsets: it comes from Kalshi's own settlements, so it works WITH the bias guard (a corrected city naturally stops tripping `BIAS_TOL`), it never manufactures edge.
+- **Dressing sigma (`sigma`)**: Gaussian kernel width per Wang-Bishop second-moment matching: kernel variance = variance of realized bias-corrected errors minus mean raw member variance, clamped to [`DRESS_SIGMA_MIN`, `DRESS_SIGMA_MAX`]. Falls back to a pooled global sigma (needs 15+ settlements), then `DRESS_SIGMA_DEFAULT`. Raw member counting into 1-degree buckets is sampling noise past the first decimal; the kernel is what makes bucket probabilities smooth and honest.
+- `dressed_prob` computes bucket probability as average kernel mass in [floor-0.5, cap+0.5), matching NWS half-up rounding. Ladder probabilities still sum to ~1.
+- Every prediction logs `bias_corr`, `sigma`, member `sd`, predictive `psd`, and `model_version`; `resolve_pending` copies `sd`/`bias_corr`/`sigma` into resolved records so the loop closes. Old records without these fields are read defensively.
+- The Results tab shows a Calibration table (forecast prob vs realized frequency by decile) and a Learned corrections table (shift, width, n per city). Those two tables are the tuning instruments; do not remove them.
 
 ---
 
@@ -77,14 +87,15 @@ Every one of these prevents a fake edge that looked real during development. If 
 1. **Edge bands** set the base from net edge (model prob minus price, after spread and fee): `>= EDGE_2U (0.14)` gives 2u, `>= EDGE_1_5U (0.08)` gives 1.5u, `>= PLAY_NET_EDGE (0.04)` gives 1u, below gives no bet.
 2. **Plausibility cap (`SUSPECT_EDGE`, 0.20).** A net edge above 20 points is almost always the model being wrong or a thin/stale market, NOT free money. It is capped to 1u and flagged. This is the single most important lesson the owner learned (from a real "52% edge" that was noise): a bigger edge is not a green light past a point, it is a red flag. Do NOT invert this to size UP on huge edges.
 3. **Win-probability cap (`WINPROB_CAP`).** `p_win` is the model prob the POSITION wins (`mp` for YES, `1 - mp` for NO). Win < 42% of the time trims to 1.5u, < 30% to 1u; 2u needs p_win >= 0.55. A long price is already its own reward. This is why fading an overpriced YES longshot via NO (high p_win) can size up while buying the YES longshot (low p_win) cannot.
-4. **Proven-city gate.** 2u also requires the city to appear in `city_skill` (>= 20 resolved buckets with a positive Brier edge). Until then 2u is locked to 1.5u. Early on nothing is proven, so 1.5u is effectively the ceiling. Intended.
+4. **Lead cap (`LEAD_CAP_DAYS`).** Plays 3+ days out are capped at 1u. Forecast skill decays fast with lead; this restores the lead discipline the old tier system had.
+5. **Proven-city gate.** 2u also requires the city to appear in `city_skill` (>= 20 resolved buckets with a positive Brier edge). Until then 2u is locked to 1.5u. Early on nothing is proven, so 1.5u is effectively the ceiling. Intended.
 
-`SUSPECT_EDGE`, `EDGE_2U`, `EDGE_1_5U`, `WINPROB_CAP`, `PLAY_NET_EDGE` are tunable constants at the top of the file; retune them from the by-edge and by-unit tables on the Results tab as data accumulates. `tier_for`/`units_of` remain defined but no longer drive sizing (the S/A/B tag shown is derived from the final unit size). `city_skill` still uses realized Brier, not tier.
+`SUSPECT_EDGE`, `EDGE_2U`, `EDGE_1_5U`, `WINPROB_CAP`, `PLAY_NET_EDGE`, `LEAD_CAP_DAYS` are tunable constants at the top of the file; retune them from the by-edge and by-unit tables on the Results tab as data accumulates. `tier_for`/`units_of` remain defined but no longer drive sizing (the S/A/B tag shown is derived from the final unit size). `city_skill` still uses realized Brier, not tier.
 
 ## 6. Data sources and quirks
 
 - **Kalshi** (`api.elections.kalshi.com/trade-api/v2`): no auth needed for reads. `events?...&with_nested_markets=true` for open markets; `markets?event_ticker=...&status=settled` for settlement. Settled markets expose `result` ("yes"/"no") and `expiration_value` (the actual settled temperature). Buckets carry `floor_strike`, `cap_strike`, `strike_type` ("less"/"between"/"greater"); parse those, not the title text.
-- **Open-Meteo ensemble** (`ensemble-api.open-meteo.com`): free, no key, `models=gfs025,ecmwf_ifs025` pooled for ~80 members. Returns hourly per-member temps already localized to the requested `timezone`, so `t[:10]` is the local date. Also returns `utc_offset_seconds`, used for the timing guard.
+- **Open-Meteo ensemble** (`ensemble-api.open-meteo.com`): free, no key, `models=gfs025,ecmwf_ifs025,icon_seamless,gem_global` pooled for ~143 members. Returns hourly per-member temps localized to the requested `timezone` in local CLOCK time. Do NOT group by `t[:10]` directly: `fetch_members` shifts timestamps back to Local Standard Time (using `utc_offset_seconds` minus the city's fixed standard offset in `STD_OFFSET_H`) before picking daily highs/lows, because NWS Climate Reports (Kalshi's settlement source) use LST year-round. Removing that shift silently breaks LOW markets during DST. `utc_offset_seconds` is also used for the timing guard.
 - **City -> station coordinates** in `CITIES` are approximate (airport or Central Park). A wrong coordinate shows up as a persistent per-city bias on the Results tab and is auto-suppressed by the bias guard. Fixing a city means correcting its lat/lon to Kalshi's actual resolution station.
 - **`CI` flag:** when `os.environ["CI"] == "true"` (GitHub Actions sets this), the script does not open a browser or wait for input. Keep it cloud-runnable and non-interactive.
 - **Python version:** the workflow pins 3.12. Backslashes inside f-string expressions are a SyntaxError on 3.11 and earlier; avoid them (use a named constant like `DOT`) so the file stays portable. This exact bug broke a run once.
@@ -124,6 +135,10 @@ On GitHub the workflow commits these back so state persists across ephemeral run
 ---
 
 ## Changelog
+
+- **v4.1 (2026-07-02), docs only:** Added `FUTURE.md`, the future inclusions log (planned improvements, known weaknesses, retune checkpoints, and the step-by-step path to automated trading). No code changes; `kalshi_weather.py` is unchanged from v4. Key process notes captured there: plays should eventually be frozen at first log before any extra cron runs are added, and live order execution should move off GitHub Actions to an always-on runner when the time comes.
+
+- **v4 (2026-07-02), renamed Nimbus:** Added the calibration engine: (1) per-city rolling bias correction learned from Kalshi settlements with shrinkage (`BIAS_MIN_N`, `BIAS_LOOKBACK`, `BIAS_SHRINK_K`); (2) Gaussian kernel dressing of ensemble members with per-city width from Wang-Bishop second-moment matching (`DRESS_SIGMA_*`), replacing raw member counting for bucket probabilities; (3) fixed the settlement window: daily highs/lows now computed over the NWS CLI day in Local Standard Time year-round (during DST the day is 1AM to 12:59AM clock time), which the old clock-day grouping got wrong, mainly hurting LOW markets. Expanded the ensemble to 4 models (~143 members, added ICON + GEM). Restored lead discipline: plays 3+ days out capped at 1u (`LEAD_CAP_DAYS`). Plays now sort by win probability within each size and carry a high-confidence tag at `HICONF_PWIN`. Fixed a bug where `model_version` was never written into logged predictions. Results tab gained Calibration and Learned corrections tables. Rebranded UI and console to Nimbus; file names unchanged.
 
 - **v3 (2026-07-01):** Replaced tier-driven sizing with edge-band sizing plus a plausibility cap (`SUSPECT_EDGE`): a net edge above 20% is sized DOWN to 1u and flagged, because outsized edges are model or liquidity errors, not opportunity. Kept the win-probability and proven-city caps. Stamped every logged bet with `MODEL_VERSION` and stored per-bet edge so history survives tunes and can be compared. Added time-windowed win rates (past day, past week, overall) and a win-rate-by-edge table to the Results tab. Report functions now read old records defensively so upgrades never lose past data.
 

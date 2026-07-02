@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kalshi Weather Edge  -  GitHub-deployable edition
+Nimbus  -  Kalshi weather edge, GitHub-deployable
 =================================================
 Runs headless on GitHub Actions (twice daily). Each run:
   * RESOLVES past paper bets using Kalshi's OWN settled result + settled temp
@@ -37,13 +37,29 @@ SUSPECT_EDGE  = 0.20     # net edge above this is treated as noise, capped to 1u
 EDGE_2U       = 0.14     # net edge for a 2u ceiling (also needs proven city + win prob >= .55)
 EDGE_1_5U     = 0.08     # net edge for a 1.5u ceiling
 # Stamp every logged bet so history survives model changes and tunes can be compared.
-MODEL_VERSION = "2026-07-02.v2-edgeband"
+MODEL_VERSION = "2026-07-02.v3-nimbus-calib"
 MIN_OI        = 300
 PLAY_NET_EDGE = 0.04
 MAX_LEAD_DAYS = 4
+LEAD_CAP_DAYS = 3        # plays 3+ days out are capped at 1u; forecast skill decays fast
 BIAS_TOL      = 2.0
 INTRADAY_HIGH_CUTOFF = 14
-ENSEMBLE_MODELS = ["gfs025", "ecmwf_ifs025"]
+# Four independent global ensembles pooled: ~143 members (GFS 31, ECMWF 51, ICON 40, GEM 21).
+# Multi-model diversity beats more members from one model.
+ENSEMBLE_MODELS = ["gfs025", "ecmwf_ifs025", "icon_seamless", "gem_global"]
+# --- calibration (learned automatically from settled results) ---
+# Kernel dressing: each member is smeared with a Gaussian so 1-degree bucket
+# probabilities are smooth instead of noisy member counts. Width is learned per
+# city/kind from realized errors (Wang-Bishop second-moment matching), clamped.
+DRESS_SIGMA_DEFAULT = 1.1   # deg F, used until a city has enough settled history
+DRESS_SIGMA_MIN     = 0.6
+DRESS_SIGMA_MAX     = 3.0
+# Rolling bias correction: shift members by the negative of the city's recent
+# raw forecast bias vs Kalshi settlement, shrunk toward 0 when history is thin.
+BIAS_MIN_N    = 5     # settled events needed before any correction applies
+BIAS_LOOKBACK = 30    # only the most recent N settlements count (season drift)
+BIAS_SHRINK_K = 5     # correction = -mean_bias * n/(n+K)
+HICONF_PWIN   = 0.65  # plays with win prob >= this get the high-confidence tag
 # tier score thresholds (effective edge in cents); tune as we calibrate
 TIER_CUTS = [("S", 0.12), ("A", 0.08), ("B", 0.05), ("C", 0.03)]
 
@@ -75,6 +91,13 @@ CITIES = {
     "SEA":(47.4444,-122.3138,"America/Los_Angeles","Seattle (SEA)"),
     "SFO":(37.6189,-122.3750,"America/Los_Angeles","San Francisco (SFO)"),
 }
+# NWS Climate Reports (the Kalshi settlement source) record the daily high/low in
+# Local STANDARD Time year-round. During DST the settlement day therefore runs
+# 1:00 AM to 12:59 AM local clock time, not midnight to midnight. We shift hourly
+# forecast timestamps back to LST before picking each day's high/low so our "day"
+# is the same day Kalshi settles. Standard UTC offsets are fixed per zone (hours):
+STD_OFFSET_H={"America/New_York":-5,"America/Chicago":-6,"America/Denver":-7,
+              "America/Phoenix":-7,"America/Los_Angeles":-8}
 MON={"JAN":1,"FEB":2,"MAR":3,"APR":4,"MAY":5,"JUN":6,"JUL":7,"AUG":8,"SEP":9,"OCT":10,"NOV":11,"DEC":12}
 TODAY=dt.date.today()
 DOT="\u00b7"   # middot, kept out of f-string expressions for py3.11 safety
@@ -164,7 +187,12 @@ def pull_weather_markets():
     return out
 
 def fetch_members(lat,lon,tz):
+    """Pool ensemble members across models. Daily highs/lows are taken over the
+    NWS Climate Report day (Local Standard Time), not the local clock day, because
+    that is the window Kalshi settles on. During DST that means shifting every
+    timestamp back one hour before grouping by date."""
     highs,lows,offset={},{},0
+    std_off=STD_OFFSET_H.get(tz,0)*3600
     for model in ENSEMBLE_MODELS:
         u=(f"https://ensemble-api.open-meteo.com/v1/ensemble?latitude={lat}&longitude={lon}"
            f"&hourly=temperature_2m&models={model}&temperature_unit=fahrenheit"
@@ -172,11 +200,19 @@ def fetch_members(lat,lon,tz):
         d=fget(u)
         if not d: continue
         offset=d.get("utc_offset_seconds",offset)
+        dst_shift=dt.timedelta(seconds=(offset-std_off))  # 1h during DST, 0 in winter
         h=d.get("hourly",{}); times=h.get("time",[])
+        # precompute the LST date string for each timestamp once per model
+        lst_days=[]
+        for t in times:
+            try:
+                lst_days.append((dt.datetime.fromisoformat(t)-dst_shift).date().isoformat())
+            except ValueError:
+                lst_days.append(t[:10])
         for k in [k for k in h if k.startswith("temperature_2m")]:
             dv={}
-            for t,v in zip(times,h[k]):
-                if v is not None: dv.setdefault(t[:10],[]).append(v)
+            for day,v in zip(lst_days,h[k]):
+                if v is not None: dv.setdefault(day,[]).append(v)
             for day,vs in dv.items():
                 if vs: highs.setdefault(day,[]).append(max(vs)); lows.setdefault(day,[]).append(min(vs))
         time.sleep(0.2)
@@ -189,6 +225,62 @@ def fetch_settled_event(event_ticker):
     if d:
         for m in d.get("markets",[]):
             out[m.get("ticker")]=(m.get("result"), fnum(m.get("expiration_value")))
+    return out
+
+# --------------------------- calibration ---------------------------
+SQRT2=math.sqrt(2.0)
+def _phi(z): return 0.5*(1.0+math.erf(z/SQRT2))
+
+def dressed_prob(members,b,sigma):
+    """Bucket probability from a Gaussian-kernel-dressed ensemble. Each member is
+    smeared with N(member, sigma^2); the bucket prob is the average kernel mass
+    inside the bucket's real-valued interval. NWS rounds half-up, so the integer
+    bucket [lo,hi] covers real temperatures [lo-0.5, hi+0.5). This replaces raw
+    member counting, whose 1-degree bucket probs are dominated by sampling noise."""
+    lo,hi=bucket_range(b); lo_e,hi_e=lo-0.5,hi+0.5
+    tot=0.0
+    for m in members:
+        tot+=_phi((hi_e-m)/sigma)-_phi((lo_e-m)/sigma)
+    return tot/len(members)
+
+def calib_params(state):
+    """Learn per (city,kind) mean-bias correction and dressing sigma from settled
+    results. Uses the RAW forecast bias (logged bias plus whatever correction was
+    applied at log time) so the learning target is stable as corrections evolve.
+    Correction is shrunk toward 0 when history is thin; sigma comes from
+    second-moment matching (Wang-Bishop): predictive variance should equal the
+    realized MSE of the bias-corrected mean, so kernel variance fills the gap
+    between that and the raw member variance."""
+    hist=defaultdict(list)
+    for r in state.get("resolved",[]):
+        if r.get("bias") is None: continue
+        raw=r["bias"]+(r.get("bias_corr") or 0.0)
+        hist[(r["code"],r["kind"])].append({"raw":raw,"sd":r.get("sd")})
+    out={}
+    pooled=[]
+    for k,rows in hist.items():
+        rows=rows[-BIAS_LOOKBACK:]
+        rb=[x["raw"] for x in rows]; n=len(rb)
+        corr=-(sum(rb)/n)*(n/(n+BIAS_SHRINK_K)) if n>=BIAS_MIN_N else 0.0
+        srows=[x for x in rows if x.get("sd") is not None]
+        pooled+=srows
+        sig=None
+        if len(srows)>=8:
+            sb=[x["raw"] for x in srows]; m=sum(sb)/len(sb)
+            var_err=sum((x-m)**2 for x in sb)/len(sb)
+            mean_s2=sum(x["sd"]**2 for x in srows)/len(srows)
+            sig=math.sqrt(max(var_err-mean_s2,0.0))
+        out[k]={"corr":round(corr,2),"sigma":sig,"n":n}
+    gsig=None
+    if len(pooled)>=15:
+        gb=[x["raw"] for x in pooled]; m=sum(gb)/len(gb)
+        var_err=sum((x-m)**2 for x in gb)/len(gb)
+        mean_s2=sum(x["sd"]**2 for x in pooled)/len(pooled)
+        gsig=math.sqrt(max(var_err-mean_s2,0.0))
+    for k,v in out.items():
+        s=v["sigma"] if v["sigma"] is not None else (gsig if gsig is not None else DRESS_SIGMA_DEFAULT)
+        v["sigma"]=round(min(max(s,DRESS_SIGMA_MIN),DRESS_SIGMA_MAX),2)
+    out["_gsigma"]=round(min(max(gsig,DRESS_SIGMA_MIN),DRESS_SIGMA_MAX),2) if gsig is not None else DRESS_SIGMA_DEFAULT
     return out
 
 # ------------------------------ tiers ------------------------------
@@ -215,8 +307,8 @@ def tier_for(net,lead,sd,skill):
 
 def units_of(t): return UNIT_MAP.get(t,0.0)
 
-def size_play(net, p_win, proven):
-    """Size from edge magnitude, then cap by win-probability, plausibility, and city track record."""
+def size_play(net, p_win, proven, lead=0):
+    """Size from edge magnitude, then cap by win-probability, plausibility, lead time, and city track record."""
     if net < PLAY_NET_EDGE: return 0.0, ""
     # plausibility: an outsized edge is a red flag, not a green light
     if net >= SUSPECT_EDGE:
@@ -228,6 +320,9 @@ def size_play(net, p_win, proven):
         if p_win>=thr: wpc=u; break
     units=min(base,wpc); reason=""
     if wpc<base: reason="win prob %.0f%%, trimmed"%(p_win*100)
+    # forecast skill decays fast with lead; a 3-4 day edge is mostly model noise
+    if lead>=LEAD_CAP_DAYS and units>1.0:
+        units=1.0; reason=reason or ("%d days out, capped"%lead)
     # a city must prove itself before it can earn max size
     if units>=2.0 and not proven:
         units=1.5; reason=reason or "city not yet proven, 2u locked"
@@ -244,37 +339,45 @@ def score(state):
         hi,lo,off=fetch_members(lat,lon,tz); fc[code]={"HIGH":hi,"LOW":lo}; offs[code]=off
     rows,plays=[],[]
     skill=city_skill(state); preds=state.setdefault("predictions",{})
+    calib=calib_params(state); gsigma=calib.get("_gsigma",DRESS_SIGMA_DEFAULT)
     for L in ladders:
         code,kind,tdate=L["code"],L["kind"],L["date"]; lead=(tdate-TODAY).days
         if lead<0: continue
         lhr=(dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)+dt.timedelta(seconds=offs.get(code,0))).hour
         realized=(lead==0 and kind=="LOW") or (lead==0 and kind=="HIGH" and lhr>=INTRADAY_HIGH_CUTOFF)
-        members=fc[code][kind].get(tdate.isoformat(),[])
-        if len(members)<10: continue
-        n=len(members); sd=pstdev(members); mean=sum(members)/n
+        raw_members=fc[code][kind].get(tdate.isoformat(),[])
+        if len(raw_members)<10: continue
+        # learned calibration for this city/kind: shift by bias correction, dress with sigma
+        cp=calib.get((code,kind)) or {}
+        corr=cp.get("corr",0.0); sigma=cp.get("sigma") or gsigma
+        members=[v+corr for v in raw_members]
+        n=len(members); msd=pstdev(members); mean=sum(members)/n
+        sd=math.sqrt(msd*msd+sigma*sigma)   # predictive spread incl. dressing
         ov=sum(b["ya"] for b in L["buckets"])-1.0
         wsum=sum((b["yb"]+b["ya"])/2 for b in L["buckets"])
         mkt_mean=(sum(((b["yb"]+b["ya"])/2)*(bucket_rep(b) or 0) for b in L["buckets"])/wsum) if wsum else mean
         offset=mean-mkt_mean; biased=abs(offset)>BIAS_TOL
         pbk,ppl=[],[]
         for b in L["buckets"]:
-            mp=sum(1 for v in members if in_bucket(v,b))/n; mid=(b["yb"]+b["ya"])/2
+            mp=dressed_prob(members,b,sigma); mid=(b["yb"]+b["ya"])/2
             cost=(b["ya"]-b["yb"])/2+fee(mid)+0.01; edge=mp-mid
             if edge>0: side,entry,net="Buy YES",b["ya"],edge-cost
             else:      side,entry,net="Buy NO",round(1-b["yb"],2),(-edge)-cost
             base=((not biased) and (not realized) and net>=PLAY_NET_EDGE and b["oi"]>=MIN_OI
                   and lead<=MAX_LEAD_DAYS and 0.02<mid<0.98)
-            tier=None; eff=net; units=0.0; p_win=None; size_reason=""
+            tier=None; eff=net; units=0.0; p_win=None; size_reason=""; hiconf=False
             if base:
                 p_win = mp if side=="Buy YES" else 1-mp
                 proven = (code,kind) in skill
-                units, size_reason = size_play(net, p_win, proven)
+                units, size_reason = size_play(net, p_win, proven, lead)
                 tier = "S" if units>=2 else "A" if units>=1.5 else "B" if units>=1 else None
+                hiconf = units>0 and p_win>=HICONF_PWIN
             is_play=base and units>0
             rec={"code":code,"label":CITIES[code][3],"kind":kind,"date":tdate,"lead":lead,
                  "bucket":b["sub"],"ticker":b["ticker"],"mid":mid,"mp":mp,"edge":edge,"side":side,
                  "entry":entry,"net":net,"oi":b["oi"],"sd":sd,"mean":mean,"overround":ov,
-                 "offset":offset,"biased":biased,"realized":realized,"tier":tier,"eff":eff,"p_win":p_win,"size_reason":size_reason,
+                 "offset":offset,"biased":biased,"realized":realized,"tier":tier,"eff":eff,"p_win":p_win,
+                 "size_reason":size_reason,"hiconf":hiconf,
                  "units":units,"stake":round(units*BASE_UNIT_USD,2) if units else None}
             rows.append(rec)
             if is_play: plays.append(rec)
@@ -287,8 +390,9 @@ def score(state):
         if not realized:
             preds[f"{code}|{kind}|{tdate.isoformat()}"]={"code":code,"kind":kind,"target":tdate.isoformat(),
                 "event_ticker":L["event_ticker"],"logged_at":dt.datetime.now().isoformat(timespec="minutes"),
-                "lead":lead,"mean":mean,"sd":sd,"biased":biased,"offset":offset,"buckets":pbk,"plays":ppl}
-    plays.sort(key=lambda r:(-r["units"],-r.get("net",0)))
+                "lead":lead,"mean":mean,"sd":msd,"psd":sd,"bias_corr":corr,"sigma":sigma,
+                "model_version":MODEL_VERSION,"biased":biased,"offset":offset,"buckets":pbk,"plays":ppl}
+    plays.sort(key=lambda r:(-r["units"],-(r.get("p_win") or 0),-r.get("net",0)))
     return ladders,rows,plays
 
 # --------------------------- resolution ----------------------------
@@ -304,6 +408,7 @@ def resolve_pending(state):
         rec={"code":p["code"],"kind":p["kind"],"target":p["target"],"lead":p["lead"],
              "actual":round_nws(actual) if actual is not None else None,
              "mean":p["mean"],"bias":(p["mean"]-actual) if actual is not None else None,
+             "sd":p.get("sd"),"bias_corr":p.get("bias_corr",0.0),"sigma":p.get("sigma"),
              "buckets":[],"plays":[]}
         ok=True
         for b in p["buckets"]:
@@ -344,6 +449,12 @@ def compute_report(state):
         sel=[b for b in bk if lo<=b["mp"]<lo+0.1]
         if sel: bins.append((lo,len(sel),sum(b["mp"] for b in sel)/len(sel),sum(b["hit"] for b in sel)/len(sel)))
     rep["bins"]=bins
+    # learned calibration currently in force (bias correction + dressing sigma)
+    cal=calib_params(state)
+    rep["calib"]=sorted(((CITIES[k[0]][3],k[1],v["corr"],v["sigma"],v["n"])
+                         for k,v in cal.items() if isinstance(k,tuple)),
+                        key=lambda x:-abs(x[2]))
+    rep["gsigma"]=cal.get("_gsigma",DRESS_SIGMA_DEFAULT)
     # per-city bias
     cb=defaultdict(list)
     for r in resolved:
@@ -353,7 +464,6 @@ def compute_report(state):
     if pls:
         wins=sum(1 for p in pls if p["won"]); tot=len(pls); pnl=sum(p["pnl"] for p in pls)
         staked=sum(p["contracts"]*p["entry"] for p in pls)
-        net_units=sum((p["units"] if p["won"] else -p["units"])*0+ (p["pnl"]/BASE_UNIT_USD) for p in pls)
         rep["pnl"]={"n":tot,"wins":wins,"winrate":wins/tot,"net":pnl,"staked":staked,
                     "roi":(pnl/staked if staked else 0),"net_units":pnl/BASE_UNIT_USD,
                     "avg_margin":sum(p["margin"] for p in pls if p["margin"] is not None)/max(1,sum(1 for p in pls if p["margin"] is not None))}
@@ -453,12 +563,12 @@ def unit_badge(u):
 def head(active,updated,extra=""):
     a=lambda p:'on' if active==p else ''
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-      "<meta name='viewport' content='width=device-width, initial-scale=1'><title>Kalshi Weather Edge</title>"
+      "<meta name='viewport' content='width=device-width, initial-scale=1'><title>Nimbus</title>"
       "<link rel='preconnect' href='https://fonts.googleapis.com'>"
       "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap' rel='stylesheet'>"
       f"<style>{CSS}</style></head><body><header><div class='hd'>"
-      "<div class='brand'><h1>Kalshi Weather Edge<span class='dot'> .</span></h1>"
-      f"<span class='sub'>{updated} &middot; ensemble {'+'.join(ENSEMBLE_MODELS)} &middot; settled by Kalshi</span></div>"
+      "<div class='brand'><h1>Nimbus<span class='dot'> .</span></h1>"
+      f"<span class='sub'>{updated} &middot; calibrated ensemble {'+'.join(ENSEMBLE_MODELS)} &middot; settled by Kalshi</span></div>"
       f"<div class='nav'><a class='{a('bets')}' href='index.html'>Today's bets</a>"
       f"<a class='{a('results')}' href='results.html'>Results tracker</a></div>{extra}</div></header><div class='wrap'>")
 
@@ -510,6 +620,7 @@ def render_bets(rows,plays,updated):
             city=esc(r["label"].split(" (")[0]); mk="Highest temp" if r["kind"]=="HIGH" else "Lowest temp"
             pw=("win prob %.0f%%"%(r["p_win"]*100)) if r.get("p_win") is not None else ""
             flag=(f'<span class="pflag">{esc(r["size_reason"])}</span>') if r.get("size_reason") else ""
+            if r.get("hiconf"): flag='<span class="tag c-hi">high confidence</span>'+flag
             ptab+=(f'<div class="pcard {sc}"><div class="ptop">'
                    f'<div><div class="pcity">{city} &middot; {mk} &middot; {r["date"].strftime("%b %d")}</div>'
                    f'<div class="prange">{esc(r["bucket"])}</div></div>'
@@ -550,9 +661,10 @@ def render_bets(rows,plays,updated):
                      f'<th class="n">Edge</th><th class="n">OI</th><th>Play</th></tr></thead><tbody>{tr}</tbody></table></div>')
         cpan+=f'<div class="panel" id="{cid}">{blocks}</div>'
     html=(head("bets",updated)+
-      "<div class='note'><b>Confidence = size.</b> Each play is sized 2u / 1.5u / 1u from a score that blends "
-      "net edge, forecast lead, ensemble tightness, and that city's track record. You cannot get a 2u until a "
-      "city has proven it beats the market on the Results tab. Sizes are tunable as we calibrate.</div>"
+      "<div class='note'><b>Confidence = size.</b> Probabilities come from a bias-corrected, kernel-dressed "
+      "multi-model ensemble that learns each city's error from Kalshi settlements. Plays are sized 2u / 1.5u / 1u "
+      "and listed highest win probability first within each size. A city cannot earn a 2u until it has proven it "
+      "beats the market on the Results tab.</div>"
       f"<h2 class='sec'>Today</h2><div class='rating'><div class='big unit {ucls}'>{rlab}</div>"
       f"<div class='txt'>Today is <b>{rtxt}</b><br>Plays: {cstr}.</div></div>"+ptab+
       "<h2 class='sec'>By city</h2><div class='tabs'>"+ctabs+"</div>"+cpan+
@@ -612,6 +724,32 @@ def render_results(rep,updated):
           f"<div class='kbox'><div class='v'>{bkk:.3f}</div><div class='l'>Brier market</div></div>"
           f"<div class='kbox'><div class='v {v}'>{(bkk-bm):+.3f}</div><div class='l'>edge (lower wins)</div></div></div>")
     # raw
+    # calibration curve: does an X% forecast happen X% of the time?
+    caltab=""
+    if rep.get("bins"):
+        bt="".join(f'<tr><td>{lo*100:.0f}-{lo*100+10:.0f}%</td><td class="n">{n}</td>'
+                   f'<td class="n">{fp*100:.0f}%</td><td class="n">{hr*100:.0f}%</td>'
+                   f'<td class="n {"up" if abs(hr-fp)<=0.07 else "red"}">{(hr-fp)*100:+.0f}%</td></tr>'
+                   for lo,n,fp,hr in rep["bins"])
+        caltab=("<h2 class='sec'>Calibration</h2>"
+          "<div class='note'>Every ladder bucket ever logged, grouped by the model's stated probability. "
+          "A calibrated model's actual column matches its forecast column. Rows that miss badly show where "
+          "the probabilities themselves need work, which matters more than any single win or loss.</div>"
+          "<table><thead><tr><th>Model prob</th><th class='n'>Buckets</th><th class='n'>Forecast</th>"
+          "<th class='n'>Actual</th><th class='n'>Gap</th></tr></thead><tbody>"+bt+"</tbody></table>")
+    # learned corrections currently applied
+    lct=""
+    if rep.get("calib"):
+        rowsL="".join(f'<tr><td>{esc(l)}</td><td>{k.title()}</td><td class="n">{c:+.1f}\u00b0</td>'
+                      f'<td class="n">{s:.1f}\u00b0</td><td class="n">{n}</td></tr>'
+                      for l,k,c,s,n in rep["calib"])
+        lct=("<h2 class='sec'>Learned corrections</h2>"
+          "<div class='note'>Applied automatically before scoring, from each city's settled history: shift is the "
+          "bias correction added to every ensemble member (shrunk when history is thin), width is the kernel "
+          "dressing sigma (how much realized error exceeds raw ensemble spread). A persistent large shift usually "
+          f"means the city's coordinates do not match Kalshi's settlement station. Pooled sigma: {rep.get('gsigma',DRESS_SIGMA_DEFAULT):.1f}\u00b0.</div>"
+          "<table><thead><tr><th>City</th><th>Mkt</th><th class='n'>Shift</th><th class='n'>Width</th>"
+          "<th class='n'>Settled</th></tr></thead><tbody>"+rowsL+"</tbody></table>")
     raw="".join(f'<tr><td>{esc(CITIES[r["code"]][3])}</td><td>{"H" if r["kind"]=="HIGH" else "L"} {r["target"][5:]}</td>'
                 f'<td>{esc(r["sub"])}</td><td>{unit_str(r["units"])}</td><td class="pl">{r["side"]}@{r["entry"]*100:.0f}\u00a2</td>'
                 f'<td class="n">{r["actual"]}\u00b0</td><td>{"WON" if r["won"] else "LOST"}</td>'
@@ -628,6 +766,7 @@ def render_results(rep,updated):
       "<div class='note'>The calibration check that matters most: a bigger edge should win more often. "
       "If the 25%+ row wins less than the 8-15% row, those fat edges are the model being wrong, not free money.</div>"
       "<table><thead><tr><th>Edge</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+et+"</tbody></table>"
+      +caltab+lct+
       "<h2 class='sec'>Every resolved bet</h2>"
       "<table><thead><tr><th>City</th><th>Mkt</th><th>Bucket</th><th>Size</th><th>Bet</th><th class='n'>Actual</th><th>Result</th><th class='n'>Margin</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+raw+"</tbody></table>"
       "</div></body></html>")
@@ -650,7 +789,7 @@ def save_state(s):
 
 def main():
     os.makedirs(OUT_DIR,exist_ok=True)
-    print("="*56); print("Kalshi Weather Edge  -",dt.datetime.now().strftime("%Y-%m-%d %H:%M")); print("="*56)
+    print("="*56); print("Nimbus  -",dt.datetime.now().strftime("%Y-%m-%d %H:%M")); print("="*56)
     state=load_state()
     resolve_pending(state)
     ladders,rows,plays=score(state)
