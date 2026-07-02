@@ -15,7 +15,17 @@ The calibration engine needs food before anything else matters. During this peri
 - [ ] Watch the **Learned corrections** table. Any city with a persistent shift above ~1.5 degrees probably has wrong station coordinates. Fix its lat/lon in `CITIES` to Kalshi's actual settlement station (the CLI station, usually the airport ASOS; NYC is Central Park). The correction handles it either way, but fixing the coordinate is cleaner.
 - [ ] Watch the **By edge size** table. If 25%+ edges win less often than 8-15% edges, the plausibility cap is earning its keep and thresholds may need tightening.
 
-## 2. Retune checkpoint (after ~100 settled bets)
+## 2. Unit scaling plan (the owner's stated intent, with guardrails)
+
+The owner wants to move toward ~$100 units, possibly betting only the 2-3 highest-probability cards per day. The plan is sound ONLY if units scale with bankroll and the by-win-probability table earns it first. Rules any AI should hold the line on:
+
+- 1u should stay near 1-2% of CURRENT bankroll. $100 units mean a $5,000-$10,000 bankroll, not a $500 one. Raise `BANKROLL` and let `BASE_UNIT_USD` follow; never hardcode a dollar unit that breaks the percentage.
+- Scale in steps after the paper gate passes (Brier below market, green P&L, 100+ bets): roughly $500 -> $1,250 -> $2,500 -> $5,000 bankroll, doubling only after 50+ live bets at the current level stay green.
+- Selective high-confidence mode is approved only when the "By win probability" table (shipped v5) shows the 80%+ row with positive ROI over 30+ plays AND stated-vs-actual within ~5 points. High-probability plays win small and lose big; overconfidence there is invisible in win rate.
+- Concentrating in 2-3 bets/day raises daily variance: cap total daily exposure around 4-6u early on. Note the model keeps learning from ALL cities regardless of which plays the owner actually bets, so selective betting never starves calibration.
+- At $100+ units, liquidity starts to matter: 100-140 contracts can eat through resting depth on thin ladders. Manual mitigation: place limit orders at the board price and accept partial fills rather than market-ordering through the book. `MIN_OI` may need raising (300 -> 1000+) at that size.
+
+## 2b. Retune checkpoint (after ~100 settled bets)
 
 - [ ] Revisit `PLAY_NET_EDGE`, `EDGE_2U`, `EDGE_1_5U`, `WINPROB_CAP`, `TIER` colors against the by-edge and by-unit tables. This is a with-AI session: bring the repo files plus a copy of `weather_state.json` so the numbers drive the tune.
 - [ ] Decide whether the high-confidence bucket (p_win >= 65%) is the best ROI or just the best win rate. If ROI concentrates in mid-probability plays instead, adjust what gets surfaced first.
