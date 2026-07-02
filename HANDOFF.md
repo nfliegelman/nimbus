@@ -2,13 +2,23 @@
 
 **Purpose of this file:** you are an AI assistant helping the owner (a hobbyist prediction-market bettor, not a professional developer) modify this program. This document tells you what the program is, how it is built, and which decisions are deliberate so you do not undo them while helping. Read it fully before proposing changes. The `README.md` is for the owner (setup instructions). `FUTURE.md` is the running list of planned improvements, known weaknesses, and the automation roadmap; read it too, and move shipped items from there into this changelog. This file is for you.
 
-**Doc version:** 2026-07-02 (v4.1). Update the changelog at the bottom whenever you change the code.
+**Doc version:** 2026-07-02 (v5.1). Update the changelog at the bottom whenever you change the code.
 
 ---
 
 ## 0. THE ONE RULE THAT PREVENTS CONFUSION
 
 Every time you change the code, hand the owner back BOTH the updated `kalshi_weather.py` AND an updated `HANDOFF.md` with a new changelog entry, and tell them to commit both together. This file is only accurate if it is kept in sync. The most common failure is code changing while this doc goes stale, which leaves the next AI confused. Do not let that happen.
+
+---
+
+## 0b. File handback protocol (the owner uploads via the GitHub web UI)
+
+The owner updates the repo by unzipping what you send and using GitHub's Add file -> Upload files at the repo ROOT. That upload overwrites same-named root files but CANNOT place files into `.github/workflows/` (and dot-folders are often hidden in file pickers). Therefore:
+
+- Hand back only root-level files: `kalshi_weather.py`, `HANDOFF.md`, `FUTURE.md`, `README.md`. These bulk-upload cleanly.
+- Do NOT include `run.yml` in handbacks unless the workflow itself must change. If it must, give the owner the full file contents to paste via the web editor at `.github/workflows/run.yml` (pencil icon), and say so explicitly. A `run.yml` at the repo root is dead weight: GitHub only runs workflows from `.github/workflows/`.
+- Never include `weather_state.json` or anything in `docs/`; the script regenerates `docs/` and the state file must never be overwritten.
 
 ---
 
@@ -135,6 +145,10 @@ On GitHub the workflow commits these back so state persists across ephemeral run
 ---
 
 ## Changelog
+
+- **v5.1 (2026-07-02), docs only:** Added the file handback protocol (section 0b): the owner uploads via GitHub's web UI at the repo root, which cannot write into `.github/workflows/`, so `run.yml` is excluded from normal handbacks and workflow changes are delivered as paste-in content instead. No code changes.
+
+- **v5 (2026-07-02):** Added a "By win probability" table to the Results tab (`rep["by_pwin"]` in `compute_report`, rendered above Calibration): every resolved play grouped by the win probability the model stated at bet time, showing count, W/L, average stated prob, actual win rate, P&L, and ROI. Purpose: the owner plans to eventually bet only the 2-3 highest-probability cards at larger units; this table is the explicit go/no-go evidence for that strategy (stated vs actual checks calibration at the extremes, ROI checks that high win rate is not masking negative expectancy). Computed retroactively from stored `mp` and `side` on old records, read defensively. No changes to scoring, guards, sizing, or persistence.
 
 - **v4.1 (2026-07-02), docs only:** Added `FUTURE.md`, the future inclusions log (planned improvements, known weaknesses, retune checkpoints, and the step-by-step path to automated trading). No code changes; `kalshi_weather.py` is unchanged from v4. Key process notes captured there: plays should eventually be frozen at first log before any extra cron runs are added, and live order execution should move off GitHub Actions to an always-on runner when the time comes.
 

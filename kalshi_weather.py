@@ -493,6 +493,24 @@ def compute_report(state):
             if sel:
                 w=sum(1 for x in sel if x["won"]); bye.append((lab,len(sel),w,sum(x["pnl"] for x in sel)))
         rep["by_edge"]=bye
+        # win rate and P&L by the model's stated win probability at bet time.
+        # This is the go/no-go table for a "bet only the high-confidence cards"
+        # strategy: it shows whether 80%+ plays actually deliver ROI or just wins.
+        PB=[(0.0,0.50,"under 50%"),(0.50,0.65,"50-65%"),(0.65,0.80,"65-80%"),(0.80,1.01,"80%+")]
+        byp=[]
+        for lo,hi,lab in PB:
+            sel=[]
+            for x in pls:
+                if x.get("mp") is None: continue
+                pw=x["mp"] if x.get("side")=="Buy YES" else 1-x["mp"]
+                if lo<=pw<hi: sel.append((x,pw))
+            if sel:
+                w=sum(1 for x,_ in sel if x["won"])
+                stk=sum(x["contracts"]*x["entry"] for x,_ in sel)
+                pn=sum(x["pnl"] for x,_ in sel)
+                avgp=sum(pw for _,pw in sel)/len(sel)
+                byp.append((lab,len(sel),w,avgp,pn,(pn/stk if stk else 0.0)))
+        rep["by_pwin"]=byp
         # cumulative series (in $), ordered by target date
         ser=[]; run=0.0
         for p in sorted(pls,key=lambda x:x["target"]):
@@ -750,6 +768,22 @@ def render_results(rep,updated):
           f"means the city's coordinates do not match Kalshi's settlement station. Pooled sigma: {rep.get('gsigma',DRESS_SIGMA_DEFAULT):.1f}\u00b0.</div>"
           "<table><thead><tr><th>City</th><th>Mkt</th><th class='n'>Shift</th><th class='n'>Width</th>"
           "<th class='n'>Settled</th></tr></thead><tbody>"+rowsL+"</tbody></table>")
+    # by stated win probability: the go/no-go readout for betting only high-confidence cards
+    pwt=""
+    if rep.get("by_pwin"):
+        pr="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
+                   f'<td class="n">{ap*100:.0f}%</td><td class="n">{(w/n*100):.0f}%</td>'
+                   f'<td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td>'
+                   f'<td class="n {"up" if roi>=0 else "red"}">{roi*100:+.1f}%</td></tr>'
+                   for lab,n,w,ap,pn,roi in rep["by_pwin"])
+        pwt=("<h2 class='sec'>By win probability</h2>"
+          "<div class='note'>Each play grouped by the win probability the model stated when the bet was logged. "
+          "Two things to check before betting only the high-confidence cards: does the actual column roughly match "
+          "the stated column (calibration), and does the 80%+ row have positive ROI, not just a high win rate? "
+          "High-probability plays win small and lose big, so a few points of overconfidence flips them negative "
+          "while still feeling like winning.</div>"
+          "<table><thead><tr><th>Stated</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Avg stated</th>"
+          "<th class='n'>Actual</th><th class='n'>P&amp;L</th><th class='n'>ROI</th></tr></thead><tbody>"+pr+"</tbody></table>")
     raw="".join(f'<tr><td>{esc(CITIES[r["code"]][3])}</td><td>{"H" if r["kind"]=="HIGH" else "L"} {r["target"][5:]}</td>'
                 f'<td>{esc(r["sub"])}</td><td>{unit_str(r["units"])}</td><td class="pl">{r["side"]}@{r["entry"]*100:.0f}\u00a2</td>'
                 f'<td class="n">{r["actual"]}\u00b0</td><td>{"WON" if r["won"] else "LOST"}</td>'
@@ -766,7 +800,7 @@ def render_results(rep,updated):
       "<div class='note'>The calibration check that matters most: a bigger edge should win more often. "
       "If the 25%+ row wins less than the 8-15% row, those fat edges are the model being wrong, not free money.</div>"
       "<table><thead><tr><th>Edge</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+et+"</tbody></table>"
-      +caltab+lct+
+      +pwt+caltab+lct+
       "<h2 class='sec'>Every resolved bet</h2>"
       "<table><thead><tr><th>City</th><th>Mkt</th><th>Bucket</th><th>Size</th><th>Bet</th><th class='n'>Actual</th><th>Result</th><th class='n'>Margin</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+raw+"</tbody></table>"
       "</div></body></html>")
