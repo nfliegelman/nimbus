@@ -97,992 +97,6 @@
    ],
    "plays": []
   },
-  "SATX|HIGH|2026-07-04": {
-   "code": "SATX",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTSATX-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 96.2132867132867,
-   "sd": 1.5513692468826088,
-   "psd": 2.5868217062977323,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": 0.09865256694526181,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-T93",
-     "bid": "less:None:93.0",
-     "sub": "92\u00b0 or below",
-     "floor": null,
-     "cap": 93.0,
-     "stype": "less",
-     "mp": 0.0764995239680241,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 2767.41
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B93.5",
-     "bid": "between:93.0:94.0",
-     "sub": "93\u00b0 to 94\u00b0",
-     "floor": 93.0,
-     "cap": 94.0,
-     "stype": "between",
-     "mp": 0.17725698392499947,
-     "mid": 0.08499999999999999,
-     "yb": 0.08,
-     "ya": 0.09,
-     "oi": 768.88
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B95.5",
-     "bid": "between:95.0:96.0",
-     "sub": "95\u00b0 to 96\u00b0",
-     "floor": 95.0,
-     "cap": 96.0,
-     "stype": "between",
-     "mp": 0.28883975724943683,
-     "mid": 0.55,
-     "yb": 0.54,
-     "ya": 0.56,
-     "oi": 1249.28
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B97.5",
-     "bid": "between:97.0:98.0",
-     "sub": "97\u00b0 to 98\u00b0",
-     "floor": 97.0,
-     "cap": 98.0,
-     "stype": "between",
-     "mp": 0.2685118101595849,
-     "mid": 0.365,
-     "yb": 0.36,
-     "ya": 0.37,
-     "oi": 1198.29
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B99.5",
-     "bid": "between:99.0:100.0",
-     "sub": "99\u00b0 to 100\u00b0",
-     "floor": 99.0,
-     "cap": 100.0,
-     "stype": "between",
-     "mp": 0.14066337696550432,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 1180.43
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-T100",
-     "bid": "greater:100.0:None",
-     "sub": "101\u00b0 or above",
-     "floor": 100.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.04822854773245068,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1343.18
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B93.5",
-     "bid": "between:93.0:94.0",
-     "sub": "93\u00b0 to 94\u00b0",
-     "side": "Buy YES",
-     "entry": 0.09,
-     "net": 0.06725698392499949,
-     "edge": 0.09225698392499948,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.17725698392499947,
-     "mp": 0.17725698392499947,
-     "mid": 0.08499999999999999
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B95.5",
-     "bid": "between:95.0:96.0",
-     "sub": "95\u00b0 to 96\u00b0",
-     "side": "Buy NO",
-     "entry": 0.46,
-     "net": 0.2211602427505632,
-     "edge": -0.2611602427505632,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.7111602427505632,
-     "mp": 0.28883975724943683,
-     "mid": 0.55
-    },
-    {
-     "ticker": "KXHIGHTSATX-26JUL04-B97.5",
-     "bid": "between:97.0:98.0",
-     "sub": "97\u00b0 to 98\u00b0",
-     "side": "Buy NO",
-     "entry": 0.64,
-     "net": 0.06148818984041507,
-     "edge": -0.09648818984041507,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.7314881898404151,
-     "mp": 0.2685118101595849,
-     "mid": 0.365
-    }
-   ]
-  },
-  "OKC|HIGH|2026-07-04": {
-   "code": "OKC",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTOKC-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 100.11328671328671,
-   "sd": 2.4163556261860717,
-   "psd": 3.181772228208845,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": 1.4094032181410796,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-T98",
-     "bid": "less:None:98.0",
-     "sub": "97\u00b0 or below",
-     "floor": null,
-     "cap": 98.0,
-     "stype": "less",
-     "mp": 0.20212690697852065,
-     "mid": 0.265,
-     "yb": 0.23,
-     "ya": 0.3,
-     "oi": 824.39
-    },
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-B98.5",
-     "bid": "between:98.0:99.0",
-     "sub": "98\u00b0 to 99\u00b0",
-     "floor": 98.0,
-     "cap": 99.0,
-     "stype": "between",
-     "mp": 0.2584239001222873,
-     "mid": 0.455,
-     "yb": 0.45,
-     "ya": 0.46,
-     "oi": 459.15
-    },
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-B100.5",
-     "bid": "between:100.0:101.0",
-     "sub": "100\u00b0 to 101\u00b0",
-     "floor": 100.0,
-     "cap": 101.0,
-     "stype": "between",
-     "mp": 0.24529979064317628,
-     "mid": 0.265,
-     "yb": 0.26,
-     "ya": 0.27,
-     "oi": 493.85
-    },
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-B102.5",
-     "bid": "between:102.0:103.0",
-     "sub": "102\u00b0 to 103\u00b0",
-     "floor": 102.0,
-     "cap": 103.0,
-     "stype": "between",
-     "mp": 0.14733318765137726,
-     "mid": 0.035,
-     "yb": 0.03,
-     "ya": 0.04,
-     "oi": 201.72
-    },
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-B104.5",
-     "bid": "between:104.0:105.0",
-     "sub": "104\u00b0 to 105\u00b0",
-     "floor": 104.0,
-     "cap": 105.0,
-     "stype": "between",
-     "mp": 0.081156216357766,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 255.54
-    },
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-T105",
-     "bid": "greater:105.0:None",
-     "sub": "106\u00b0 or above",
-     "floor": 105.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.06565999824687227,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1037.83
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTOKC-26JUL04-B98.5",
-     "bid": "between:98.0:99.0",
-     "sub": "98\u00b0 to 99\u00b0",
-     "side": "Buy NO",
-     "entry": 0.55,
-     "net": 0.16157609987771274,
-     "edge": -0.19657609987771274,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.7415760998777128,
-     "mp": 0.2584239001222873,
-     "mid": 0.455
-    }
-   ]
-  },
-  "NOLA|HIGH|2026-07-04": {
-   "code": "NOLA",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTNOLA-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 92.42587412587412,
-   "sd": 2.5048125227979625,
-   "psd": 3.2494593049252813,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": -1.6222027972027888,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-T91",
-     "bid": "less:None:91.0",
-     "sub": "90\u00b0 or below",
-     "floor": null,
-     "cap": 91.0,
-     "stype": "less",
-     "mp": 0.2868701516076364,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 984.91
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B91.5",
-     "bid": "between:91.0:92.0",
-     "sub": "91\u00b0 to 92\u00b0",
-     "floor": 91.0,
-     "cap": 92.0,
-     "stype": "between",
-     "mp": 0.2299965972202129,
-     "mid": 0.095,
-     "yb": 0.09,
-     "ya": 0.1,
-     "oi": 734.09
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B93.5",
-     "bid": "between:93.0:94.0",
-     "sub": "93\u00b0 to 94\u00b0",
-     "floor": 93.0,
-     "cap": 94.0,
-     "stype": "between",
-     "mp": 0.21454164017759808,
-     "mid": 0.575,
-     "yb": 0.56,
-     "ya": 0.59,
-     "oi": 335.36
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B95.5",
-     "bid": "between:95.0:96.0",
-     "sub": "95\u00b0 to 96\u00b0",
-     "floor": 95.0,
-     "cap": 96.0,
-     "stype": "between",
-     "mp": 0.15544454561463739,
-     "mid": 0.345,
-     "yb": 0.34,
-     "ya": 0.35,
-     "oi": 502.03
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B97.5",
-     "bid": "between:97.0:98.0",
-     "sub": "97\u00b0 to 98\u00b0",
-     "floor": 97.0,
-     "cap": 98.0,
-     "stype": "between",
-     "mp": 0.08253995725120636,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 2472.21
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-T98",
-     "bid": "greater:98.0:None",
-     "sub": "99\u00b0 or above",
-     "floor": 98.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.030607108128708822,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 392.33
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B91.5",
-     "bid": "between:91.0:92.0",
-     "sub": "91\u00b0 to 92\u00b0",
-     "side": "Buy YES",
-     "entry": 0.1,
-     "net": 0.10999659722021289,
-     "edge": 0.1349965972202129,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.2299965972202129,
-     "mp": 0.2299965972202129,
-     "mid": 0.095
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B93.5",
-     "bid": "between:93.0:94.0",
-     "sub": "93\u00b0 to 94\u00b0",
-     "side": "Buy NO",
-     "entry": 0.44,
-     "net": 0.3154583598224019,
-     "edge": -0.3604583598224019,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.7854583598224019,
-     "mp": 0.21454164017759808,
-     "mid": 0.575
-    },
-    {
-     "ticker": "KXHIGHTNOLA-26JUL04-B95.5",
-     "bid": "between:95.0:96.0",
-     "sub": "95\u00b0 to 96\u00b0",
-     "side": "Buy NO",
-     "entry": 0.66,
-     "net": 0.1545554543853626,
-     "edge": -0.1895554543853626,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.8445554543853626,
-     "mp": 0.15544454561463739,
-     "mid": 0.345
-    }
-   ]
-  },
-  "MIN|HIGH|2026-07-04": {
-   "code": "MIN",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTMIN-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 84.84685314685315,
-   "sd": 3.2564256907126645,
-   "psd": 3.858653687380283,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": -0.5351981351981436,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-T78",
-     "bid": "less:None:78.0",
-     "sub": "77\u00b0 or below",
-     "floor": null,
-     "cap": 78.0,
-     "stype": "less",
-     "mp": 0.031096916386362493,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1162.0
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B78.5",
-     "bid": "between:78.0:79.0",
-     "sub": "78\u00b0 to 79\u00b0",
-     "floor": 78.0,
-     "cap": 79.0,
-     "stype": "between",
-     "mp": 0.06313803153626098,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 956.36
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B80.5",
-     "bid": "between:80.0:81.0",
-     "sub": "80\u00b0 to 81\u00b0",
-     "floor": 80.0,
-     "cap": 81.0,
-     "stype": "between",
-     "mp": 0.1115142441253763,
-     "mid": 0.025,
-     "yb": 0.02,
-     "ya": 0.03,
-     "oi": 1096.84
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B82.5",
-     "bid": "between:82.0:83.0",
-     "sub": "82\u00b0 to 83\u00b0",
-     "floor": 82.0,
-     "cap": 83.0,
-     "stype": "between",
-     "mp": 0.15301518129711555,
-     "mid": 0.065,
-     "yb": 0.05,
-     "ya": 0.08,
-     "oi": 1373.82
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B84.5",
-     "bid": "between:84.0:85.0",
-     "sub": "84\u00b0 to 85\u00b0",
-     "floor": 84.0,
-     "cap": 85.0,
-     "stype": "between",
-     "mp": 0.18494444142749145,
-     "mid": 0.29500000000000004,
-     "yb": 0.27,
-     "ya": 0.32,
-     "oi": 7211.46
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-T85",
-     "bid": "greater:85.0:None",
-     "sub": "86\u00b0 or above",
-     "floor": 85.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.4562911852273932,
-     "mid": 0.5800000000000001,
-     "yb": 0.54,
-     "ya": 0.62,
-     "oi": 1003.93
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B80.5",
-     "bid": "between:80.0:81.0",
-     "sub": "80\u00b0 to 81\u00b0",
-     "side": "Buy YES",
-     "entry": 0.03,
-     "net": 0.07151424412537631,
-     "edge": 0.08651424412537631,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.1115142441253763,
-     "mp": 0.1115142441253763,
-     "mid": 0.025
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B82.5",
-     "bid": "between:82.0:83.0",
-     "sub": "82\u00b0 to 83\u00b0",
-     "side": "Buy YES",
-     "entry": 0.08,
-     "net": 0.06301518129711556,
-     "edge": 0.08801518129711555,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.15301518129711555,
-     "mp": 0.15301518129711555,
-     "mid": 0.065
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-B84.5",
-     "bid": "between:84.0:85.0",
-     "sub": "84\u00b0 to 85\u00b0",
-     "side": "Buy NO",
-     "entry": 0.73,
-     "net": 0.0650555585725086,
-     "edge": -0.1100555585725086,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.8150555585725086,
-     "mp": 0.18494444142749145,
-     "mid": 0.29500000000000004
-    },
-    {
-     "ticker": "KXHIGHTMIN-26JUL04-T85",
-     "bid": "greater:85.0:None",
-     "sub": "86\u00b0 or above",
-     "side": "Buy NO",
-     "entry": 0.46,
-     "net": 0.05370881477260689,
-     "edge": -0.12370881477260687,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.5437088147726068,
-     "mp": 0.4562911852273932,
-     "mid": 0.5800000000000001
-    }
-   ]
-  },
-  "HOU|HIGH|2026-07-04": {
-   "code": "HOU",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTHOU-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 95.37062937062937,
-   "sd": 2.6139173551504924,
-   "psd": 3.334286121429435,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": -1.2952474066218116,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-T93",
-     "bid": "less:None:93.0",
-     "sub": "92\u00b0 or below",
-     "floor": null,
-     "cap": 93.0,
-     "stype": "less",
-     "mp": 0.19590697476974459,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 980.01
-    },
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-B93.5",
-     "bid": "between:93.0:94.0",
-     "sub": "93\u00b0 to 94\u00b0",
-     "floor": 93.0,
-     "cap": 94.0,
-     "stype": "between",
-     "mp": 0.24054291254705643,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1740.46
-    },
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-B95.5",
-     "bid": "between:95.0:96.0",
-     "sub": "95\u00b0 to 96\u00b0",
-     "floor": 95.0,
-     "cap": 96.0,
-     "stype": "between",
-     "mp": 0.22935792304226593,
-     "mid": 0.505,
-     "yb": 0.5,
-     "ya": 0.51,
-     "oi": 1260.63
-    },
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-B97.5",
-     "bid": "between:97.0:98.0",
-     "sub": "97\u00b0 to 98\u00b0",
-     "floor": 97.0,
-     "cap": 98.0,
-     "stype": "between",
-     "mp": 0.1497147665226635,
-     "mid": 0.455,
-     "yb": 0.45,
-     "ya": 0.46,
-     "oi": 1615.69
-    },
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-B99.5",
-     "bid": "between:99.0:100.0",
-     "sub": "99\u00b0 to 100\u00b0",
-     "floor": 99.0,
-     "cap": 100.0,
-     "stype": "between",
-     "mp": 0.1004629835102679,
-     "mid": 0.08,
-     "yb": 0.07,
-     "ya": 0.09,
-     "oi": 1565.74
-    },
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-T100",
-     "bid": "greater:100.0:None",
-     "sub": "101\u00b0 or above",
-     "floor": 100.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.08401443960800142,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1644.09
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-B95.5",
-     "bid": "between:95.0:96.0",
-     "sub": "95\u00b0 to 96\u00b0",
-     "side": "Buy NO",
-     "entry": 0.5,
-     "net": 0.24064207695773407,
-     "edge": -0.2756420769577341,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.770642076957734,
-     "mp": 0.22935792304226593,
-     "mid": 0.505
-    },
-    {
-     "ticker": "KXHIGHTHOU-26JUL04-B97.5",
-     "bid": "between:97.0:98.0",
-     "sub": "97\u00b0 to 98\u00b0",
-     "side": "Buy NO",
-     "entry": 0.55,
-     "net": 0.27028523347733646,
-     "edge": -0.3052852334773365,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.8502852334773365,
-     "mp": 0.1497147665226635,
-     "mid": 0.455
-    }
-   ]
-  },
-  "DC|HIGH|2026-07-04": {
-   "code": "DC",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTDC-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 103.25244755244755,
-   "sd": 1.7910746927310321,
-   "psd": 2.7373068068708633,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": 1.337813406106065,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTDC-26JUL04-T100",
-     "bid": "less:None:100.0",
-     "sub": "99\u00b0 or below",
-     "floor": null,
-     "cap": 100.0,
-     "stype": "less",
-     "mp": 0.08366353560898136,
-     "mid": 0.035,
-     "yb": 0.02,
-     "ya": 0.05,
-     "oi": 2037.39
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B100.5",
-     "bid": "between:100.0:101.0",
-     "sub": "100\u00b0 to 101\u00b0",
-     "floor": 100.0,
-     "cap": 101.0,
-     "stype": "between",
-     "mp": 0.17245253027600657,
-     "mid": 0.395,
-     "yb": 0.39,
-     "ya": 0.4,
-     "oi": 1215.6
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B102.5",
-     "bid": "between:102.0:103.0",
-     "sub": "102\u00b0 to 103\u00b0",
-     "floor": 102.0,
-     "cap": 103.0,
-     "stype": "between",
-     "mp": 0.27826077344739336,
-     "mid": 0.46499999999999997,
-     "yb": 0.46,
-     "ya": 0.47,
-     "oi": 1123.78
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B104.5",
-     "bid": "between:104.0:105.0",
-     "sub": "104\u00b0 to 105\u00b0",
-     "floor": 104.0,
-     "cap": 105.0,
-     "stype": "between",
-     "mp": 0.26293422999237787,
-     "mid": 0.10500000000000001,
-     "yb": 0.1,
-     "ya": 0.11,
-     "oi": 1521.9
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B106.5",
-     "bid": "between:106.0:107.0",
-     "sub": "106\u00b0 to 107\u00b0",
-     "floor": 106.0,
-     "cap": 107.0,
-     "stype": "between",
-     "mp": 0.14397249607226373,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 2003.04
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-T107",
-     "bid": "greater:107.0:None",
-     "sub": "108\u00b0 or above",
-     "floor": 107.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.05871643460297724,
-     "mid": 0.01,
-     "yb": 0.0,
-     "ya": 0.02,
-     "oi": 1578.66
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B100.5",
-     "bid": "between:100.0:101.0",
-     "sub": "100\u00b0 to 101\u00b0",
-     "side": "Buy NO",
-     "entry": 0.61,
-     "net": 0.18754746972399344,
-     "edge": -0.22254746972399345,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.8275474697239934,
-     "mp": 0.17245253027600657,
-     "mid": 0.395
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B102.5",
-     "bid": "between:102.0:103.0",
-     "sub": "102\u00b0 to 103\u00b0",
-     "side": "Buy NO",
-     "entry": 0.54,
-     "net": 0.15173922655260663,
-     "edge": -0.1867392265526066,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.7217392265526066,
-     "mp": 0.27826077344739336,
-     "mid": 0.46499999999999997
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL04-B104.5",
-     "bid": "between:104.0:105.0",
-     "sub": "104\u00b0 to 105\u00b0",
-     "side": "Buy YES",
-     "entry": 0.11,
-     "net": 0.13293422999237786,
-     "edge": 0.15793422999237786,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.26293422999237787,
-     "mp": 0.26293422999237787,
-     "mid": 0.10500000000000001
-    }
-   ]
-  },
-  "DAL|HIGH|2026-07-04": {
-   "code": "DAL",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTDAL-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 99.5013986013986,
-   "sd": 1.7606016936361295,
-   "psd": 2.717465422711834,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": 0.26554954479483683,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-T96",
-     "bid": "less:None:96.0",
-     "sub": "95\u00b0 or below",
-     "floor": null,
-     "cap": 96.0,
-     "stype": "less",
-     "mp": 0.06652138091594949,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1189.06
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B96.5",
-     "bid": "between:96.0:97.0",
-     "sub": "96\u00b0 to 97\u00b0",
-     "floor": 96.0,
-     "cap": 97.0,
-     "stype": "between",
-     "mp": 0.16422167867932913,
-     "mid": 0.045,
-     "yb": 0.04,
-     "ya": 0.05,
-     "oi": 1532.23
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B98.5",
-     "bid": "between:98.0:99.0",
-     "sub": "98\u00b0 to 99\u00b0",
-     "floor": 98.0,
-     "cap": 99.0,
-     "stype": "between",
-     "mp": 0.277442631033896,
-     "mid": 0.6,
-     "yb": 0.57,
-     "ya": 0.63,
-     "oi": 2241.74
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B100.5",
-     "bid": "between:100.0:101.0",
-     "sub": "100\u00b0 to 101\u00b0",
-     "floor": 100.0,
-     "cap": 101.0,
-     "stype": "between",
-     "mp": 0.2667751844493688,
-     "mid": 0.38,
-     "yb": 0.37,
-     "ya": 0.39,
-     "oi": 791.03
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B102.5",
-     "bid": "between:102.0:103.0",
-     "sub": "102\u00b0 to 103\u00b0",
-     "floor": 102.0,
-     "cap": 103.0,
-     "stype": "between",
-     "mp": 0.15166899743431783,
-     "mid": 0.025,
-     "yb": 0.02,
-     "ya": 0.03,
-     "oi": 1006.19
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-T103",
-     "bid": "greater:103.0:None",
-     "sub": "104\u00b0 or above",
-     "floor": 103.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.07337012748713911,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 579.25
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B96.5",
-     "bid": "between:96.0:97.0",
-     "sub": "96\u00b0 to 97\u00b0",
-     "side": "Buy YES",
-     "entry": 0.05,
-     "net": 0.10422167867932913,
-     "edge": 0.11922167867932913,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.16422167867932913,
-     "mp": 0.16422167867932913,
-     "mid": 0.045
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B98.5",
-     "bid": "between:98.0:99.0",
-     "sub": "98\u00b0 to 99\u00b0",
-     "side": "Buy NO",
-     "entry": 0.43,
-     "net": 0.26255736896610393,
-     "edge": -0.322557368966104,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.722557368966104,
-     "mp": 0.277442631033896,
-     "mid": 0.6
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B100.5",
-     "bid": "between:100.0:101.0",
-     "sub": "100\u00b0 to 101\u00b0",
-     "side": "Buy NO",
-     "entry": 0.63,
-     "net": 0.07322481555063118,
-     "edge": -0.11322481555063119,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.7332248155506311,
-     "mp": 0.2667751844493688,
-     "mid": 0.38
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL04-B102.5",
-     "bid": "between:102.0:103.0",
-     "sub": "102\u00b0 to 103\u00b0",
-     "side": "Buy YES",
-     "entry": 0.03,
-     "net": 0.11166899743431784,
-     "edge": 0.12666899743431784,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.15166899743431783,
-     "mp": 0.15166899743431783,
-     "mid": 0.025
-    }
-   ]
-  },
   "BOS|HIGH|2026-07-04": {
    "code": "BOS",
    "kind": "HIGH",
@@ -1226,598 +240,21 @@
     }
    ]
   },
-  "ATL|HIGH|2026-07-04": {
-   "code": "ATL",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTATL-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 92.88391608391608,
-   "sd": 3.140991121242994,
-   "psd": 3.761744970585768,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": true,
-   "offset": -2.1552996023584257,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTATL-26JUL04-T94",
-     "bid": "less:None:94.0",
-     "sub": "93\u00b0 or below",
-     "floor": null,
-     "cap": 94.0,
-     "stype": "less",
-     "mp": 0.5724009096155558,
-     "mid": 0.13,
-     "yb": 0.12,
-     "ya": 0.14,
-     "oi": 2919.34
-    },
-    {
-     "ticker": "KXHIGHTATL-26JUL04-B94.5",
-     "bid": "between:94.0:95.0",
-     "sub": "94\u00b0 to 95\u00b0",
-     "floor": 94.0,
-     "cap": 95.0,
-     "stype": "between",
-     "mp": 0.18411729437339278,
-     "mid": 0.565,
-     "yb": 0.54,
-     "ya": 0.59,
-     "oi": 1845.49
-    },
-    {
-     "ticker": "KXHIGHTATL-26JUL04-B96.5",
-     "bid": "between:96.0:97.0",
-     "sub": "96\u00b0 to 97\u00b0",
-     "floor": 96.0,
-     "cap": 97.0,
-     "stype": "between",
-     "mp": 0.127724232477039,
-     "mid": 0.27,
-     "yb": 0.25,
-     "ya": 0.29,
-     "oi": 1101.59
-    },
-    {
-     "ticker": "KXHIGHTATL-26JUL04-B98.5",
-     "bid": "between:98.0:99.0",
-     "sub": "98\u00b0 to 99\u00b0",
-     "floor": 98.0,
-     "cap": 99.0,
-     "stype": "between",
-     "mp": 0.07474823016110005,
-     "mid": 0.035,
-     "yb": 0.03,
-     "ya": 0.04,
-     "oi": 1186.52
-    },
-    {
-     "ticker": "KXHIGHTATL-26JUL04-B100.5",
-     "bid": "between:100.0:101.0",
-     "sub": "100\u00b0 to 101\u00b0",
-     "floor": 100.0,
-     "cap": 101.0,
-     "stype": "between",
-     "mp": 0.031580746752052254,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 891.59
-    },
-    {
-     "ticker": "KXHIGHTATL-26JUL04-T101",
-     "bid": "greater:101.0:None",
-     "sub": "102\u00b0 or above",
-     "floor": 101.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.009428586620859788,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 927.01
-    }
-   ],
-   "plays": []
-  },
-  "SFO|HIGH|2026-07-04": {
-   "code": "SFO",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTSFO-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 70.45524475524476,
-   "sd": 5.855505786609552,
-   "psd": 6.210623802567496,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": 0.4193595877806473,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-T67",
-     "bid": "less:None:67.0",
-     "sub": "66\u00b0 or below",
-     "floor": null,
-     "cap": 67.0,
-     "stype": "less",
-     "mp": 0.30562311773082934,
-     "mid": 0.05500000000000001,
-     "yb": 0.04,
-     "ya": 0.07,
-     "oi": 1594.53
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-B67.5",
-     "bid": "between:67.0:68.0",
-     "sub": "67\u00b0 to 68\u00b0",
-     "floor": 67.0,
-     "cap": 68.0,
-     "stype": "between",
-     "mp": 0.07962499811962788,
-     "mid": 0.115,
-     "yb": 0.1,
-     "ya": 0.13,
-     "oi": 1436.49
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-B69.5",
-     "bid": "between:69.0:70.0",
-     "sub": "69\u00b0 to 70\u00b0",
-     "floor": 69.0,
-     "cap": 70.0,
-     "stype": "between",
-     "mp": 0.09144053499631949,
-     "mid": 0.475,
-     "yb": 0.46,
-     "ya": 0.49,
-     "oi": 1197.24
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-B71.5",
-     "bid": "between:71.0:72.0",
-     "sub": "71\u00b0 to 72\u00b0",
-     "floor": 71.0,
-     "cap": 72.0,
-     "stype": "between",
-     "mp": 0.12363733190144292,
-     "mid": 0.31,
-     "yb": 0.29,
-     "ya": 0.33,
-     "oi": 1436.4
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-B73.5",
-     "bid": "between:73.0:74.0",
-     "sub": "73\u00b0 to 74\u00b0",
-     "floor": 73.0,
-     "cap": 74.0,
-     "stype": "between",
-     "mp": 0.11961097681063952,
-     "mid": 0.07500000000000001,
-     "yb": 0.07,
-     "ya": 0.08,
-     "oi": 906.92
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-T74",
-     "bid": "greater:74.0:None",
-     "sub": "75\u00b0 or above",
-     "floor": 74.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.2800630404411409,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 2622.4
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-T67",
-     "bid": "less:None:67.0",
-     "sub": "66\u00b0 or below",
-     "side": "Buy YES",
-     "entry": 0.07,
-     "net": 0.22562311773082935,
-     "edge": 0.25062311773082935,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.30562311773082934,
-     "mp": 0.30562311773082934,
-     "mid": 0.05500000000000001
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-B69.5",
-     "bid": "between:69.0:70.0",
-     "sub": "69\u00b0 to 70\u00b0",
-     "side": "Buy NO",
-     "entry": 0.54,
-     "net": 0.3385594650036805,
-     "edge": -0.3835594650036805,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.9085594650036806,
-     "mp": 0.09144053499631949,
-     "mid": 0.475
-    },
-    {
-     "ticker": "KXHIGHTSFO-26JUL04-B71.5",
-     "bid": "between:71.0:72.0",
-     "sub": "71\u00b0 to 72\u00b0",
-     "side": "Buy NO",
-     "entry": 0.71,
-     "net": 0.14636266809855702,
-     "edge": -0.18636266809855706,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.8763626680985571,
-     "mp": 0.12363733190144292,
-     "mid": 0.31
-    }
-   ]
-  },
-  "SEA|HIGH|2026-07-04": {
-   "code": "SEA",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTSEA-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 72.15944055944055,
-   "sd": 3.1741578424370425,
-   "psd": 3.7894825515767425,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": false,
-   "offset": -0.27325174825175225,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-T72",
-     "bid": "less:None:72.0",
-     "sub": "71\u00b0 or below",
-     "floor": null,
-     "cap": 72.0,
-     "stype": "less",
-     "mp": 0.44886584355649245,
-     "mid": 0.275,
-     "yb": 0.25,
-     "ya": 0.3,
-     "oi": 1927.46
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-B72.5",
-     "bid": "between:72.0:73.0",
-     "sub": "72\u00b0 to 73\u00b0",
-     "floor": 72.0,
-     "cap": 73.0,
-     "stype": "between",
-     "mp": 0.20176657723841424,
-     "mid": 0.605,
-     "yb": 0.6,
-     "ya": 0.61,
-     "oi": 2066.57
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-B74.5",
-     "bid": "between:74.0:75.0",
-     "sub": "74\u00b0 to 75\u00b0",
-     "floor": 74.0,
-     "cap": 75.0,
-     "stype": "between",
-     "mp": 0.14926749221963934,
-     "mid": 0.10500000000000001,
-     "yb": 0.1,
-     "ya": 0.11,
-     "oi": 1017.19
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-B76.5",
-     "bid": "between:76.0:77.0",
-     "sub": "76\u00b0 to 77\u00b0",
-     "floor": 76.0,
-     "cap": 77.0,
-     "stype": "between",
-     "mp": 0.1073824506038736,
-     "mid": 0.035,
-     "yb": 0.03,
-     "ya": 0.04,
-     "oi": 959.87
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-B78.5",
-     "bid": "between:78.0:79.0",
-     "sub": "78\u00b0 to 79\u00b0",
-     "floor": 78.0,
-     "cap": 79.0,
-     "stype": "between",
-     "mp": 0.06527614184523028,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 928.21
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-T79",
-     "bid": "greater:79.0:None",
-     "sub": "80\u00b0 or above",
-     "floor": 79.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.027441494536349694,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1713.18
-    }
-   ],
-   "plays": [
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-T72",
-     "bid": "less:None:72.0",
-     "sub": "71\u00b0 or below",
-     "side": "Buy YES",
-     "entry": 0.3,
-     "net": 0.12886584355649244,
-     "edge": 0.17386584355649243,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.44886584355649245,
-     "mp": 0.44886584355649245,
-     "mid": 0.275
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-B72.5",
-     "bid": "between:72.0:73.0",
-     "sub": "72\u00b0 to 73\u00b0",
-     "side": "Buy NO",
-     "entry": 0.4,
-     "net": 0.36823342276158577,
-     "edge": -0.40323342276158575,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.7982334227615857,
-     "mp": 0.20176657723841424,
-     "mid": 0.605
-    },
-    {
-     "ticker": "KXHIGHTSEA-26JUL04-B76.5",
-     "bid": "between:76.0:77.0",
-     "sub": "76\u00b0 to 77\u00b0",
-     "side": "Buy YES",
-     "entry": 0.04,
-     "net": 0.05738245060387359,
-     "edge": 0.07238245060387359,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.1073824506038736,
-     "mp": 0.1073824506038736,
-     "mid": 0.035
-    }
-   ]
-  },
-  "PHX|HIGH|2026-07-04": {
-   "code": "PHX",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTPHX-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 102.23636363636363,
-   "sd": 2.7877490595133465,
-   "psd": 3.4722391649795017,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": true,
-   "offset": -3.1568402471315125,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTPHX-26JUL04-T104",
-     "bid": "less:None:104.0",
-     "sub": "103\u00b0 or below",
-     "floor": null,
-     "cap": 104.0,
-     "stype": "less",
-     "mp": 0.6234653452865162,
-     "mid": 0.05,
-     "yb": 0.04,
-     "ya": 0.06,
-     "oi": 3397.74
-    },
-    {
-     "ticker": "KXHIGHTPHX-26JUL04-B104.5",
-     "bid": "between:104.0:105.0",
-     "sub": "104\u00b0 to 105\u00b0",
-     "floor": 104.0,
-     "cap": 105.0,
-     "stype": "between",
-     "mp": 0.20263784631773243,
-     "mid": 0.56,
-     "yb": 0.55,
-     "ya": 0.57,
-     "oi": 1729.8
-    },
-    {
-     "ticker": "KXHIGHTPHX-26JUL04-B106.5",
-     "bid": "between:106.0:107.0",
-     "sub": "106\u00b0 to 107\u00b0",
-     "floor": 106.0,
-     "cap": 107.0,
-     "stype": "between",
-     "mp": 0.12065931865722818,
-     "mid": 0.355,
-     "yb": 0.35,
-     "ya": 0.36,
-     "oi": 1103.14
-    },
-    {
-     "ticker": "KXHIGHTPHX-26JUL04-B108.5",
-     "bid": "between:108.0:109.0",
-     "sub": "108\u00b0 to 109\u00b0",
-     "floor": 108.0,
-     "cap": 109.0,
-     "stype": "between",
-     "mp": 0.043910694694572996,
-     "mid": 0.045,
-     "yb": 0.04,
-     "ya": 0.05,
-     "oi": 1881.64
-    },
-    {
-     "ticker": "KXHIGHTPHX-26JUL04-B110.5",
-     "bid": "between:110.0:111.0",
-     "sub": "110\u00b0 to 111\u00b0",
-     "floor": 110.0,
-     "cap": 111.0,
-     "stype": "between",
-     "mp": 0.008503619659806231,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 2503.23
-    },
-    {
-     "ticker": "KXHIGHTPHX-26JUL04-T111",
-     "bid": "greater:111.0:None",
-     "sub": "112\u00b0 or above",
-     "floor": 111.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.0008231753841438841,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 898.36
-    }
-   ],
-   "plays": []
-  },
-  "LV|HIGH|2026-07-04": {
-   "code": "LV",
-   "kind": "HIGH",
-   "target": "2026-07-04",
-   "event_ticker": "KXHIGHTLV-26JUL04",
-   "logged_at": "2026-07-04T13:26",
-   "lead": 0,
-   "mean": 102.02097902097903,
-   "sd": 1.5550887882754543,
-   "psd": 2.589054101292598,
-   "bias_corr": 0.0,
-   "sigma": 2.07,
-   "model_version": "2026-07-02.v3-nimbus-calib",
-   "biased": true,
-   "offset": -2.097378466943667,
-   "buckets": [
-    {
-     "ticker": "KXHIGHTLV-26JUL04-T101",
-     "bid": "less:None:101.0",
-     "sub": "100\u00b0 or below",
-     "floor": null,
-     "cap": 101.0,
-     "stype": "less",
-     "mp": 0.2740600892972384,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 559.66
-    },
-    {
-     "ticker": "KXHIGHTLV-26JUL04-B101.5",
-     "bid": "between:101.0:102.0",
-     "sub": "101\u00b0 to 102\u00b0",
-     "floor": 101.0,
-     "cap": 102.0,
-     "stype": "between",
-     "mp": 0.2871394109868754,
-     "mid": 0.025,
-     "yb": 0.02,
-     "ya": 0.03,
-     "oi": 868.87
-    },
-    {
-     "ticker": "KXHIGHTLV-26JUL04-B103.5",
-     "bid": "between:103.0:104.0",
-     "sub": "103\u00b0 to 104\u00b0",
-     "floor": 103.0,
-     "cap": 104.0,
-     "stype": "between",
-     "mp": 0.26913480931364225,
-     "mid": 0.665,
-     "yb": 0.66,
-     "ya": 0.67,
-     "oi": 855.44
-    },
-    {
-     "ticker": "KXHIGHTLV-26JUL04-B105.5",
-     "bid": "between:105.0:106.0",
-     "sub": "105\u00b0 to 106\u00b0",
-     "floor": 105.0,
-     "cap": 106.0,
-     "stype": "between",
-     "mp": 0.13324899045058375,
-     "mid": 0.33,
-     "yb": 0.32,
-     "ya": 0.34,
-     "oi": 518.94
-    },
-    {
-     "ticker": "KXHIGHTLV-26JUL04-B107.5",
-     "bid": "between:107.0:108.0",
-     "sub": "107\u00b0 to 108\u00b0",
-     "floor": 107.0,
-     "cap": 108.0,
-     "stype": "between",
-     "mp": 0.03242462620252381,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1231.7
-    },
-    {
-     "ticker": "KXHIGHTLV-26JUL04-T108",
-     "bid": "greater:108.0:None",
-     "sub": "109\u00b0 or above",
-     "floor": 108.0,
-     "cap": null,
-     "stype": "greater",
-     "mp": 0.00399207374913642,
-     "mid": 0.005,
-     "yb": 0.0,
-     "ya": 0.01,
-     "oi": 601.97
-    }
-   ],
-   "plays": []
-  },
   "SATX|HIGH|2026-07-05": {
    "code": "SATX",
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTSATX-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 95.8993006993007,
-   "sd": 1.7385186405172892,
-   "psd": 2.424571521614919,
+   "mean": 96.36013986013987,
+   "sd": 1.4482272674554146,
+   "psd": 1.973059101547994,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": 0.24778554778553996,
+   "offset": -0.13033633033631986,
    "buckets": [
     {
      "ticker": "KXHIGHTSATX-26JUL05-T93",
@@ -1826,11 +263,11 @@
      "floor": null,
      "cap": 93.0,
      "stype": "less",
-     "mp": 0.0867065375963878,
-     "mid": 0.02,
+     "mp": 0.024800198824579265,
+     "mid": 0.015,
      "yb": 0.01,
-     "ya": 0.03,
-     "oi": 323.0
+     "ya": 0.02,
+     "oi": 463.11
     },
     {
      "ticker": "KXHIGHTSATX-26JUL05-B93.5",
@@ -1839,11 +276,11 @@
      "floor": 93.0,
      "cap": 94.0,
      "stype": "between",
-     "mp": 0.18876968103510658,
-     "mid": 0.185,
-     "yb": 0.18,
-     "ya": 0.19,
-     "oi": 450.72
+     "mp": 0.15136808890765555,
+     "mid": 0.035,
+     "yb": 0.03,
+     "ya": 0.04,
+     "oi": 1107.71
     },
     {
      "ticker": "KXHIGHTSATX-26JUL05-B95.5",
@@ -1852,11 +289,11 @@
      "floor": 95.0,
      "cap": 96.0,
      "stype": "between",
-     "mp": 0.30901204562568585,
-     "mid": 0.53,
-     "yb": 0.52,
-     "ya": 0.54,
-     "oi": 570.06
+     "mp": 0.3496993428274624,
+     "mid": 0.47,
+     "yb": 0.46,
+     "ya": 0.48,
+     "oi": 751.42
     },
     {
      "ticker": "KXHIGHTSATX-26JUL05-B97.5",
@@ -1865,11 +302,11 @@
      "floor": 97.0,
      "cap": 98.0,
      "stype": "between",
-     "mp": 0.2755254473526289,
-     "mid": 0.215,
-     "yb": 0.21,
-     "ya": 0.22,
-     "oi": 416.73
+     "mp": 0.3345650360953489,
+     "mid": 0.48,
+     "yb": 0.47,
+     "ya": 0.49,
+     "oi": 1039.37
     },
     {
      "ticker": "KXHIGHTSATX-26JUL05-B99.5",
@@ -1878,11 +315,11 @@
      "floor": 99.0,
      "cap": 100.0,
      "stype": "between",
-     "mp": 0.11697344153065393,
-     "mid": 0.035,
-     "yb": 0.03,
-     "ya": 0.04,
-     "oi": 95.0
+     "mp": 0.12217767463540169,
+     "mid": 0.045,
+     "yb": 0.04,
+     "ya": 0.05,
+     "oi": 1672.54
     },
     {
      "ticker": "KXHIGHTSATX-26JUL05-T100",
@@ -1891,28 +328,73 @@
      "floor": 100.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.0230128468595368,
+     "mp": 0.017389658709552665,
      "mid": 0.005,
      "yb": 0.0,
      "ya": 0.01,
-     "oi": 266.5
+     "oi": 295.5
     }
    ],
    "plays": [
+    {
+     "ticker": "KXHIGHTSATX-26JUL05-B93.5",
+     "bid": "between:93.0:94.0",
+     "sub": "93\u00b0 to 94\u00b0",
+     "side": "Buy YES",
+     "entry": 0.04,
+     "net": 0.10136808890765554,
+     "edge": 0.11636808890765554,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.15136808890765555,
+     "mp": 0.15136808890765555,
+     "mid": 0.035
+    },
     {
      "ticker": "KXHIGHTSATX-26JUL05-B95.5",
      "bid": "between:95.0:96.0",
      "sub": "95\u00b0 to 96\u00b0",
      "side": "Buy NO",
-     "entry": 0.48,
-     "net": 0.18098795437431417,
-     "edge": -0.22098795437431418,
+     "entry": 0.54,
+     "net": 0.08030065717253759,
+     "edge": -0.12030065717253757,
      "tier": "A",
      "units": 1.5,
      "stake": 15.0,
-     "p_win": 0.6909879543743142,
-     "mp": 0.30901204562568585,
-     "mid": 0.53
+     "p_win": 0.6503006571725376,
+     "mp": 0.3496993428274624,
+     "mid": 0.47
+    },
+    {
+     "ticker": "KXHIGHTSATX-26JUL05-B97.5",
+     "bid": "between:97.0:98.0",
+     "sub": "97\u00b0 to 98\u00b0",
+     "side": "Buy NO",
+     "entry": 0.53,
+     "net": 0.1054349639046511,
+     "edge": -0.1454349639046511,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "p_win": 0.6654349639046511,
+     "mp": 0.3345650360953489,
+     "mid": 0.48
+    },
+    {
+     "ticker": "KXHIGHTSATX-26JUL05-B99.5",
+     "bid": "between:99.0:100.0",
+     "sub": "99\u00b0 to 100\u00b0",
+     "side": "Buy YES",
+     "entry": 0.05,
+     "net": 0.06217767463540169,
+     "edge": 0.07717767463540169,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.12217767463540169,
+     "mp": 0.12217767463540169,
+     "mid": 0.045
     }
    ]
   },
@@ -1921,16 +403,16 @@
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTOKC-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 92.61748251748251,
-   "sd": 4.413715347954746,
-   "psd": 4.726201770213718,
+   "mean": 91.61958041958042,
+   "sd": 4.060715062271578,
+   "psd": 4.276097147745742,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": 1.4262382778511693,
+   "offset": 0.035836577215874854,
    "buckets": [
     {
      "ticker": "KXHIGHTOKC-26JUL05-T90",
@@ -1939,11 +421,11 @@
      "floor": null,
      "cap": 90.0,
      "stype": "less",
-     "mp": 0.2744621583507805,
-     "mid": 0.365,
-     "yb": 0.34,
-     "ya": 0.39,
-     "oi": 315.35
+     "mp": 0.3311754480848372,
+     "mid": 0.175,
+     "yb": 0.16,
+     "ya": 0.19,
+     "oi": 1291.36
     },
     {
      "ticker": "KXHIGHTOKC-26JUL05-B90.5",
@@ -1952,11 +434,11 @@
      "floor": 90.0,
      "cap": 91.0,
      "stype": "between",
-     "mp": 0.22267021701296807,
-     "mid": 0.245,
-     "yb": 0.24,
-     "ya": 0.25,
-     "oi": 15.55
+     "mp": 0.22779427464207286,
+     "mid": 0.31,
+     "yb": 0.29,
+     "ya": 0.33,
+     "oi": 109.96
     },
     {
      "ticker": "KXHIGHTOKC-26JUL05-B92.5",
@@ -1965,11 +447,11 @@
      "floor": 92.0,
      "cap": 93.0,
      "stype": "between",
-     "mp": 0.1658106079837072,
-     "mid": 0.275,
-     "yb": 0.27,
-     "ya": 0.28,
-     "oi": 21.17
+     "mp": 0.15875756505862473,
+     "mid": 0.38,
+     "yb": 0.35,
+     "ya": 0.41,
+     "oi": 482.68
     },
     {
      "ticker": "KXHIGHTOKC-26JUL05-B94.5",
@@ -1978,11 +460,11 @@
      "floor": 94.0,
      "cap": 95.0,
      "stype": "between",
-     "mp": 0.10288588445413994,
-     "mid": 0.14500000000000002,
-     "yb": 0.14,
-     "ya": 0.15,
-     "oi": 62.93
+     "mp": 0.08755939671637149,
+     "mid": 0.11499999999999999,
+     "yb": 0.11,
+     "ya": 0.12,
+     "oi": 299.46
     },
     {
      "ticker": "KXHIGHTOKC-26JUL05-B96.5",
@@ -1991,11 +473,11 @@
      "floor": 96.0,
      "cap": 97.0,
      "stype": "between",
-     "mp": 0.06658652477356947,
-     "mid": 0.045,
-     "yb": 0.03,
-     "ya": 0.06,
-     "oi": 43.28
+     "mp": 0.07178481675680336,
+     "mid": 0.025,
+     "yb": 0.02,
+     "ya": 0.03,
+     "oi": 375.21
     },
     {
      "ticker": "KXHIGHTOKC-26JUL05-T97",
@@ -2004,30 +486,61 @@
      "floor": 97.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.16758460742483466,
+     "mp": 0.12292849874128998,
      "mid": 0.01,
      "yb": 0.0,
      "ya": 0.02,
-     "oi": 2385.78
+     "oi": 2631.71
     }
    ],
-   "plays": []
+   "plays": [
+    {
+     "ticker": "KXHIGHTOKC-26JUL05-T90",
+     "bid": "less:None:90.0",
+     "sub": "89\u00b0 or below",
+     "side": "Buy YES",
+     "entry": 0.19,
+     "net": 0.12117544808483718,
+     "edge": 0.1561754480848372,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.3311754480848372,
+     "mp": 0.3311754480848372,
+     "mid": 0.175
+    },
+    {
+     "ticker": "KXHIGHTOKC-26JUL05-B92.5",
+     "bid": "between:92.0:93.0",
+     "sub": "92\u00b0 to 93\u00b0",
+     "side": "Buy NO",
+     "entry": 0.65,
+     "net": 0.16124243494137527,
+     "edge": -0.22124243494137527,
+     "tier": "S",
+     "units": 2.0,
+     "stake": 20.0,
+     "p_win": 0.8412424349413753,
+     "mp": 0.15875756505862473,
+     "mid": 0.38
+    }
+   ]
   },
   "NOLA|HIGH|2026-07-05": {
    "code": "NOLA",
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTNOLA-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 89.6076923076923,
-   "sd": 3.1702303400260914,
-   "psd": 3.592556249917591,
+   "mean": 89.2,
+   "sd": 3.3049655373085516,
+   "psd": 3.5662861919365363,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": true,
-   "offset": -2.494348508634232,
+   "offset": -2.9380952380952294,
    "buckets": [
     {
      "ticker": "KXHIGHTNOLA-26JUL05-T89",
@@ -2036,11 +549,11 @@
      "floor": null,
      "cap": 89.0,
      "stype": "less",
-     "mp": 0.38584049575973695,
-     "mid": 0.055,
-     "yb": 0.05,
-     "ya": 0.06,
-     "oi": 55.13
+     "mp": 0.42696433858204597,
+     "mid": 0.025,
+     "yb": 0.02,
+     "ya": 0.03,
+     "oi": 268.26
     },
     {
      "ticker": "KXHIGHTNOLA-26JUL05-B89.5",
@@ -2049,11 +562,11 @@
      "floor": 89.0,
      "cap": 90.0,
      "stype": "between",
-     "mp": 0.19845895638355607,
-     "mid": 0.08499999999999999,
-     "yb": 0.08,
-     "ya": 0.09,
-     "oi": 202.28
+     "mp": 0.15460344426132794,
+     "mid": 0.12,
+     "yb": 0.11,
+     "ya": 0.13,
+     "oi": 888.38
     },
     {
      "ticker": "KXHIGHTNOLA-26JUL05-B91.5",
@@ -2062,11 +575,11 @@
      "floor": 91.0,
      "cap": 92.0,
      "stype": "between",
-     "mp": 0.19240984136189626,
-     "mid": 0.445,
-     "yb": 0.44,
-     "ya": 0.45,
-     "oi": 43.0
+     "mp": 0.20879577986445866,
+     "mid": 0.46499999999999997,
+     "yb": 0.46,
+     "ya": 0.47,
+     "oi": 230.39
     },
     {
      "ticker": "KXHIGHTNOLA-26JUL05-B93.5",
@@ -2075,11 +588,11 @@
      "floor": 93.0,
      "cap": 94.0,
      "stype": "between",
-     "mp": 0.13644582671194547,
-     "mid": 0.315,
-     "yb": 0.31,
-     "ya": 0.32,
-     "oi": 124.5
+     "mp": 0.1597303411534207,
+     "mid": 0.39,
+     "yb": 0.38,
+     "ya": 0.4,
+     "oi": 199.99
     },
     {
      "ticker": "KXHIGHTNOLA-26JUL05-B95.5",
@@ -2088,11 +601,11 @@
      "floor": 95.0,
      "cap": 96.0,
      "stype": "between",
-     "mp": 0.06369137128105316,
-     "mid": 0.065,
-     "yb": 0.06,
-     "ya": 0.07,
-     "oi": 86.9
+     "mp": 0.04572526829002563,
+     "mid": 0.035,
+     "yb": 0.03,
+     "ya": 0.04,
+     "oi": 885.46
     },
     {
      "ticker": "KXHIGHTNOLA-26JUL05-T96",
@@ -2101,11 +614,11 @@
      "floor": 96.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.023153508501812112,
+     "mp": 0.004180827848720968,
      "mid": 0.015,
      "yb": 0.01,
      "ya": 0.02,
-     "oi": 482.61
+     "oi": 604.53
     }
    ],
    "plays": []
@@ -2115,16 +628,16 @@
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTMIN-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 85.23286713286713,
-   "sd": 3.060275051027396,
-   "psd": 3.495909522276103,
+   "mean": 85.81258741258742,
+   "sd": 3.0190969597131607,
+   "psd": 3.3031116318025417,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": -0.41951381951382416,
+   "offset": -1.2631701631701588,
    "buckets": [
     {
      "ticker": "KXHIGHTMIN-26JUL05-T82",
@@ -2133,11 +646,11 @@
      "floor": null,
      "cap": 82.0,
      "stype": "less",
-     "mp": 0.11657531159177101,
-     "mid": 0.035,
-     "yb": 0.02,
-     "ya": 0.05,
-     "oi": 361.98
+     "mp": 0.09124996591936217,
+     "mid": 0.015,
+     "yb": 0.01,
+     "ya": 0.02,
+     "oi": 851.59
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-B82.5",
@@ -2146,11 +659,11 @@
      "floor": 82.0,
      "cap": 83.0,
      "stype": "between",
-     "mp": 0.20353526288824042,
-     "mid": 0.045,
-     "yb": 0.04,
-     "ya": 0.05,
-     "oi": 224.69
+     "mp": 0.16289661860809712,
+     "mid": 0.025,
+     "yb": 0.02,
+     "ya": 0.03,
+     "oi": 720.01
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-B84.5",
@@ -2159,11 +672,11 @@
      "floor": 84.0,
      "cap": 85.0,
      "stype": "between",
-     "mp": 0.2645955392702286,
-     "mid": 0.405,
-     "yb": 0.4,
-     "ya": 0.41,
-     "oi": 482.73
+     "mp": 0.23597245774579145,
+     "mid": 0.055,
+     "yb": 0.05,
+     "ya": 0.06,
+     "oi": 896.04
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-B86.5",
@@ -2172,11 +685,11 @@
      "floor": 86.0,
      "cap": 87.0,
      "stype": "between",
-     "mp": 0.19225594858757394,
-     "mid": 0.435,
-     "yb": 0.43,
-     "ya": 0.44,
-     "oi": 430.98
+     "mp": 0.2114823344321464,
+     "mid": 0.485,
+     "yb": 0.48,
+     "ya": 0.49,
+     "oi": 640.54
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-B88.5",
@@ -2185,11 +698,11 @@
      "floor": 88.0,
      "cap": 89.0,
      "stype": "between",
-     "mp": 0.09640808637460375,
-     "mid": 0.10500000000000001,
-     "yb": 0.1,
-     "ya": 0.11,
-     "oi": 266.6
+     "mp": 0.14063967375203038,
+     "mid": 0.385,
+     "yb": 0.38,
+     "ya": 0.39,
+     "oi": 1338.6
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-T89",
@@ -2198,58 +711,73 @@
      "floor": 89.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.12662985128758258,
+     "mp": 0.15775894954257227,
      "mid": 0.025,
      "yb": 0.02,
      "ya": 0.03,
-     "oi": 494.98
+     "oi": 563.91
     }
    ],
    "plays": [
     {
-     "ticker": "KXHIGHTMIN-26JUL05-T82",
-     "bid": "less:None:82.0",
-     "sub": "81\u00b0 or below",
+     "ticker": "KXHIGHTMIN-26JUL05-B82.5",
+     "bid": "between:82.0:83.0",
+     "sub": "82\u00b0 to 83\u00b0",
      "side": "Buy YES",
-     "entry": 0.05,
-     "net": 0.056575311591771,
-     "edge": 0.081575311591771,
+     "entry": 0.03,
+     "net": 0.12289661860809713,
+     "edge": 0.13789661860809713,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.11657531159177101,
-     "mp": 0.11657531159177101,
-     "mid": 0.035
+     "p_win": 0.16289661860809712,
+     "mp": 0.16289661860809712,
+     "mid": 0.025
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-B84.5",
      "bid": "between:84.0:85.0",
      "sub": "84\u00b0 to 85\u00b0",
-     "side": "Buy NO",
-     "entry": 0.6,
-     "net": 0.10540446072977144,
-     "edge": -0.14040446072977142,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.7354044607297714,
-     "mp": 0.2645955392702286,
-     "mid": 0.405
+     "side": "Buy YES",
+     "entry": 0.06,
+     "net": 0.16597245774579147,
+     "edge": 0.18097245774579146,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.23597245774579145,
+     "mp": 0.23597245774579145,
+     "mid": 0.055
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-B86.5",
      "bid": "between:86.0:87.0",
      "sub": "86\u00b0 to 87\u00b0",
      "side": "Buy NO",
-     "entry": 0.57,
-     "net": 0.20774405141242605,
-     "edge": -0.24274405141242605,
+     "entry": 0.52,
+     "net": 0.23851766556785362,
+     "edge": -0.2735176655678536,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.8077440514124261,
-     "mp": 0.19225594858757394,
-     "mid": 0.435
+     "p_win": 0.7885176655678536,
+     "mp": 0.2114823344321464,
+     "mid": 0.485
+    },
+    {
+     "ticker": "KXHIGHTMIN-26JUL05-B88.5",
+     "bid": "between:88.0:89.0",
+     "sub": "88\u00b0 to 89\u00b0",
+     "side": "Buy NO",
+     "entry": 0.62,
+     "net": 0.20936032624796963,
+     "edge": -0.24436032624796963,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.8593603262479697,
+     "mp": 0.14063967375203038,
+     "mid": 0.385
     },
     {
      "ticker": "KXHIGHTMIN-26JUL05-T89",
@@ -2257,13 +785,13 @@
      "sub": "90\u00b0 or above",
      "side": "Buy YES",
      "entry": 0.03,
-     "net": 0.08662985128758259,
-     "edge": 0.10162985128758259,
+     "net": 0.11775894954257228,
+     "edge": 0.13275894954257228,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.12662985128758258,
-     "mp": 0.12662985128758258,
+     "p_win": 0.15775894954257227,
+     "mp": 0.15775894954257227,
      "mid": 0.025
     }
    ]
@@ -2273,16 +801,16 @@
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTHOU-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 96.34265734265735,
-   "sd": 2.9908365766187375,
-   "psd": 3.43528796872118,
+   "mean": 96.4090909090909,
+   "sd": 2.4269728213664905,
+   "psd": 2.7723270145586403,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": -0.9050062087445241,
+   "offset": -1.1392182696530568,
    "buckets": [
     {
      "ticker": "KXHIGHTHOU-26JUL05-T93",
@@ -2291,11 +819,11 @@
      "floor": null,
      "cap": 93.0,
      "stype": "less",
-     "mp": 0.11546680098281611,
+     "mp": 0.06353659181906482,
      "mid": 0.005,
      "yb": 0.0,
      "ya": 0.01,
-     "oi": 741.45
+     "oi": 789.59
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-B93.5",
@@ -2304,11 +832,11 @@
      "floor": 93.0,
      "cap": 94.0,
      "stype": "between",
-     "mp": 0.19575294439847526,
-     "mid": 0.045,
-     "yb": 0.04,
-     "ya": 0.05,
-     "oi": 427.67
+     "mp": 0.19351163345639574,
+     "mid": 0.025,
+     "yb": 0.02,
+     "ya": 0.03,
+     "oi": 968.77
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-B95.5",
@@ -2317,11 +845,11 @@
      "floor": 95.0,
      "cap": 96.0,
      "stype": "between",
-     "mp": 0.2548358657551696,
-     "mid": 0.255,
-     "yb": 0.25,
-     "ya": 0.26,
-     "oi": 957.31
+     "mp": 0.2970128628976848,
+     "mid": 0.16999999999999998,
+     "yb": 0.15,
+     "ya": 0.19,
+     "oi": 1850.41
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-B97.5",
@@ -2330,11 +858,11 @@
      "floor": 97.0,
      "cap": 98.0,
      "stype": "between",
-     "mp": 0.18630177342423063,
-     "mid": 0.555,
-     "yb": 0.55,
-     "ya": 0.56,
-     "oi": 1723.47
+     "mp": 0.224756272207536,
+     "mid": 0.59,
+     "yb": 0.58,
+     "ya": 0.6,
+     "oi": 2207.18
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-B99.5",
@@ -2343,11 +871,11 @@
      "floor": 99.0,
      "cap": 100.0,
      "stype": "between",
-     "mp": 0.10944000909614045,
-     "mid": 0.195,
-     "yb": 0.19,
-     "ya": 0.2,
-     "oi": 1437.0
+     "mp": 0.12912380521328812,
+     "mid": 0.22999999999999998,
+     "yb": 0.22,
+     "ya": 0.24,
+     "oi": 2189.92
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-T100",
@@ -2356,11 +884,11 @@
      "floor": 100.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.13820260634316797,
+     "mp": 0.09205883440603047,
      "mid": 0.015,
      "yb": 0.01,
      "ya": 0.02,
-     "oi": 456.0
+     "oi": 1196.43
     }
    ],
    "plays": [
@@ -2369,45 +897,60 @@
      "bid": "between:93.0:94.0",
      "sub": "93\u00b0 to 94\u00b0",
      "side": "Buy YES",
-     "entry": 0.05,
-     "net": 0.13575294439847524,
-     "edge": 0.15075294439847525,
+     "entry": 0.03,
+     "net": 0.15351163345639574,
+     "edge": 0.16851163345639575,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.19575294439847526,
-     "mp": 0.19575294439847526,
-     "mid": 0.045
+     "p_win": 0.19351163345639574,
+     "mp": 0.19351163345639574,
+     "mid": 0.025
+    },
+    {
+     "ticker": "KXHIGHTHOU-26JUL05-B95.5",
+     "bid": "between:95.0:96.0",
+     "sub": "95\u00b0 to 96\u00b0",
+     "side": "Buy YES",
+     "entry": 0.19,
+     "net": 0.08701286289768481,
+     "edge": 0.12701286289768482,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.2970128628976848,
+     "mp": 0.2970128628976848,
+     "mid": 0.16999999999999998
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-B97.5",
      "bid": "between:97.0:98.0",
      "sub": "97\u00b0 to 98\u00b0",
      "side": "Buy NO",
-     "entry": 0.45,
-     "net": 0.3336982265757694,
-     "edge": -0.36869822657576945,
+     "entry": 0.42,
+     "net": 0.3252437277924639,
+     "edge": -0.36524372779246395,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.8136982265757694,
-     "mp": 0.18630177342423063,
-     "mid": 0.555
+     "p_win": 0.775243727792464,
+     "mp": 0.224756272207536,
+     "mid": 0.59
     },
     {
      "ticker": "KXHIGHTHOU-26JUL05-B99.5",
      "bid": "between:99.0:100.0",
      "sub": "99\u00b0 to 100\u00b0",
      "side": "Buy NO",
-     "entry": 0.81,
-     "net": 0.06055999090385955,
-     "edge": -0.08555999090385956,
+     "entry": 0.78,
+     "net": 0.07087619478671187,
+     "edge": -0.10087619478671186,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.8905599909038595,
-     "mp": 0.10944000909614045,
-     "mid": 0.195
+     "p_win": 0.8708761947867119,
+     "mp": 0.12912380521328812,
+     "mid": 0.22999999999999998
     }
    ]
   },
@@ -2416,16 +959,16 @@
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTDC-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 96.63566433566433,
-   "sd": 4.088794265388283,
-   "psd": 4.424289609041446,
+   "mean": 95.5027972027972,
+   "sd": 2.6447981417532693,
+   "psd": 2.964887385824552,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": 0.19121989121987326,
+   "offset": 0.0027972027972111846,
    "buckets": [
     {
      "ticker": "KXHIGHTDC-26JUL05-T91",
@@ -2434,11 +977,11 @@
      "floor": null,
      "cap": 91.0,
      "stype": "less",
-     "mp": 0.09615605276051026,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 786.05
+     "mp": 0.04941077452019761,
+     "mid": 0.005,
+     "yb": 0.0,
+     "ya": 0.01,
+     "oi": 889.15
     },
     {
      "ticker": "KXHIGHTDC-26JUL05-B91.5",
@@ -2447,11 +990,11 @@
      "floor": 91.0,
      "cap": 92.0,
      "stype": "between",
-     "mp": 0.05991679714092648,
-     "mid": 0.025,
+     "mp": 0.11181523221637987,
+     "mid": 0.035,
      "yb": 0.02,
-     "ya": 0.03,
-     "oi": 692.44
+     "ya": 0.05,
+     "oi": 1442.56
     },
     {
      "ticker": "KXHIGHTDC-26JUL05-B93.5",
@@ -2460,11 +1003,11 @@
      "floor": 93.0,
      "cap": 94.0,
      "stype": "between",
-     "mp": 0.1125227833491804,
-     "mid": 0.08499999999999999,
-     "yb": 0.08,
-     "ya": 0.09,
-     "oi": 1173.46
+     "mp": 0.20576551071869953,
+     "mid": 0.21500000000000002,
+     "yb": 0.2,
+     "ya": 0.23,
+     "oi": 3616.6
     },
     {
      "ticker": "KXHIGHTDC-26JUL05-B95.5",
@@ -2473,11 +1016,11 @@
      "floor": 95.0,
      "cap": 96.0,
      "stype": "between",
-     "mp": 0.17395291107016142,
-     "mid": 0.275,
-     "yb": 0.25,
-     "ya": 0.3,
-     "oi": 578.28
+     "mp": 0.2587656478250425,
+     "mid": 0.505,
+     "yb": 0.49,
+     "ya": 0.52,
+     "oi": 1392.32
     },
     {
      "ticker": "KXHIGHTDC-26JUL05-B97.5",
@@ -2486,11 +1029,11 @@
      "floor": 97.0,
      "cap": 98.0,
      "stype": "between",
-     "mp": 0.19920480654820313,
-     "mid": 0.395,
-     "yb": 0.39,
-     "ya": 0.4,
-     "oi": 688.19
+     "mp": 0.21168771869151815,
+     "mid": 0.24,
+     "yb": 0.23,
+     "ya": 0.25,
+     "oi": 982.91
     },
     {
      "ticker": "KXHIGHTDC-26JUL05-T98",
@@ -2499,58 +1042,58 @@
      "floor": 98.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.35824664913101834,
-     "mid": 0.10500000000000001,
-     "yb": 0.1,
-     "ya": 0.11,
-     "oi": 427.59
+     "mp": 0.162555116028162,
+     "mid": 0.03,
+     "yb": 0.02,
+     "ya": 0.04,
+     "oi": 1170.87
     }
    ],
    "plays": [
+    {
+     "ticker": "KXHIGHTDC-26JUL05-B91.5",
+     "bid": "between:91.0:92.0",
+     "sub": "91\u00b0 to 92\u00b0",
+     "side": "Buy YES",
+     "entry": 0.05,
+     "net": 0.05181523221637987,
+     "edge": 0.07681523221637987,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.11181523221637987,
+     "mp": 0.11181523221637987,
+     "mid": 0.035
+    },
     {
      "ticker": "KXHIGHTDC-26JUL05-B95.5",
      "bid": "between:95.0:96.0",
      "sub": "95\u00b0 to 96\u00b0",
      "side": "Buy NO",
-     "entry": 0.75,
-     "net": 0.056047088929838604,
-     "edge": -0.1010470889298386,
+     "entry": 0.51,
+     "net": 0.20123435217495747,
+     "edge": -0.24623435217495748,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.8260470889298386,
-     "mp": 0.17395291107016142,
-     "mid": 0.275
-    },
-    {
-     "ticker": "KXHIGHTDC-26JUL05-B97.5",
-     "bid": "between:97.0:98.0",
-     "sub": "97\u00b0 to 98\u00b0",
-     "side": "Buy NO",
-     "entry": 0.61,
-     "net": 0.16079519345179688,
-     "edge": -0.19579519345179688,
-     "tier": "A",
-     "units": 1.5,
-     "stake": 15.0,
-     "p_win": 0.8007951934517968,
-     "mp": 0.19920480654820313,
-     "mid": 0.395
+     "p_win": 0.7412343521749575,
+     "mp": 0.2587656478250425,
+     "mid": 0.505
     },
     {
      "ticker": "KXHIGHTDC-26JUL05-T98",
      "bid": "greater:98.0:None",
      "sub": "99\u00b0 or above",
      "side": "Buy YES",
-     "entry": 0.11,
-     "net": 0.22824664913101836,
-     "edge": 0.25324664913101835,
+     "entry": 0.04,
+     "net": 0.112555116028162,
+     "edge": 0.132555116028162,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.35824664913101834,
-     "mp": 0.35824664913101834,
-     "mid": 0.10500000000000001
+     "p_win": 0.162555116028162,
+     "mp": 0.162555116028162,
+     "mid": 0.03
     }
    ]
   },
@@ -2559,16 +1102,16 @@
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTDAL-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 99.78251748251748,
-   "sd": 3.444552092337584,
-   "psd": 3.8368006355331037,
+   "mean": 99.4895104895105,
+   "sd": 2.8173715193176063,
+   "psd": 3.1198048461181025,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": 0.9804341491841342,
+   "offset": 1.9794602382542195,
    "buckets": [
     {
      "ticker": "KXHIGHTDAL-26JUL05-T97",
@@ -2577,11 +1120,11 @@
      "floor": null,
      "cap": 97.0,
      "stype": "less",
-     "mp": 0.17373672455117853,
-     "mid": 0.11499999999999999,
-     "yb": 0.11,
-     "ya": 0.12,
-     "oi": 1259.7
+     "mp": 0.15405051652217758,
+     "mid": 0.355,
+     "yb": 0.35,
+     "ya": 0.36,
+     "oi": 4015.59
     },
     {
      "ticker": "KXHIGHTDAL-26JUL05-B97.5",
@@ -2590,11 +1133,11 @@
      "floor": 97.0,
      "cap": 98.0,
      "stype": "between",
-     "mp": 0.16175512247095197,
-     "mid": 0.275,
-     "yb": 0.26,
-     "ya": 0.29,
-     "oi": 753.0
+     "mp": 0.19575282235847843,
+     "mid": 0.36,
+     "yb": 0.35,
+     "ya": 0.37,
+     "oi": 1366.44
     },
     {
      "ticker": "KXHIGHTDAL-26JUL05-B99.5",
@@ -2603,11 +1146,11 @@
      "floor": 99.0,
      "cap": 100.0,
      "stype": "between",
-     "mp": 0.2234732680734269,
-     "mid": 0.445,
-     "yb": 0.44,
-     "ya": 0.45,
-     "oi": 884.93
+     "mp": 0.25059894485638073,
+     "mid": 0.225,
+     "yb": 0.22,
+     "ya": 0.23,
+     "oi": 1092.84
     },
     {
      "ticker": "KXHIGHTDAL-26JUL05-B101.5",
@@ -2616,11 +1159,11 @@
      "floor": 101.0,
      "cap": 102.0,
      "stype": "between",
-     "mp": 0.21029638596863726,
-     "mid": 0.08499999999999999,
-     "yb": 0.08,
-     "ya": 0.09,
-     "oi": 465.5
+     "mp": 0.23861076404385465,
+     "mid": 0.035,
+     "yb": 0.03,
+     "ya": 0.04,
+     "oi": 929.9
     },
     {
      "ticker": "KXHIGHTDAL-26JUL05-B103.5",
@@ -2629,11 +1172,11 @@
      "floor": 103.0,
      "cap": 104.0,
      "stype": "between",
-     "mp": 0.13211158107955392,
-     "mid": 0.035,
-     "yb": 0.03,
-     "ya": 0.04,
-     "oi": 153.94
+     "mp": 0.12494450738467335,
+     "mid": 0.015,
+     "yb": 0.01,
+     "ya": 0.02,
+     "oi": 649.84
     },
     {
      "ticker": "KXHIGHTDAL-26JUL05-T104",
@@ -2642,58 +1185,58 @@
      "floor": 104.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.09862691785625141,
+     "mp": 0.03604244483443509,
      "mid": 0.005,
      "yb": 0.0,
      "ya": 0.01,
-     "oi": 735.87
+     "oi": 1204.35
     }
    ],
    "plays": [
+    {
+     "ticker": "KXHIGHTDAL-26JUL05-T97",
+     "bid": "less:None:97.0",
+     "sub": "96\u00b0 or below",
+     "side": "Buy NO",
+     "entry": 0.65,
+     "net": 0.1659494834778224,
+     "edge": -0.2009494834778224,
+     "tier": "S",
+     "units": 2.0,
+     "stake": 20.0,
+     "p_win": 0.8459494834778224,
+     "mp": 0.15405051652217758,
+     "mid": 0.355
+    },
     {
      "ticker": "KXHIGHTDAL-26JUL05-B97.5",
      "bid": "between:97.0:98.0",
      "sub": "97\u00b0 to 98\u00b0",
      "side": "Buy NO",
-     "entry": 0.74,
-     "net": 0.07824487752904806,
-     "edge": -0.11324487752904805,
-     "tier": "B",
-     "units": 1.0,
-     "stake": 10.0,
-     "p_win": 0.8382448775290481,
-     "mp": 0.16175512247095197,
-     "mid": 0.275
-    },
-    {
-     "ticker": "KXHIGHTDAL-26JUL05-B99.5",
-     "bid": "between:99.0:100.0",
-     "sub": "99\u00b0 to 100\u00b0",
-     "side": "Buy NO",
-     "entry": 0.56,
-     "net": 0.1865267319265731,
-     "edge": -0.2215267319265731,
+     "entry": 0.65,
+     "net": 0.12424717764152154,
+     "edge": -0.16424717764152155,
      "tier": "A",
      "units": 1.5,
      "stake": 15.0,
-     "p_win": 0.7765267319265731,
-     "mp": 0.2234732680734269,
-     "mid": 0.445
+     "p_win": 0.8042471776415215,
+     "mp": 0.19575282235847843,
+     "mid": 0.36
     },
     {
      "ticker": "KXHIGHTDAL-26JUL05-B101.5",
      "bid": "between:101.0:102.0",
      "sub": "101\u00b0 to 102\u00b0",
      "side": "Buy YES",
-     "entry": 0.09,
-     "net": 0.10029638596863727,
-     "edge": 0.12529638596863726,
+     "entry": 0.04,
+     "net": 0.18861076404385463,
+     "edge": 0.20361076404385464,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.21029638596863726,
-     "mp": 0.21029638596863726,
-     "mid": 0.08499999999999999
+     "p_win": 0.23861076404385465,
+     "mp": 0.23861076404385465,
+     "mid": 0.035
     }
    ]
   },
@@ -2702,16 +1245,16 @@
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTBOS-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 78.4986013986014,
-   "sd": 2.829712135745764,
-   "psd": 3.2959627988171913,
+   "mean": 79.08531468531469,
+   "sd": 2.8032937181472657,
+   "psd": 3.10709762804517,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": -0.3860139860139924,
+   "offset": -0.993365517730993,
    "buckets": [
     {
      "ticker": "KXHIGHTBOS-26JUL05-T79",
@@ -2720,11 +1263,11 @@
      "floor": null,
      "cap": 79.0,
      "stype": "less",
-     "mp": 0.506321594598936,
-     "mid": 0.53,
-     "yb": 0.51,
-     "ya": 0.55,
-     "oi": 765.25
+     "mp": 0.4572403915542504,
+     "mid": 0.12,
+     "yb": 0.11,
+     "ya": 0.13,
+     "oi": 1164.9
     },
     {
      "ticker": "KXHIGHTBOS-26JUL05-B79.5",
@@ -2733,11 +1276,11 @@
      "floor": 79.0,
      "cap": 80.0,
      "stype": "between",
-     "mp": 0.20888285337350443,
-     "mid": 0.29000000000000004,
-     "yb": 0.28,
-     "ya": 0.3,
-     "oi": 124.77
+     "mp": 0.23889203303317252,
+     "mid": 0.595,
+     "yb": 0.59,
+     "ya": 0.6,
+     "oi": 621.3
     },
     {
      "ticker": "KXHIGHTBOS-26JUL05-B81.5",
@@ -2746,11 +1289,11 @@
      "floor": 81.0,
      "cap": 82.0,
      "stype": "between",
-     "mp": 0.16683731616860148,
-     "mid": 0.10500000000000001,
-     "yb": 0.1,
-     "ya": 0.11,
-     "oi": 458.09
+     "mp": 0.15279103862622612,
+     "mid": 0.19,
+     "yb": 0.18,
+     "ya": 0.2,
+     "oi": 6555.98
     },
     {
      "ticker": "KXHIGHTBOS-26JUL05-B83.5",
@@ -2759,11 +1302,11 @@
      "floor": 83.0,
      "cap": 84.0,
      "stype": "between",
-     "mp": 0.08636310893596198,
-     "mid": 0.03,
-     "yb": 0.02,
+     "mp": 0.09329258911593931,
+     "mid": 0.035,
+     "yb": 0.03,
      "ya": 0.04,
-     "oi": 298.55
+     "oi": 3566.03
     },
     {
      "ticker": "KXHIGHTBOS-26JUL05-B85.5",
@@ -2772,11 +1315,11 @@
      "floor": 85.0,
      "cap": 86.0,
      "stype": "between",
-     "mp": 0.024643349923956396,
-     "mid": 0.015,
-     "yb": 0.01,
-     "ya": 0.02,
-     "oi": 437.33
+     "mp": 0.04766593832175042,
+     "mid": 0.035,
+     "yb": 0.02,
+     "ya": 0.05,
+     "oi": 1154.62
     },
     {
      "ticker": "KXHIGHTBOS-26JUL05-T86",
@@ -2785,30 +1328,76 @@
      "floor": 86.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.006951776999039889,
-     "mid": 0.005,
+     "mp": 0.010118009348661184,
+     "mid": 0.01,
      "yb": 0.0,
-     "ya": 0.01,
-     "oi": 1356.1
+     "ya": 0.02,
+     "oi": 1750.31
     }
    ],
-   "plays": []
+   "plays": [
+    {
+     "ticker": "KXHIGHTBOS-26JUL05-T79",
+     "bid": "less:None:79.0",
+     "sub": "78\u00b0 or below",
+     "side": "Buy YES",
+     "entry": 0.13,
+     "net": 0.30724039155425037,
+     "edge": 0.3372403915542504,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.4572403915542504,
+     "mp": 0.4572403915542504,
+     "mid": 0.12
+    },
+    {
+     "ticker": "KXHIGHTBOS-26JUL05-B79.5",
+     "bid": "between:79.0:80.0",
+     "sub": "79\u00b0 to 80\u00b0",
+     "side": "Buy NO",
+     "entry": 0.41,
+     "net": 0.3211079669668274,
+     "edge": -0.35610796696682745,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.7611079669668275,
+     "mp": 0.23889203303317252,
+     "mid": 0.595
+    },
+    {
+     "ticker": "KXHIGHTBOS-26JUL05-B83.5",
+     "bid": "between:83.0:84.0",
+     "sub": "83\u00b0 to 84\u00b0",
+     "side": "Buy YES",
+     "entry": 0.04,
+     "net": 0.043292589115939306,
+     "edge": 0.058292589115939306,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.09329258911593931,
+     "mp": 0.09329258911593931,
+     "mid": 0.035
+    }
+   ]
   },
   "ATL|HIGH|2026-07-05": {
    "code": "ATL",
    "kind": "HIGH",
    "target": "2026-07-05",
    "event_ticker": "KXHIGHTATL-26JUL05",
-   "logged_at": "2026-07-05T06:11",
+   "logged_at": "2026-07-05T13:31",
    "lead": 0,
-   "mean": 92.12517482517482,
-   "sd": 2.592093101676296,
-   "psd": 3.0943572269144752,
+   "mean": 92.3,
+   "sd": 2.6089142504945557,
+   "psd": 2.932922359428147,
    "bias_corr": 0.0,
-   "sigma": 1.69,
+   "sigma": 1.34,
    "model_version": "2026-07-02.v3-nimbus-calib",
    "biased": false,
-   "offset": -1.649957449957455,
+   "offset": -1.6285714285714334,
    "buckets": [
     {
      "ticker": "KXHIGHTATL-26JUL05-T91",
@@ -2817,11 +1406,11 @@
      "floor": null,
      "cap": 91.0,
      "stype": "less",
-     "mp": 0.2961289878454815,
+     "mp": 0.26066586946995646,
      "mid": 0.025,
      "yb": 0.02,
      "ya": 0.03,
-     "oi": 960.94
+     "oi": 2739.55
     },
     {
      "ticker": "KXHIGHTATL-26JUL05-B91.5",
@@ -2830,11 +1419,11 @@
      "floor": 91.0,
      "cap": 92.0,
      "stype": "between",
-     "mp": 0.24490362954030495,
-     "mid": 0.095,
-     "yb": 0.09,
-     "ya": 0.1,
-     "oi": 749.27
+     "mp": 0.2402526891968972,
+     "mid": 0.14500000000000002,
+     "yb": 0.13,
+     "ya": 0.16,
+     "oi": 2672.15
     },
     {
      "ticker": "KXHIGHTATL-26JUL05-B93.5",
@@ -2843,11 +1432,11 @@
      "floor": 93.0,
      "cap": 94.0,
      "stype": "between",
-     "mp": 0.22790524798728834,
-     "mid": 0.605,
-     "yb": 0.6,
-     "ya": 0.61,
-     "oi": 1233.73
+     "mp": 0.2573276058834514,
+     "mid": 0.505,
+     "yb": 0.5,
+     "ya": 0.51,
+     "oi": 1544.98
     },
     {
      "ticker": "KXHIGHTATL-26JUL05-B95.5",
@@ -2856,11 +1445,11 @@
      "floor": 95.0,
      "cap": 96.0,
      "stype": "between",
-     "mp": 0.1543054140603448,
-     "mid": 0.18,
-     "yb": 0.17,
-     "ya": 0.19,
-     "oi": 462.98
+     "mp": 0.1788044140009647,
+     "mid": 0.33999999999999997,
+     "yb": 0.33,
+     "ya": 0.35,
+     "oi": 942.68
     },
     {
      "ticker": "KXHIGHTATL-26JUL05-B97.5",
@@ -2869,11 +1458,11 @@
      "floor": 97.0,
      "cap": 98.0,
      "stype": "between",
-     "mp": 0.0636254550195349,
+     "mp": 0.056587772530212334,
      "mid": 0.025,
      "yb": 0.02,
      "ya": 0.03,
-     "oi": 394.57
+     "oi": 463.81
     },
     {
      "ticker": "KXHIGHTATL-26JUL05-T98",
@@ -2882,11 +1471,11 @@
      "floor": 98.0,
      "cap": null,
      "stype": "greater",
-     "mp": 0.013131265547045431,
-     "mid": 0.015,
-     "yb": 0.01,
+     "mp": 0.00636164891851749,
+     "mid": 0.01,
+     "yb": 0.0,
      "ya": 0.02,
-     "oi": 209.21
+     "oi": 304.89
     }
    ],
    "plays": [
@@ -2896,13 +1485,13 @@
      "sub": "90\u00b0 or below",
      "side": "Buy YES",
      "entry": 0.03,
-     "net": 0.25612898784548144,
-     "edge": 0.27112898784548145,
+     "net": 0.22066586946995648,
+     "edge": 0.23566586946995646,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.2961289878454815,
-     "mp": 0.2961289878454815,
+     "p_win": 0.26066586946995646,
+     "mp": 0.26066586946995646,
      "mid": 0.025
     },
     {
@@ -2910,30 +1499,570 @@
      "bid": "between:91.0:92.0",
      "sub": "91\u00b0 to 92\u00b0",
      "side": "Buy YES",
-     "entry": 0.1,
-     "net": 0.12490362954030494,
-     "edge": 0.14990362954030495,
+     "entry": 0.16,
+     "net": 0.06025268919689719,
+     "edge": 0.0952526891968972,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.24490362954030495,
-     "mp": 0.24490362954030495,
-     "mid": 0.095
+     "p_win": 0.2402526891968972,
+     "mp": 0.2402526891968972,
+     "mid": 0.14500000000000002
     },
     {
      "ticker": "KXHIGHTATL-26JUL05-B93.5",
      "bid": "between:93.0:94.0",
      "sub": "93\u00b0 to 94\u00b0",
      "side": "Buy NO",
-     "entry": 0.4,
-     "net": 0.34209475201271167,
-     "edge": -0.37709475201271164,
+     "entry": 0.5,
+     "net": 0.21267239411654862,
+     "edge": -0.24767239411654862,
      "tier": "B",
      "units": 1.0,
      "stake": 10.0,
-     "p_win": 0.7720947520127117,
-     "mp": 0.22790524798728834,
-     "mid": 0.605
+     "p_win": 0.7426723941165486,
+     "mp": 0.2573276058834514,
+     "mid": 0.505
+    },
+    {
+     "ticker": "KXHIGHTATL-26JUL05-B95.5",
+     "bid": "between:95.0:96.0",
+     "sub": "95\u00b0 to 96\u00b0",
+     "side": "Buy NO",
+     "entry": 0.67,
+     "net": 0.1211955859990353,
+     "edge": -0.16119558599903527,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "p_win": 0.8211955859990353,
+     "mp": 0.1788044140009647,
+     "mid": 0.33999999999999997
+    }
+   ]
+  },
+  "SFO|HIGH|2026-07-05": {
+   "code": "SFO",
+   "kind": "HIGH",
+   "target": "2026-07-05",
+   "event_ticker": "KXHIGHTSFO-26JUL05",
+   "logged_at": "2026-07-05T13:31",
+   "lead": 0,
+   "mean": 68.64685314685315,
+   "sd": 4.460217376806227,
+   "psd": 4.657159976677226,
+   "bias_corr": 0.0,
+   "sigma": 1.34,
+   "model_version": "2026-07-02.v3-nimbus-calib",
+   "biased": false,
+   "offset": -0.38424733161575375,
+   "buckets": [
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-T65",
+     "bid": "less:None:65.0",
+     "sub": "64\u00b0 or below",
+     "floor": null,
+     "cap": 65.0,
+     "stype": "less",
+     "mp": 0.256234511255377,
+     "mid": 0.045,
+     "yb": 0.03,
+     "ya": 0.06,
+     "oi": 800.87
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B65.5",
+     "bid": "between:65.0:66.0",
+     "sub": "65\u00b0 to 66\u00b0",
+     "floor": 65.0,
+     "cap": 66.0,
+     "stype": "between",
+     "mp": 0.10129478730007575,
+     "mid": 0.025,
+     "yb": 0.02,
+     "ya": 0.03,
+     "oi": 2380.09
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B67.5",
+     "bid": "between:67.0:68.0",
+     "sub": "67\u00b0 to 68\u00b0",
+     "floor": 67.0,
+     "cap": 68.0,
+     "stype": "between",
+     "mp": 0.06967070381420978,
+     "mid": 0.29000000000000004,
+     "yb": 0.26,
+     "ya": 0.32,
+     "oi": 2250.73
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B69.5",
+     "bid": "between:69.0:70.0",
+     "sub": "69\u00b0 to 70\u00b0",
+     "floor": 69.0,
+     "cap": 70.0,
+     "stype": "between",
+     "mp": 0.1375277461432348,
+     "mid": 0.48,
+     "yb": 0.46,
+     "ya": 0.5,
+     "oi": 1485.41
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B71.5",
+     "bid": "between:71.0:72.0",
+     "sub": "71\u00b0 to 72\u00b0",
+     "floor": 71.0,
+     "cap": 72.0,
+     "stype": "between",
+     "mp": 0.19757115402052147,
+     "mid": 0.18,
+     "yb": 0.17,
+     "ya": 0.19,
+     "oi": 1443.23
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-T72",
+     "bid": "greater:72.0:None",
+     "sub": "73\u00b0 or above",
+     "floor": 72.0,
+     "cap": null,
+     "stype": "greater",
+     "mp": 0.237701097466581,
+     "mid": 0.025,
+     "yb": 0.02,
+     "ya": 0.03,
+     "oi": 399.63
+    }
+   ],
+   "plays": [
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-T65",
+     "bid": "less:None:65.0",
+     "sub": "64\u00b0 or below",
+     "side": "Buy YES",
+     "entry": 0.06,
+     "net": 0.18623451125537702,
+     "edge": 0.211234511255377,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.256234511255377,
+     "mp": 0.256234511255377,
+     "mid": 0.045
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B65.5",
+     "bid": "between:65.0:66.0",
+     "sub": "65\u00b0 to 66\u00b0",
+     "side": "Buy YES",
+     "entry": 0.03,
+     "net": 0.061294787300075745,
+     "edge": 0.07629478730007574,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.10129478730007575,
+     "mp": 0.10129478730007575,
+     "mid": 0.025
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B67.5",
+     "bid": "between:67.0:68.0",
+     "sub": "67\u00b0 to 68\u00b0",
+     "side": "Buy NO",
+     "entry": 0.74,
+     "net": 0.17032929618579024,
+     "edge": -0.22032929618579025,
+     "tier": "S",
+     "units": 2.0,
+     "stake": 20.0,
+     "p_win": 0.9303292961857902,
+     "mp": 0.06967070381420978,
+     "mid": 0.29000000000000004
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-B69.5",
+     "bid": "between:69.0:70.0",
+     "sub": "69\u00b0 to 70\u00b0",
+     "side": "Buy NO",
+     "entry": 0.54,
+     "net": 0.2924722538567652,
+     "edge": -0.34247225385676516,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.8624722538567652,
+     "mp": 0.1375277461432348,
+     "mid": 0.48
+    },
+    {
+     "ticker": "KXHIGHTSFO-26JUL05-T72",
+     "bid": "greater:72.0:None",
+     "sub": "73\u00b0 or above",
+     "side": "Buy YES",
+     "entry": 0.03,
+     "net": 0.197701097466581,
+     "edge": 0.212701097466581,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.237701097466581,
+     "mp": 0.237701097466581,
+     "mid": 0.025
+    }
+   ]
+  },
+  "SEA|HIGH|2026-07-05": {
+   "code": "SEA",
+   "kind": "HIGH",
+   "target": "2026-07-05",
+   "event_ticker": "KXHIGHTSEA-26JUL05",
+   "logged_at": "2026-07-05T13:31",
+   "lead": 0,
+   "mean": 72.5,
+   "sd": 2.438244238183485,
+   "psd": 2.782199663042709,
+   "bias_corr": 0.0,
+   "sigma": 1.34,
+   "model_version": "2026-07-02.v3-nimbus-calib",
+   "biased": true,
+   "offset": -3.17307692307692,
+   "buckets": [
+    {
+     "ticker": "KXHIGHTSEA-26JUL05-T72",
+     "bid": "less:None:72.0",
+     "sub": "71\u00b0 or below",
+     "floor": null,
+     "cap": 72.0,
+     "stype": "less",
+     "mp": 0.37594343746585607,
+     "mid": 0.015,
+     "yb": 0.01,
+     "ya": 0.02,
+     "oi": 1126.25
+    },
+    {
+     "ticker": "KXHIGHTSEA-26JUL05-B72.5",
+     "bid": "between:72.0:73.0",
+     "sub": "72\u00b0 to 73\u00b0",
+     "floor": 72.0,
+     "cap": 73.0,
+     "stype": "between",
+     "mp": 0.2683022161586032,
+     "mid": 0.045,
+     "yb": 0.04,
+     "ya": 0.05,
+     "oi": 2127.5
+    },
+    {
+     "ticker": "KXHIGHTSEA-26JUL05-B74.5",
+     "bid": "between:74.0:75.0",
+     "sub": "74\u00b0 to 75\u00b0",
+     "floor": 74.0,
+     "cap": 75.0,
+     "stype": "between",
+     "mp": 0.20441321666055917,
+     "mid": 0.35,
+     "yb": 0.33,
+     "ya": 0.37,
+     "oi": 2122.6
+    },
+    {
+     "ticker": "KXHIGHTSEA-26JUL05-B76.5",
+     "bid": "between:76.0:77.0",
+     "sub": "76\u00b0 to 77\u00b0",
+     "floor": 76.0,
+     "cap": 77.0,
+     "stype": "between",
+     "mp": 0.11189956126218835,
+     "mid": 0.5800000000000001,
+     "yb": 0.56,
+     "ya": 0.6,
+     "oi": 2434.2
+    },
+    {
+     "ticker": "KXHIGHTSEA-26JUL05-B78.5",
+     "bid": "between:78.0:79.0",
+     "sub": "78\u00b0 to 79\u00b0",
+     "floor": 78.0,
+     "cap": 79.0,
+     "stype": "between",
+     "mp": 0.03537720986857151,
+     "mid": 0.045,
+     "yb": 0.04,
+     "ya": 0.05,
+     "oi": 1054.89
+    },
+    {
+     "ticker": "KXHIGHTSEA-26JUL05-T79",
+     "bid": "greater:79.0:None",
+     "sub": "80\u00b0 or above",
+     "floor": 79.0,
+     "cap": null,
+     "stype": "greater",
+     "mp": 0.004064358584221967,
+     "mid": 0.005,
+     "yb": 0.0,
+     "ya": 0.01,
+     "oi": 742.94
+    }
+   ],
+   "plays": []
+  },
+  "PHX|HIGH|2026-07-05": {
+   "code": "PHX",
+   "kind": "HIGH",
+   "target": "2026-07-05",
+   "event_ticker": "KXHIGHTPHX-26JUL05",
+   "logged_at": "2026-07-05T13:31",
+   "lead": 0,
+   "mean": 107.04895104895105,
+   "sd": 1.8033716337327832,
+   "psd": 2.246719664166415,
+   "bias_corr": 0.0,
+   "sigma": 1.34,
+   "model_version": "2026-07-02.v3-nimbus-calib",
+   "biased": true,
+   "offset": -2.3124350896627988,
+   "buckets": [
+    {
+     "ticker": "KXHIGHTPHX-26JUL05-T107",
+     "bid": "less:None:107.0",
+     "sub": "106\u00b0 or below",
+     "floor": null,
+     "cap": 107.0,
+     "stype": "less",
+     "mp": 0.36552326934177753,
+     "mid": 0.035,
+     "yb": 0.03,
+     "ya": 0.04,
+     "oi": 4946.9
+    },
+    {
+     "ticker": "KXHIGHTPHX-26JUL05-B107.5",
+     "bid": "between:107.0:108.0",
+     "sub": "107\u00b0 to 108\u00b0",
+     "floor": 107.0,
+     "cap": 108.0,
+     "stype": "between",
+     "mp": 0.3656569856239444,
+     "mid": 0.22999999999999998,
+     "yb": 0.22,
+     "ya": 0.24,
+     "oi": 8250.95
+    },
+    {
+     "ticker": "KXHIGHTPHX-26JUL05-B109.5",
+     "bid": "between:109.0:110.0",
+     "sub": "109\u00b0 to 110\u00b0",
+     "floor": 109.0,
+     "cap": 110.0,
+     "stype": "between",
+     "mp": 0.22731846720769983,
+     "mid": 0.54,
+     "yb": 0.52,
+     "ya": 0.56,
+     "oi": 2320.01
+    },
+    {
+     "ticker": "KXHIGHTPHX-26JUL05-B111.5",
+     "bid": "between:111.0:112.0",
+     "sub": "111\u00b0 to 112\u00b0",
+     "floor": 111.0,
+     "cap": 112.0,
+     "stype": "between",
+     "mp": 0.03989403671115193,
+     "mid": 0.185,
+     "yb": 0.18,
+     "ya": 0.19,
+     "oi": 1473.8
+    },
+    {
+     "ticker": "KXHIGHTPHX-26JUL05-B113.5",
+     "bid": "between:113.0:114.0",
+     "sub": "113\u00b0 to 114\u00b0",
+     "floor": 113.0,
+     "cap": 114.0,
+     "stype": "between",
+     "mp": 0.0015940521328248836,
+     "mid": 0.015,
+     "yb": 0.01,
+     "ya": 0.02,
+     "oi": 1632.34
+    },
+    {
+     "ticker": "KXHIGHTPHX-26JUL05-T114",
+     "bid": "greater:114.0:None",
+     "sub": "115\u00b0 or above",
+     "floor": 114.0,
+     "cap": null,
+     "stype": "greater",
+     "mp": 1.3188982601470306e-05,
+     "mid": 0.005,
+     "yb": 0.0,
+     "ya": 0.01,
+     "oi": 2071.79
+    }
+   ],
+   "plays": []
+  },
+  "LV|HIGH|2026-07-05": {
+   "code": "LV",
+   "kind": "HIGH",
+   "target": "2026-07-05",
+   "event_ticker": "KXHIGHTLV-26JUL05",
+   "logged_at": "2026-07-05T13:31",
+   "lead": 0,
+   "mean": 102.94055944055944,
+   "sd": 1.5917724545820358,
+   "psd": 2.08070650192816,
+   "bias_corr": 0.0,
+   "sigma": 1.34,
+   "model_version": "2026-07-02.v3-nimbus-calib",
+   "biased": false,
+   "offset": -1.7952896160443288,
+   "buckets": [
+    {
+     "ticker": "KXHIGHTLV-26JUL05-T102",
+     "bid": "less:None:102.0",
+     "sub": "101\u00b0 or below",
+     "floor": null,
+     "cap": 102.0,
+     "stype": "less",
+     "mp": 0.23962254057383764,
+     "mid": 0.04,
+     "yb": 0.03,
+     "ya": 0.05,
+     "oi": 1453.39
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B102.5",
+     "bid": "between:102.0:103.0",
+     "sub": "102\u00b0 to 103\u00b0",
+     "floor": 102.0,
+     "cap": 103.0,
+     "stype": "between",
+     "mp": 0.38379837174729325,
+     "mid": 0.11499999999999999,
+     "yb": 0.11,
+     "ya": 0.12,
+     "oi": 1467.65
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B104.5",
+     "bid": "between:104.0:105.0",
+     "sub": "104\u00b0 to 105\u00b0",
+     "floor": 104.0,
+     "cap": 105.0,
+     "stype": "between",
+     "mp": 0.2781801183749634,
+     "mid": 0.61,
+     "yb": 0.6,
+     "ya": 0.62,
+     "oi": 832.56
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B106.5",
+     "bid": "between:106.0:107.0",
+     "sub": "106\u00b0 to 107\u00b0",
+     "floor": 106.0,
+     "cap": 107.0,
+     "stype": "between",
+     "mp": 0.07437376652057634,
+     "mid": 0.275,
+     "yb": 0.27,
+     "ya": 0.28,
+     "oi": 485.93
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B108.5",
+     "bid": "between:108.0:109.0",
+     "sub": "108\u00b0 to 109\u00b0",
+     "floor": 108.0,
+     "cap": 109.0,
+     "stype": "between",
+     "mp": 0.018519903062346937,
+     "mid": 0.015,
+     "yb": 0.01,
+     "ya": 0.02,
+     "oi": 827.21
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-T109",
+     "bid": "greater:109.0:None",
+     "sub": "110\u00b0 or above",
+     "floor": 109.0,
+     "cap": null,
+     "stype": "greater",
+     "mp": 0.0055052997209824005,
+     "mid": 0.005,
+     "yb": 0.0,
+     "ya": 0.01,
+     "oi": 532.14
+    }
+   ],
+   "plays": [
+    {
+     "ticker": "KXHIGHTLV-26JUL05-T102",
+     "bid": "less:None:102.0",
+     "sub": "101\u00b0 or below",
+     "side": "Buy YES",
+     "entry": 0.05,
+     "net": 0.17962254057383764,
+     "edge": 0.19962254057383763,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.23962254057383764,
+     "mp": 0.23962254057383764,
+     "mid": 0.04
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B102.5",
+     "bid": "between:102.0:103.0",
+     "sub": "102\u00b0 to 103\u00b0",
+     "side": "Buy YES",
+     "entry": 0.12,
+     "net": 0.24379837174729327,
+     "edge": 0.26879837174729326,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.38379837174729325,
+     "mp": 0.38379837174729325,
+     "mid": 0.11499999999999999
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B104.5",
+     "bid": "between:104.0:105.0",
+     "sub": "104\u00b0 to 105\u00b0",
+     "side": "Buy NO",
+     "entry": 0.4,
+     "net": 0.2918198816250366,
+     "edge": -0.33181988162503656,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "p_win": 0.7218198816250365,
+     "mp": 0.2781801183749634,
+     "mid": 0.61
+    },
+    {
+     "ticker": "KXHIGHTLV-26JUL05-B106.5",
+     "bid": "between:106.0:107.0",
+     "sub": "106\u00b0 to 107\u00b0",
+     "side": "Buy NO",
+     "entry": 0.73,
+     "net": 0.1756262334794237,
+     "edge": -0.20062623347942368,
+     "tier": "S",
+     "units": 2.0,
+     "stake": 20.0,
+     "p_win": 0.9256262334794236,
+     "mp": 0.07437376652057634,
+     "mid": 0.275
     }
    ]
   }
@@ -8019,6 +7148,1075 @@
     {
      "mp": 0.03881994709746497,
      "mid": 0.45,
+     "hit": 0
+    }
+   ],
+   "plays": []
+  },
+  {
+   "code": "SATX",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 94,
+   "mean": 96.2132867132867,
+   "bias": 2.2132867132867062,
+   "sd": 1.5513692468826088,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.0764995239680241,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.17725698392499947,
+     "mid": 0.08499999999999999,
+     "hit": 1
+    },
+    {
+     "mp": 0.28883975724943683,
+     "mid": 0.55,
+     "hit": 0
+    },
+    {
+     "mp": 0.2685118101595849,
+     "mid": 0.365,
+     "hit": 0
+    },
+    {
+     "mp": 0.14066337696550432,
+     "mid": 0.015,
+     "hit": 0
+    },
+    {
+     "mp": 0.04822854773245068,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "SATX",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "93\u00b0 to 94\u00b0",
+     "side": "Buy YES",
+     "entry": 0.09,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 111,
+     "won": true,
+     "pnl": 99.9,
+     "margin": 0.5,
+     "actual": 94,
+     "mp": 0.17725698392499947,
+     "mid": 0.08499999999999999,
+     "edge": 0.09225698392499948,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "SATX",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "95\u00b0 to 96\u00b0",
+     "side": "Buy NO",
+     "entry": 0.46,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 21,
+     "won": true,
+     "pnl": 10.92,
+     "margin": 0.5,
+     "actual": 94,
+     "mp": 0.28883975724943683,
+     "mid": 0.55,
+     "edge": -0.2611602427505632,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "SATX",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "97\u00b0 to 98\u00b0",
+     "side": "Buy NO",
+     "entry": 0.64,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 15,
+     "won": true,
+     "pnl": 5.1,
+     "margin": 2.5,
+     "actual": 94,
+     "mp": 0.2685118101595849,
+     "mid": 0.365,
+     "edge": -0.09648818984041507,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "OKC",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 100,
+   "mean": 100.11328671328671,
+   "bias": 0.11328671328671192,
+   "sd": 2.4163556261860717,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.20212690697852065,
+     "mid": 0.265,
+     "hit": 0
+    },
+    {
+     "mp": 0.2584239001222873,
+     "mid": 0.455,
+     "hit": 0
+    },
+    {
+     "mp": 0.24529979064317628,
+     "mid": 0.265,
+     "hit": 1
+    },
+    {
+     "mp": 0.14733318765137726,
+     "mid": 0.035,
+     "hit": 0
+    },
+    {
+     "mp": 0.081156216357766,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.06565999824687227,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "OKC",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "98\u00b0 to 99\u00b0",
+     "side": "Buy NO",
+     "entry": 0.55,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "contracts": 27,
+     "won": true,
+     "pnl": 11.61,
+     "margin": 0.5,
+     "actual": 100,
+     "mp": 0.2584239001222873,
+     "mid": 0.455,
+     "edge": -0.19657609987771274,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "NOLA",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 96,
+   "mean": 92.42587412587412,
+   "bias": -3.5741258741258832,
+   "sd": 2.5048125227979625,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.2868701516076364,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.2299965972202129,
+     "mid": 0.095,
+     "hit": 0
+    },
+    {
+     "mp": 0.21454164017759808,
+     "mid": 0.575,
+     "hit": 0
+    },
+    {
+     "mp": 0.15544454561463739,
+     "mid": 0.345,
+     "hit": 1
+    },
+    {
+     "mp": 0.08253995725120636,
+     "mid": 0.015,
+     "hit": 0
+    },
+    {
+     "mp": 0.030607108128708822,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "NOLA",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "91\u00b0 to 92\u00b0",
+     "side": "Buy YES",
+     "entry": 0.1,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 99,
+     "won": false,
+     "pnl": -10.89,
+     "margin": -3.5,
+     "actual": 96,
+     "mp": 0.2299965972202129,
+     "mid": 0.095,
+     "edge": 0.1349965972202129,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "NOLA",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "93\u00b0 to 94\u00b0",
+     "side": "Buy NO",
+     "entry": 0.44,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 22,
+     "won": true,
+     "pnl": 11.88,
+     "margin": 1.5,
+     "actual": 96,
+     "mp": 0.21454164017759808,
+     "mid": 0.575,
+     "edge": -0.3604583598224019,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "NOLA",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "95\u00b0 to 96\u00b0",
+     "side": "Buy NO",
+     "entry": 0.66,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "contracts": 22,
+     "won": false,
+     "pnl": -14.96,
+     "margin": -0.5,
+     "actual": 96,
+     "mp": 0.15544454561463739,
+     "mid": 0.345,
+     "edge": -0.1895554543853626,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "MIN",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 87,
+   "mean": 84.84685314685315,
+   "bias": -2.1531468531468505,
+   "sd": 3.2564256907126645,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.031096916386362493,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.06313803153626098,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.1115142441253763,
+     "mid": 0.025,
+     "hit": 0
+    },
+    {
+     "mp": 0.15301518129711555,
+     "mid": 0.065,
+     "hit": 0
+    },
+    {
+     "mp": 0.18494444142749145,
+     "mid": 0.29500000000000004,
+     "hit": 0
+    },
+    {
+     "mp": 0.4562911852273932,
+     "mid": 0.5800000000000001,
+     "hit": 1
+    }
+   ],
+   "plays": [
+    {
+     "code": "MIN",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "80\u00b0 to 81\u00b0",
+     "side": "Buy YES",
+     "entry": 0.03,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 333,
+     "won": false,
+     "pnl": -9.99,
+     "margin": -5.5,
+     "actual": 87,
+     "mp": 0.1115142441253763,
+     "mid": 0.025,
+     "edge": 0.08651424412537631,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "MIN",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "82\u00b0 to 83\u00b0",
+     "side": "Buy YES",
+     "entry": 0.08,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 124,
+     "won": false,
+     "pnl": -11.16,
+     "margin": -3.5,
+     "actual": 87,
+     "mp": 0.15301518129711555,
+     "mid": 0.065,
+     "edge": 0.08801518129711555,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "MIN",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "84\u00b0 to 85\u00b0",
+     "side": "Buy NO",
+     "entry": 0.73,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 13,
+     "won": true,
+     "pnl": 3.38,
+     "margin": 1.5,
+     "actual": 87,
+     "mp": 0.18494444142749145,
+     "mid": 0.29500000000000004,
+     "edge": -0.1100555585725086,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "MIN",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "86\u00b0 or above",
+     "side": "Buy NO",
+     "entry": 0.46,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 21,
+     "won": false,
+     "pnl": -10.08,
+     "margin": -1.5,
+     "actual": 87,
+     "mp": 0.4562911852273932,
+     "mid": 0.5800000000000001,
+     "edge": -0.12370881477260687,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "HOU",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 99,
+   "mean": 95.37062937062937,
+   "bias": -3.6293706293706265,
+   "sd": 2.6139173551504924,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.19590697476974459,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.24054291254705643,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.22935792304226593,
+     "mid": 0.505,
+     "hit": 0
+    },
+    {
+     "mp": 0.1497147665226635,
+     "mid": 0.455,
+     "hit": 0
+    },
+    {
+     "mp": 0.1004629835102679,
+     "mid": 0.08,
+     "hit": 1
+    },
+    {
+     "mp": 0.08401443960800142,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "HOU",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "95\u00b0 to 96\u00b0",
+     "side": "Buy NO",
+     "entry": 0.5,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 20,
+     "won": true,
+     "pnl": 9.6,
+     "margin": 2.5,
+     "actual": 99,
+     "mp": 0.22935792304226593,
+     "mid": 0.505,
+     "edge": -0.2756420769577341,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "HOU",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "97\u00b0 to 98\u00b0",
+     "side": "Buy NO",
+     "entry": 0.55,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 18,
+     "won": true,
+     "pnl": 7.74,
+     "margin": 0.5,
+     "actual": 99,
+     "mp": 0.1497147665226635,
+     "mid": 0.455,
+     "edge": -0.3052852334773365,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "DC",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 103,
+   "mean": 103.25244755244755,
+   "bias": 0.25244755244754913,
+   "sd": 1.7910746927310321,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.08366353560898136,
+     "mid": 0.035,
+     "hit": 0
+    },
+    {
+     "mp": 0.17245253027600657,
+     "mid": 0.395,
+     "hit": 0
+    },
+    {
+     "mp": 0.27826077344739336,
+     "mid": 0.46499999999999997,
+     "hit": 1
+    },
+    {
+     "mp": 0.26293422999237787,
+     "mid": 0.10500000000000001,
+     "hit": 0
+    },
+    {
+     "mp": 0.14397249607226373,
+     "mid": 0.015,
+     "hit": 0
+    },
+    {
+     "mp": 0.05871643460297724,
+     "mid": 0.01,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "DC",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "100\u00b0 to 101\u00b0",
+     "side": "Buy NO",
+     "entry": 0.61,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "contracts": 24,
+     "won": true,
+     "pnl": 8.88,
+     "margin": 1.5,
+     "actual": 103,
+     "mp": 0.17245253027600657,
+     "mid": 0.395,
+     "edge": -0.22254746972399345,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "DC",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "102\u00b0 to 103\u00b0",
+     "side": "Buy NO",
+     "entry": 0.54,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "contracts": 27,
+     "won": false,
+     "pnl": -15.12,
+     "margin": -0.5,
+     "actual": 103,
+     "mp": 0.27826077344739336,
+     "mid": 0.46499999999999997,
+     "edge": -0.1867392265526066,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "DC",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "104\u00b0 to 105\u00b0",
+     "side": "Buy YES",
+     "entry": 0.11,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 90,
+     "won": false,
+     "pnl": -10.8,
+     "margin": -0.5,
+     "actual": 103,
+     "mp": 0.26293422999237787,
+     "mid": 0.10500000000000001,
+     "edge": 0.15793422999237786,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "DAL",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 99,
+   "mean": 99.5013986013986,
+   "bias": 0.5013986013986056,
+   "sd": 1.7606016936361295,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.06652138091594949,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.16422167867932913,
+     "mid": 0.045,
+     "hit": 0
+    },
+    {
+     "mp": 0.277442631033896,
+     "mid": 0.6,
+     "hit": 1
+    },
+    {
+     "mp": 0.2667751844493688,
+     "mid": 0.38,
+     "hit": 0
+    },
+    {
+     "mp": 0.15166899743431783,
+     "mid": 0.025,
+     "hit": 0
+    },
+    {
+     "mp": 0.07337012748713911,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "DAL",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "96\u00b0 to 97\u00b0",
+     "side": "Buy YES",
+     "entry": 0.05,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 199,
+     "won": false,
+     "pnl": -9.95,
+     "margin": -1.5,
+     "actual": 99,
+     "mp": 0.16422167867932913,
+     "mid": 0.045,
+     "edge": 0.11922167867932913,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "DAL",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "98\u00b0 to 99\u00b0",
+     "side": "Buy NO",
+     "entry": 0.43,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 23,
+     "won": false,
+     "pnl": -10.35,
+     "margin": -0.5,
+     "actual": 99,
+     "mp": 0.277442631033896,
+     "mid": 0.6,
+     "edge": -0.322557368966104,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "DAL",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "100\u00b0 to 101\u00b0",
+     "side": "Buy NO",
+     "entry": 0.63,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 15,
+     "won": true,
+     "pnl": 5.25,
+     "margin": 0.5,
+     "actual": 99,
+     "mp": 0.2667751844493688,
+     "mid": 0.38,
+     "edge": -0.11322481555063119,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "DAL",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "102\u00b0 to 103\u00b0",
+     "side": "Buy YES",
+     "entry": 0.03,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 333,
+     "won": false,
+     "pnl": -9.99,
+     "margin": -2.5,
+     "actual": 99,
+     "mp": 0.15166899743431783,
+     "mid": 0.025,
+     "edge": 0.12666899743431784,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "ATL",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 93,
+   "mean": 92.88391608391608,
+   "bias": -0.1160839160839231,
+   "sd": 3.140991121242994,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.5724009096155558,
+     "mid": 0.13,
+     "hit": 1
+    },
+    {
+     "mp": 0.18411729437339278,
+     "mid": 0.565,
+     "hit": 0
+    },
+    {
+     "mp": 0.127724232477039,
+     "mid": 0.27,
+     "hit": 0
+    },
+    {
+     "mp": 0.07474823016110005,
+     "mid": 0.035,
+     "hit": 0
+    },
+    {
+     "mp": 0.031580746752052254,
+     "mid": 0.015,
+     "hit": 0
+    },
+    {
+     "mp": 0.009428586620859788,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": []
+  },
+  {
+   "code": "SFO",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 69,
+   "mean": 70.45524475524476,
+   "bias": 1.4552447552447632,
+   "sd": 5.855505786609552,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.30562311773082934,
+     "mid": 0.05500000000000001,
+     "hit": 0
+    },
+    {
+     "mp": 0.07962499811962788,
+     "mid": 0.115,
+     "hit": 0
+    },
+    {
+     "mp": 0.09144053499631949,
+     "mid": 0.475,
+     "hit": 1
+    },
+    {
+     "mp": 0.12363733190144292,
+     "mid": 0.31,
+     "hit": 0
+    },
+    {
+     "mp": 0.11961097681063952,
+     "mid": 0.07500000000000001,
+     "hit": 0
+    },
+    {
+     "mp": 0.2800630404411409,
+     "mid": 0.015,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "SFO",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "66\u00b0 or below",
+     "side": "Buy YES",
+     "entry": 0.07,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 142,
+     "won": false,
+     "pnl": -9.94,
+     "margin": -2.5,
+     "actual": 69,
+     "mp": 0.30562311773082934,
+     "mid": 0.05500000000000001,
+     "edge": 0.25062311773082935,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "SFO",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "69\u00b0 to 70\u00b0",
+     "side": "Buy NO",
+     "entry": 0.54,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 18,
+     "won": false,
+     "pnl": -10.08,
+     "margin": -0.5,
+     "actual": 69,
+     "mp": 0.09144053499631949,
+     "mid": 0.475,
+     "edge": -0.3835594650036805,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "SFO",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "71\u00b0 to 72\u00b0",
+     "side": "Buy NO",
+     "entry": 0.71,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "contracts": 21,
+     "won": true,
+     "pnl": 5.88,
+     "margin": 1.5,
+     "actual": 69,
+     "mp": 0.12363733190144292,
+     "mid": 0.31,
+     "edge": -0.18636266809855706,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "SEA",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 72,
+   "mean": 72.15944055944055,
+   "bias": 0.15944055944055435,
+   "sd": 3.1741578424370425,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.44886584355649245,
+     "mid": 0.275,
+     "hit": 0
+    },
+    {
+     "mp": 0.20176657723841424,
+     "mid": 0.605,
+     "hit": 1
+    },
+    {
+     "mp": 0.14926749221963934,
+     "mid": 0.10500000000000001,
+     "hit": 0
+    },
+    {
+     "mp": 0.1073824506038736,
+     "mid": 0.035,
+     "hit": 0
+    },
+    {
+     "mp": 0.06527614184523028,
+     "mid": 0.015,
+     "hit": 0
+    },
+    {
+     "mp": 0.027441494536349694,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": [
+    {
+     "code": "SEA",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "71\u00b0 or below",
+     "side": "Buy YES",
+     "entry": 0.3,
+     "tier": "A",
+     "units": 1.5,
+     "stake": 15.0,
+     "contracts": 50,
+     "won": false,
+     "pnl": -15.5,
+     "margin": -0.5,
+     "actual": 72,
+     "mp": 0.44886584355649245,
+     "mid": 0.275,
+     "edge": 0.17386584355649243,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "SEA",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "72\u00b0 to 73\u00b0",
+     "side": "Buy NO",
+     "entry": 0.4,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 24,
+     "won": false,
+     "pnl": -10.08,
+     "margin": -0.5,
+     "actual": 72,
+     "mp": 0.20176657723841424,
+     "mid": 0.605,
+     "edge": -0.40323342276158575,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    },
+    {
+     "code": "SEA",
+     "kind": "HIGH",
+     "target": "2026-07-04",
+     "sub": "76\u00b0 to 77\u00b0",
+     "side": "Buy YES",
+     "entry": 0.04,
+     "tier": "B",
+     "units": 1.0,
+     "stake": 10.0,
+     "contracts": 249,
+     "won": false,
+     "pnl": -9.96,
+     "margin": -3.5,
+     "actual": 72,
+     "mp": 0.1073824506038736,
+     "mid": 0.035,
+     "edge": 0.07238245060387359,
+     "model_version": "2026-07-02.v3-nimbus-calib"
+    }
+   ]
+  },
+  {
+   "code": "PHX",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 101,
+   "mean": 102.23636363636363,
+   "bias": 1.2363636363636346,
+   "sd": 2.7877490595133465,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.6234653452865162,
+     "mid": 0.05,
+     "hit": 1
+    },
+    {
+     "mp": 0.20263784631773243,
+     "mid": 0.56,
+     "hit": 0
+    },
+    {
+     "mp": 0.12065931865722818,
+     "mid": 0.355,
+     "hit": 0
+    },
+    {
+     "mp": 0.043910694694572996,
+     "mid": 0.045,
+     "hit": 0
+    },
+    {
+     "mp": 0.008503619659806231,
+     "mid": 0.015,
+     "hit": 0
+    },
+    {
+     "mp": 0.0008231753841438841,
+     "mid": 0.005,
+     "hit": 0
+    }
+   ],
+   "plays": []
+  },
+  {
+   "code": "LV",
+   "kind": "HIGH",
+   "target": "2026-07-04",
+   "lead": 0,
+   "actual": 104,
+   "mean": 102.02097902097903,
+   "bias": -1.979020979020973,
+   "sd": 1.5550887882754543,
+   "bias_corr": 0.0,
+   "sigma": 2.07,
+   "buckets": [
+    {
+     "mp": 0.2740600892972384,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.2871394109868754,
+     "mid": 0.025,
+     "hit": 0
+    },
+    {
+     "mp": 0.26913480931364225,
+     "mid": 0.665,
+     "hit": 1
+    },
+    {
+     "mp": 0.13324899045058375,
+     "mid": 0.33,
+     "hit": 0
+    },
+    {
+     "mp": 0.03242462620252381,
+     "mid": 0.005,
+     "hit": 0
+    },
+    {
+     "mp": 0.00399207374913642,
+     "mid": 0.005,
      "hit": 0
     }
    ],
