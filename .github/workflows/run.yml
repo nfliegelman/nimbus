@@ -1,8 +1,12 @@
 name: nimbus
 on:
   schedule:
-    - cron: '0 12 * * *'   # ~7:00 AM Dallas (CDT) - morning bets
-    - cron: '0 2 * * *'    # ~9:00 PM Dallas (CDT) - evening results
+    # Minutes are deliberately off the hour: GitHub delays :00 crons the most
+    # (observed 2026-07: 12:00 fired at 13:26, 02:00 fired at 05:51).
+    # Local times shift one hour later in winter (CST).
+    - cron: '17 12 * * *'   # ~7:17 AM Dallas (CDT): morning board, same-day highs (06z GFS + 00z ECMWF/ICON/GEM cycle)
+    - cron: '38 21 * * *'   # ~4:38 PM Dallas (CDT): capture run; the FULL 12z cycle is in by ~20:12 UTC (measured: ECMWF ENS is the slowest at init+8.2h) and Kalshi listed tomorrow's markets at 14:00 UTC, so tomorrow's lows and highs enter the tracker here on the freshest data
+    - cron: '7 2 * * *'     # ~9:07 PM Dallas (CDT): evening board for tomorrow (18z GFS in) + settle results
   workflow_dispatch: {}     # lets you run it manually from the Actions tab
 permissions:
   contents: write
@@ -17,7 +21,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Self-test
+        run: python test_nimbus.py
       - name: Generate boards
+        env:
+          # Phone pings (audit batch 10): create these two repo secrets to turn
+          # notifications on; leave them absent and the notifier is a silent no-op.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NIMBUS_PAGE_URL: https://nfliegelman.github.io/nimbus/
         run: python kalshi_weather.py
       - name: Commit updated boards + state
         run: |
