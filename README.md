@@ -1,5 +1,7 @@
 # Nimbus
 
+*Fully audited 2026-07-04 to 07-06 (12 batches): every finding, fix, and design decision is in `AUDIT_TODO.md` and the `HANDOFF.md` changelog. A 14-test suite runs before every scheduled board and blocks publishing on failure.*
+
 Runs itself on GitHub (twice a day), so your office network never touches Kalshi.
 You just open two web pages on your phone.
 
@@ -28,10 +30,31 @@ Your pages will be at:
 Open each URL in Safari or Chrome -> Share -> **Add to Home Screen**. Two taps to check bets.
 
 ## Schedule
-Runs at 12:00 and 02:00 UTC (~7 AM and 9 PM Dallas in summer). Edit the `cron` lines in
-`.github/workflows/run.yml` to change times. Notes: GitHub can delay scheduled runs by a few
-minutes, and it pauses schedules if the repo has no activity for 60 days (just push or click
-Run workflow to wake it).
+Runs three times a day (Dallas summer time): ~7:17 AM (morning board, freshest overnight
+models), ~4:38 PM (capture run: by then the complete midday model cycle has landed AND
+Kalshi has listed tomorrow's markets, so tomorrow's lows and highs enter the tracker here
+on the freshest data), and ~9:07 PM (evening board + settling results). Times sit off the
+hour on purpose: GitHub delays on-the-hour crons the most, sometimes by hours. Winter times
+are one hour later. Edit the `cron` lines in `.github/workflows/run.yml` to change them.
+GitHub pauses schedules if the repo has no activity for 60 days (click Run workflow to wake it).
+
+Two honesty features to know about:
+- **Frozen plays.** Once a play appears on a board, the tracker scores THAT version forever,
+  even if a later run would have picked differently. The tracker always matches a board you
+  actually saw.
+- **Data gate.** If a city's forecast comes in degraded (missing weather models, a thin
+  ensemble, or a market ladder that fails a structure check), that city is sat out for the
+  run and named in the header instead of being priced on bad data. The degraded forecast is
+  still recorded behind the scenes, so every sit-out can be judged later against the actual
+  settlement.
+- **Exposure caps.** At most 6 units ride any single day and 2 units any single market,
+  best plays first. The header shows how many overflow plays were trimmed.
+- **Drift alarms.** The results header raises a flag when the model starts losing ground
+  to the market, a probability bucket runs far off its stated rate, spreads look over- or
+  under-confident, or a learned city correction jumps suddenly.
+- **Stale-board banner.** If the page you are looking at was built more than 16 hours ago
+  (a run or the Pages deploy failed), an orange banner says so. Do not bet from a flagged board.
+  Failed runs show red in the Actions tab and commit nothing, so the last good board stays up.
 
 ## Tuning (top of kalshi_weather.py)
 - `UNIT_MAP`   tier -> units (currently S=2u, A=1.5u, B=1u, C=no bet)
