@@ -372,5 +372,6 @@ Every finding, its severity, and where it stands. Batch column = where found.
 | 15 | logged_at lacked a timezone marker | P2 | 1 | FIXED (explicit UTC) |
 | 16 | Dead code (in_bucket) | P2 | 4 | REMOVED |
 | 17 | Play-sort tie nondeterminism | P2 | 8 | FIXED (ticker tiebreak) |
+| 18 | Caps counted per-run, not cumulative frozen exposure (deploy-day race inherited 37.5u; a second run stacked past the daily cap) | P1 | deploy day | FIXED (v12 budget seeding) + regression test |
 
 Trust verdict: the pre-audit historical dataset was sound (each record logged exactly once, settled authoritatively, stations correct except HOU's 5 records); every P0 was caught BEFORE it corrupted data, three of them within days of activating. The system now measures itself honestly enough to be worth improving.
