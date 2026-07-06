@@ -108,6 +108,17 @@ class TestReport(unittest.TestCase):
         self.assertEqual(rep1["clv"]["n"], 4)
         self.assertTrue(any("NBM" in k for k, _, _ in rep1["sources"]))
 
+    def test_calibration_series_and_eras(self):
+        st = self._state()
+        st["resolved"] = st["resolved"] * 3   # 12 rows clears the 8-row gate
+        rep = kw.compute_report(st)
+        cs = rep.get("calib_series")
+        self.assertTrue(cs and len(cs["raw"]) == len(cs["cor"]) == len(cs["mkt"]))
+        self.assertTrue(rep.get("disp_series") and len(rep["disp_series"]) == len(cs["raw"]))
+        self.assertTrue(rep.get("eras") and rep["eras"][0][0].startswith(("Audit", "Legacy")))
+        small = {"resolved": self._state()["resolved"][:2], "predictions": {}}
+        self.assertNotIn("calib_series", kw.compute_report(small))
+
     def test_gated_records_never_enter_aggregates(self):
         st = self._state()
         st["resolved"].append({"code": "PHX", "kind": "HIGH", "target": "2026-07-09", "lead": 1,
@@ -188,6 +199,31 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(dal["plays"], before["plays"])
         self.assertEqual(dal.get("plays_logged_at"), before.get("plays_logged_at"))
         self.assertIsNone(dal.get("gated"))
+
+    def test_caps_count_previously_frozen_units(self):
+        # Deploy-day regression: a target already holding frozen units (from an
+        # earlier run or an inherited legacy board) must consume the daily and
+        # event budgets, so later runs cannot rotate fresh units past the caps.
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {f"ZZZ|HIGH|{self.day}": {
+            "code": "ZZZ", "kind": "HIGH", "target": self.day, "event_ticker": "EZ",
+            "logged_at": "2026-07-06T15:31", "lead": 1, "mean": 90.0, "sd": 1, "psd": 1.4,
+            "bias_corr": 0, "sigma": 1.1, "model_version": "legacy", "biased": False,
+            "offset": -18000, "buckets": [], "plays_lead": 1,
+            "plays_logged_at": "2026-07-06T15:31", "plays_model_version": "legacy",
+            "plays": [{"ticker": "ZA", "bid": "x", "sub": "x", "side": "Buy YES",
+                       "entry": 0.5, "net": 0.05, "edge": 0.06, "tier": "A",
+                       "units": 5.5, "stake": 55.0, "p_win": 0.6, "mp": 0.55, "mid": 0.5}]}},
+            "resolved": []}
+        rows, plays, health = kw.score(state)
+        new_units = sum(p["units"] for p in plays)
+        self.assertLessEqual(new_units, kw.DAILY_UNIT_CAP - 5.5 + 1e-9)
+        legacy = state["predictions"][f"ZZZ|HIGH|{self.day}"]
+        self.assertEqual(len(legacy["plays"]), 1)   # inherited history untouched
+        total_frozen = sum(pl["units"] for v in state["predictions"].values()
+                           for pl in v.get("plays", []) if v["target"] == self.day)
+        self.assertLessEqual(total_frozen, kw.DAILY_UNIT_CAP + 1e-9)
 
     def test_resolution_fee_and_clv(self):
         state = {"predictions": {"DAL|HIGH|2026-07-01": {

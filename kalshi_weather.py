@@ -37,7 +37,7 @@ SUSPECT_EDGE  = 0.20     # net edge above this is treated as noise, capped to 1u
 EDGE_2U       = 0.14     # net edge for a 2u ceiling (also needs proven city + win prob >= .55)
 EDGE_1_5U     = 0.08     # net edge for a 1.5u ceiling
 # Stamp every logged bet so history survives model changes and tunes can be compared.
-MODEL_VERSION = "2026-07-06.v11-audit12"
+MODEL_VERSION = "2026-07-06.v12-capseed"
 # Exposure caps (audit batch 8). Measured before caps: 54.5u staked on a single
 # target date against a $500 bankroll, and up to 5 plays stacked on one ladder
 # (31 of 44 played events carried 2+), i.e. multiples of one settlement number.
@@ -656,9 +656,20 @@ def score(state):
                     frozen_now.add(key)
                 preds[key]=rec
     plays.sort(key=lambda r:(-r["units"],-(r.get("p_win") or 0),-r.get("net",0),r["ticker"]))
-    # ---- exposure caps (audit batch 8): best plays fill first, the rest never log ----
+    # ---- exposure caps (audit batch 8; SEEDED v12): best plays fill first ----
+    # The caps bound CUMULATIVE frozen exposure per target, so the ledger of
+    # already-frozen plays (earlier runs today, or inherited pre-audit records:
+    # deploy day proved a 37.5u legacy board can be inherited in one race)
+    # consumes the budget BEFORE any new play may freeze. Without the seed,
+    # every additional run on a volatile day could rotate a fresh 6u into the
+    # frozen set as old edges fade and new ones appear.
     kept=[]; dropped=0
     per_day=defaultdict(float); per_ev=defaultdict(float)
+    for key,rec in preds.items():
+        if key in frozen_now or not rec.get("plays"): continue
+        for pl in rec["plays"]:
+            per_day[rec["target"]]+=pl["units"]
+            per_ev[(rec["target"],rec["code"],rec["kind"])]+=pl["units"]
     for r in plays:
         dk=r["date"].isoformat(); ek=(dk,r["code"],r["kind"])
         if per_day[dk]+r["units"]>DAILY_UNIT_CAP+1e-9 or per_ev[ek]+r["units"]>EVENT_UNIT_CAP+1e-9:
@@ -680,7 +691,9 @@ def score(state):
         ts=rec.get("plays_logged_at")
         if ts and rec.get("plays"):
             try:
-                if (now_utc-dt.datetime.strptime(ts,"%Y-%m-%dT%H:%MZ")).total_seconds()<=86400:
+                try: tsd=dt.datetime.strptime(ts,"%Y-%m-%dT%H:%MZ")
+                except ValueError: tsd=dt.datetime.strptime(ts,"%Y-%m-%dT%H:%M")  # inherited pre-audit stamps lack the Z
+                if (now_utc-tsd).total_seconds()<=86400:
                     new24+=len(rec["plays"])
             except ValueError: pass
     health={"ladders":len(ladders),"cities":len(needed),"cities_failed":fetch_failed,
@@ -800,6 +813,37 @@ def compute_report(state):
             nm="NBM (station-calibrated)" if k=="nbm" else "HRRR (short-lead)"
             src[nm][0]+=abs(v-a); src[nm][1]+=1
     rep["sources"]=sorted(((k,s/n,n) for k,(s,n) in src.items() if n),key=lambda x:x[1])
+    # Calibration engine series (owner request 2026-07-06): rolling MAE of the
+    # UNCORRECTED forecast, the CORRECTED forecast, and the market-implied mean,
+    # in resolution order. Raw-vs-corrected divergence IS the learning engine
+    # visible; the market line is the bar both must clear. The rounded stored
+    # actual adds identical noise to every line, so comparisons stay fair.
+    W=30
+    crows=[r for r in resolved if r.get("bias") is not None and r.get("actual") is not None]
+    if len(crows)>=8:
+        raw=[abs(r["bias"]-(r.get("bias_corr") or 0.0)) for r in crows]
+        cor=[abs(r["bias"]) for r in crows]
+        mkt=[]
+        for r in crows:
+            bs=[b for b in r.get("buckets",[]) if b.get("rep") is not None and b.get("mid")]
+            sm=sum(b["mid"] for b in bs) if len(bs)>=3 else 0
+            mkt.append(abs(sum(b["mid"]*b["rep"] for b in bs)/sm-r["actual"]) if sm else None)
+        def _roll(xs,minn=8):
+            out=[]
+            for i in range(len(xs)):
+                w=[x for x in xs[max(0,i-W+1):i+1] if x is not None]
+                out.append(round(sum(w)/len(w),3) if len(w)>=minn else None)
+            return out
+        rep["calib_series"]={"raw":_roll(raw),"cor":_roll(cor),"mkt":_roll(mkt),
+            "active":sum(1 for r in crows if abs(r.get("bias_corr") or 0.0)>0.01)}
+        zs=[(r["bias"]/r["psd"]) if r.get("psd") else None for r in crows]
+        dso=[]
+        for i in range(len(zs)):
+            w=[z for z in zs[max(0,i-W+1):i+1] if z is not None]
+            if len(w)>=10:
+                m=sum(w)/len(w); dso.append(round(math.sqrt(sum((z-m)**2 for z in w)/len(w)),3))
+            else: dso.append(None)
+        if any(v is not None for v in dso): rep["disp_series"]=dso
     # learned calibration currently in force (bias correction + dressing sigma)
     cal=calib_params(state)
     rep["calib"]=sorted(((CITIES[k[0]][3],k[1],v["corr"],v["sigma"],v["n"])
@@ -888,12 +932,22 @@ def compute_report(state):
                 avgp=sum(pw for _,pw in sel)/len(sel)
                 byp.append((lab,len(sel),w,avgp,pn,(pn/stk if stk else 0.0)))
         rep["by_pwin"]=byp
-        # cumulative series (in $), ordered by target date
+        # cumulative series (in UNITS: owner directive 2026-07-06, the display is
+        # bankroll-agnostic until a real unit is chosen), ordered by target date
         ser=[]; run=0.0
         for p in sorted(pls,key=lambda x:x["target"]):
-            run+=p["pnl"]; ser.append(run)
+            run+=p["pnl"]/BASE_UNIT_USD; ser.append(round(run,2))
         rep["cum"]=ser
         rep["recent"]=sorted(pls,key=lambda x:x["target"],reverse=True)
+        # Era split in units: the honest instrument for "is the audit build
+        # better", once its plays settle. Version stamps make this a query.
+        eras=defaultdict(lambda:[0,0,0.0,0.0])
+        for p in pls:
+            mv=p.get("model_version") or ""
+            lab="Audit build (v11+)" if ("audit" in mv or "capseed" in mv) else "Legacy (pre-audit)"
+            e=eras[lab]; e[0]+=1; e[1]+=1 if p["won"] else 0
+            e[2]+=p["units"]; e[3]+=p["pnl"]/BASE_UNIT_USD
+        rep["eras"]=sorted(((k,)+tuple(v) for k,v in eras.items()))
     return rep
 
 # ----------------------------- render ------------------------------
@@ -976,7 +1030,34 @@ def svg_line(vals,w=680,h=170,pad=26):
     zero=Y(0)
     return (f"<svg viewBox='0 0 {w} {h}'><line x1='{pad}' y1='{zero:.1f}' x2='{w-pad}' y2='{zero:.1f}' "
             f"stroke='#232a33'/><polyline points='{pts}' fill='none' stroke='#5ad1c8' stroke-width='2'/>"
-            f"<text x='{pad}' y='14' fill='#8b97a6' font-size='11' font-family=monospace>cumulative $ P&amp;L</text></svg>")
+            f"<text x='{pad}' y='14' fill='#8b97a6' font-size='11' font-family=monospace>cumulative units P&amp;L</text></svg>")
+
+def svg_multi(series,labels,colors,w=680,h=190,pad=26,ref=None):
+    """Multi-line chart; None values break the line (data-gated segments)."""
+    vals=[v for s in series for v in s if v is not None]
+    if not vals: return ""
+    lo=min(vals+([ref] if ref is not None else [])); hi=max(vals+([ref] if ref is not None else []))
+    rng=(hi-lo) or 1; n=max(len(s) for s in series)
+    X=lambda i: pad+(w-2*pad)*(i/max(1,n-1)); Y=lambda v: h-pad-(h-2*pad)*((v-lo)/rng)
+    out=[f"<svg viewBox='0 0 {w} {h}'>"]
+    if ref is not None:
+        out.append(f"<line x1='{pad}' y1='{Y(ref):.1f}' x2='{w-pad}' y2='{Y(ref):.1f}' stroke='#232a33' stroke-dasharray='4 4'/>")
+        out.append(f"<text x='{w-pad-8}' y='{Y(ref)-5:.1f}' fill='#8b97a6' font-size='10' font-family=monospace text-anchor='end'>{ref:g}</text>")
+    for s,c in zip(series,colors):
+        seg=[]
+        for i,v in enumerate(s):
+            if v is None:
+                if len(seg)>1: out.append(f"<polyline points='{' '.join(seg)}' fill='none' stroke='{c}' stroke-width='2'/>")
+                seg=[]
+            else: seg.append(f"{X(i):.1f},{Y(v):.1f}")
+        if len(seg)>1: out.append(f"<polyline points='{' '.join(seg)}' fill='none' stroke='{c}' stroke-width='2'/>")
+    x=pad
+    for lab,c,s in zip(labels,colors,series):
+        if any(v is not None for v in s):
+            out.append(f"<text x='{x}' y='14' fill='{c}' font-size='11' font-family=monospace>{esc(lab)}</text>")
+            x+=len(lab)*7+18
+    out.append("</svg>")
+    return "".join(out)
 
 def svg_bars(items,w=680,bar=26,gap=10,pad=90):
     if not items: return ""
@@ -1038,7 +1119,7 @@ def render_bets(rows,plays,updated,health=None):
                    f'<div><div class="pcity">{city} &middot; {mk} &middot; {r["date"].strftime("%b %d")}</div>'
                    f'<div class="prange">{esc(r["bucket"])}</div></div>'
                    f'<div class="pside {sb}">{word}<div class="psub">{r["entry"]*100:.0f}\u00a2</div></div></div>'
-                   f'<div class="pbar">{unit_badge(r["units"])}<span class="pmoney">${r["stake"]:.0f} stake</span>'
+                   f'<div class="pbar">{unit_badge(r["units"])}'
                    f'<span class="pwin">{pw}</span>{flag}</div>'
                    f'<div class="pdata">model {pct(r["mp"])} &middot; market {pct(r["mid"])} &middot; '
                    f'edge +{pct(abs(r["edge"]))} &middot; net +{r["net"]*100:.0f}\u00a2 &middot; OI {fmt_oi(r["oi"])}</div></div>')
@@ -1102,7 +1183,6 @@ def render_results(rep,updated,health=None,alerts=None):
     p=rep["pnl"]; cls="up" if p["net"]>=0 else "red"
     kpis=("<div class='kpi'>"
       f"<div class='kbox'><div class='v {cls}'>{p['net_units']:+.1f}u</div><div class='l'>net units</div></div>"
-      f"<div class='kbox'><div class='v {cls}'>${p['net']:+.2f}</div><div class='l'>net $</div></div>"
       f"<div class='kbox'><div class='v'>{p['winrate']*100:.0f}%</div><div class='l'>win rate ({p['wins']}/{p['n']})</div></div>"
       f"<div class='kbox'><div class='v {cls}'>{p['roi']*100:+.1f}%</div><div class='l'>ROI</div></div>"
       f"<div class='kbox'><div class='v'>{p['avg_margin']:+.1f}\u00b0</div><div class='l'>avg margin</div></div>"
@@ -1137,6 +1217,40 @@ def render_results(rep,updated,health=None,alerts=None):
           "after the audit build deployed.</div>"
           "<table><thead><tr><th>Source</th><th class='n'>MAE</th><th class='n'>Settled</th></tr></thead><tbody>"+rowsS+"</tbody></table>")
     chart=f"<div class='card'>{svg_line(rep.get('cum',[]))}</div>"
+    calsec=""
+    if rep.get("calib_series"):
+        cs=rep["calib_series"]
+        c1=svg_multi([cs["raw"],cs["cor"],cs["mkt"]],
+                     ["uncorrected model MAE","corrected model MAE","market-implied MAE"],
+                     ["#8b97a6","#5ad1c8","#e2b34d"])
+        note=("<div class='note'>Rolling 30-settlement mean absolute error of the daily-extreme forecast, in "
+              "resolution order. The grey line is what the raw ensemble would have said; the teal line is what "
+              "Nimbus actually said after per-city corrections. The gap between them is the calibration engine, "
+              "visible. Corrections have touched <b>%d</b> of the settled records so far, so the lines separate "
+              "from that point on: they will overlap over the pre-activation history, which is the honest "
+              "baseline, not a bug. Amber is the market's own implied forecast (computable on new-format records "
+              "only): the bar both lines have to clear.</div>"%cs["active"])
+        disp=""
+        if rep.get("disp_series"):
+            d1=svg_multi([rep["disp_series"]],["rolling sd(z), 30-settlement window"],["#5ad1c8"],ref=1.0)
+            disp=("<div class='card'>"+d1+"</div>"
+              "<div class='note'>Spread honesty. z is the forecast miss divided by the stated uncertainty; a "
+              "well-calibrated model keeps the rolling sd(z) near the dashed 1.0 line. Above 1.0 the model is "
+              "overconfident (spreads too tight, tail bets poisoned); below it, underconfident (edges understated). "
+              "This converging to 1.0 is the leading indicator that the probabilities, and therefore the stated "
+              "edges, can be believed. It moves weeks before P&amp;L can.</div>")
+        erat=""
+        if rep.get("eras"):
+            rowsE="".join(f"<tr><td>{esc(k)}</td><td class='n'>{n}</td><td class='n'>{w}/{n-w}</td>"
+                          f"<td class='n'>{st:.1f}u</td><td class='n {'up' if pn>=0 else 'red'}'>{pn:+.1f}u</td></tr>"
+                          for k,n,w,st,pn in rep["eras"])
+            erat=("<h2 class='sec'>By model era</h2>"
+              "<div class='note'>Every play is stamped with the model version that froze it, so old and new "
+              "engines never blend. The audit-era row is the number that answers whether the rebuild worked; "
+              "judge it only at the pre-registered checkpoints, not daily.</div>"
+              "<table><thead><tr><th>Era</th><th class='n'>Plays</th><th class='n'>W/L</th>"
+              "<th class='n'>Risked</th><th class='n'>Net</th></tr></thead><tbody>"+rowsE+"</tbody></table>")
+        calsec=("<h2 class='sec'>Calibration engine</h2>"+note+"<div class='card'>"+c1+"</div>"+disp+erat)
     # time-windowed win rate row
     W=rep.get("windows",{})
     def _wk(lbl,d):
@@ -1146,16 +1260,16 @@ def render_results(rep,updated,health=None,alerts=None):
             +_wk("win% overall",W.get("all"))+"</div>")
     # by edge magnitude
     et="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
-               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td></tr>'
+               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
                for lab,n,w,pn in rep.get("by_edge",[]))
     # by city
     ct="".join(f'<tr><td>{esc(l)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
-               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td></tr>'
+               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
                for l,n,w,pn in rep.get("by_city",[]))
     city_bars=svg_bars([(l,pn) for l,n,w,pn in rep.get("by_city",[])])
     # by unit
     ut="".join(f'<tr><td>{unit_str(u)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
-               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td></tr>'
+               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
                for u,n,w,pn in rep.get("by_unit",[]))
     # brier
     brier=""
@@ -1205,7 +1319,7 @@ def render_results(rep,updated,health=None,alerts=None):
     if rep.get("by_pwin"):
         pr="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
                    f'<td class="n">{ap*100:.0f}%</td><td class="n">{(w/n*100):.0f}%</td>'
-                   f'<td class="n {"up" if pn>=0 else "red"}">${pn:+.2f}</td>'
+                   f'<td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td>'
                    f'<td class="n {"up" if roi>=0 else "red"}">{roi*100:+.1f}%</td></tr>'
                    for lab,n,w,ap,pn,roi in rep["by_pwin"])
         pwt=("<h2 class='sec'>By win probability</h2>"
@@ -1220,10 +1334,10 @@ def render_results(rep,updated,health=None,alerts=None):
                 f'<td>{esc(r["sub"])}</td><td>{unit_str(r["units"])}</td><td class="pl">{r["side"]}@{r["entry"]*100:.0f}\u00a2</td>'
                 f'<td class="n">{r["actual"]}\u00b0</td><td>{"WON" if r["won"] else "LOST"}</td>'
                 f'<td class="n">{("%+.1f"%r["margin"]) if r["margin"] is not None else DOT}\u00b0</td>'
-                f'<td class="n {"up" if r["pnl"]>=0 else "red"}">${r["pnl"]:+.2f}</td></tr>'
+                f'<td class="n {"up" if r["pnl"]>=0 else "red"}">{r["pnl"]/BASE_UNIT_USD:+.1f}u</td></tr>'
                 for r in rep.get("recent",[])[:60])
     html=(head("results",updated,_health_strip(health,alerts))+
-      "<h2 class='sec'>Performance</h2>"+kpis+winrow+honest+chart+brier+
+      "<h2 class='sec'>Performance</h2>"+kpis+winrow+honest+chart+brier+calsec+
       "<h2 class='sec'>By city</h2><div class='card'>"+city_bars+"</div>"
       "<table><thead><tr><th>City</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+ct+"</tbody></table>"
       "<h2 class='sec'>By unit size</h2>"
@@ -1276,7 +1390,7 @@ def notify_telegram(plays,health,alerts,rep):
         if top:
             lines.append(f"Top: {top['label']} {top['kind']} {top['bucket']} {top['side']} {top['units']}u @ {int(round(top['entry']*100))}c (p_win {int(round((top.get('p_win') or 0)*100))}%)")
         if rep.get("pnl"):
-            p=rep["pnl"]; lines.append(f"Record {p['wins']}/{p['n']}  ${p['net']:+.2f}")
+            p=rep["pnl"]; lines.append(f"Record {p['wins']}/{p['n']}  {p['net_units']:+.1f}u")
         if health.get("gated"): lines.append("Gated: "+", ".join(health["gated"][:3]))
         if alerts: lines.append("ALERT: "+alerts[0])
         url=os.environ.get("NIMBUS_PAGE_URL")
@@ -1343,7 +1457,7 @@ def main():
     render_bets(rows,plays,updated,health); render_results(rep,updated,health,alerts)
     notify_telegram(plays,health,alerts,rep)
     print(f"\nPlays today: {len(plays)} | resolved: {rep.get('n_events',0)}")
-    if rep.get("pnl"): print(f"Paper P&L: ${rep['pnl']['net']:+.2f} ({rep['pnl']['net_units']:+.1f}u, {rep['pnl']['wins']}/{rep['pnl']['n']})")
+    if rep.get("pnl"): print(f"Paper P&L: {rep['pnl']['net_units']:+.1f}u ({rep['pnl']['wins']}/{rep['pnl']['n']})")
     print("Dashboards ->",OUT_DIR)
     if os.environ.get("CI")!="true":
         try: webbrowser.open("file://"+os.path.join(OUT_DIR,"index.html"))
