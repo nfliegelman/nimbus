@@ -269,5 +269,82 @@ class TestState(unittest.TestCase):
                 kw.STATE_PATH = saved
 
 
+class TestNowcastShadow(unittest.TestCase):
+    """Checkpoint 1 build (FUTURE 5 stage 1): truncation math, obs parsing,
+    grading, and the guarantees that keep the shadow a shadow."""
+
+    def test_parse_obs_max_filters_and_converts(self):
+        js={"features":[
+            {"properties":{"timestamp":"2026-07-13T12:53:00+00:00","temperature":{"value":25.0}}},   # before window
+            {"properties":{"timestamp":"2026-07-13T13:53:00+00:00","temperature":{"value":30.0}}},   # 86.0 F
+            {"properties":{"timestamp":"2026-07-13T14:53:00+00:00","temperature":{"value":None}}},   # null skipped
+            {"properties":{"timestamp":"2026-07-13T15:53:00+00:00","temperature":{"value":32.2}}},   # 89.96 F
+        ]}
+        got=kw._parse_obs_max(js,"2026-07-13T13:00")
+        self.assertIsNotNone(got)
+        mx,n=got
+        self.assertEqual(n,2)
+        self.assertAlmostEqual(mx,89.96,places=2)
+        self.assertIsNone(kw._parse_obs_max({"features":[]},"2026-07-13T13:00"))
+        self.assertIsNone(kw._parse_obs_max(None,"2026-07-13T13:00"))
+
+    def test_truncation_floors_members_and_raises_mean(self):
+        mem_u=[70.0,72.0,75.0]; runmax=73.0
+        mem_t=[max(v,runmax) for v in mem_u]
+        self.assertEqual(mem_t,[73.0,73.0,75.0])
+        self.assertGreater(sum(mem_t)/3,sum(mem_u)/3)
+        self.assertTrue(all(v>=runmax for v in mem_t))
+        # truncated mass below the running max collapses toward zero
+        b={"stype":"less","cap":72,"floor":None}
+        lo_u=kw.dressed_prob(mem_u,b,0.8); lo_t=kw.dressed_prob(mem_t,b,0.8)
+        self.assertLess(lo_t,lo_u)
+
+    def test_grade_nowcast_mirrors_report_rps(self):
+        nc={"asof":"x","obs_max":91.0,"n_obs":5,"mean_u":90.0,"psd_u":2.0,
+            "mean_t":92.0,"psd_t":1.5,
+            "buckets":[{"ticker":"A","rep":88.5,"mp_u":0.30,"mp_t":0.05},
+                       {"ticker":"B","rep":90.5,"mp_u":0.40,"mp_t":0.25},
+                       {"ticker":"C","rep":92.5,"mp_u":0.20,"mp_t":0.50},
+                       {"ticker":"D","rep":94.5,"mp_u":0.10,"mp_t":0.20}]}
+        settled={"A":("no",None),"B":("no",None),"C":("yes",None),"D":("no",None)}
+        g=kw._grade_nowcast(nc,settled,92)
+        self.assertIsNotNone(g)
+        # truncated ladder, built to know 91 already printed, must grade sharper
+        self.assertLess(g["rps_t"],g["rps_u"])
+        self.assertLess(g["crps_t"],g["crps_u"])
+        # hand-checked cumulative math on the truncated side:
+        # F=.05,.30,.80 vs O=0,0,1 -> .0025+.09+.04=.1325
+        self.assertAlmostEqual(g["rps_t"],0.1325,places=4)
+        # ungradeable inputs return None instead of poisoning aggregates
+        self.assertIsNone(kw._grade_nowcast(nc,{"A":("no",None)},92))
+        two_hit=dict(settled); two_hit["D"]=("yes",None)
+        self.assertIsNone(kw._grade_nowcast(nc,two_hit,92))
+
+    def test_shadow_pass_write_once_and_no_side_effects(self):
+        saved=(kw.pull_weather_markets,kw.fetch_members,kw.fget)
+        kw.pull_weather_markets=_no_network; kw.fetch_members=_no_network; kw.fget=_no_network
+        try:
+            # a pending record already carrying a snapshot is never refetched or
+            # rewritten (all fetchers raise here), and nothing else is touched
+            marker={"asof":"first","obs_max":90.0,"n_obs":3,"buckets":[]}
+            code=next(iter(kw.STATION_IDS))
+            tz=kw.CITIES[code][2]
+            off=kw.STD_OFFSET_H.get(tz,0)*3600
+            lnow=dtm.datetime.now(dtm.timezone.utc).replace(tzinfo=None)+dtm.timedelta(seconds=off)
+            state={"predictions":{f"{code}|HIGH|{lnow.date().isoformat()}":
+                       {"code":code,"kind":"HIGH","target":lnow.date().isoformat(),
+                        "nowcast":dict(marker),"plays":[]}},
+                   "resolved":[]}
+            before=json.dumps(state["predictions"],sort_keys=True)
+            kw.shadow_pass(state)
+            self.assertEqual(json.dumps(state["predictions"],sort_keys=True),before)
+            # LOW records and gated records are never candidates either
+            state2={"predictions":{"X|LOW|2026-01-01":{"code":"X","kind":"LOW","target":"2026-01-01"}},
+                    "resolved":[]}
+            self.assertEqual(kw.shadow_pass(state2),0)
+        finally:
+            kw.pull_weather_markets,kw.fetch_members,kw.fget=saved
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

@@ -37,7 +37,7 @@ SUSPECT_EDGE  = 0.20     # net edge above this is treated as noise, capped to 1u
 EDGE_2U       = 0.14     # net edge for a 2u ceiling (also needs proven city + win prob >= .55)
 EDGE_1_5U     = 0.08     # net edge for a 1.5u ceiling
 # Stamp every logged bet so history survives model changes and tunes can be compared.
-MODEL_VERSION = "2026-07-06.v12-capseed"
+MODEL_VERSION = "2026-07-13.v13-nowcast-shadow"
 # Exposure caps (audit batch 8). Measured before caps: 54.5u staked on a single
 # target date against a $500 bankroll, and up to 5 plays stacked on one ladder
 # (31 of 44 played events carried 2+), i.e. multiples of one settlement number.
@@ -72,6 +72,7 @@ MAX_LEAD_DAYS = 4
 LEAD_CAP_DAYS = 3        # plays 3+ days out are capped at 1u; forecast skill decays fast
 BIAS_TOL      = 2.0
 INTRADAY_HIGH_CUTOFF = 14
+NOWCAST_MIN_LHR = 9      # nowcast SHADOW snapshots collect no earlier than this local hour (FUTURE 5 stage 1); upper bound is INTRADAY_HIGH_CUTOFF
 # Four independent global ensembles pooled: ~143 members (GFS 31, ECMWF 51, ICON 40, GEM 21).
 # Multi-model diversity beats more members from one model.
 ENSEMBLE_MODELS = ["gfs025", "ecmwf_ifs025", "icon_seamless", "gem_global"]
@@ -158,7 +159,7 @@ STD_OFFSET_H={"America/New_York":-5,"America/Chicago":-6,"America/Denver":-7,
 _KNOB_NAMES=("BANKROLL","BASE_UNIT_USD","UNIT_MAP","WINPROB_CAP","SUSPECT_EDGE",
  "EDGE_2U","EDGE_1_5U","DAILY_UNIT_CAP","EVENT_UNIT_CAP","GATE_MIN_LADDERS",
  "GATE_MIN_MEMBERS","GATE_MIN_MODELS","TAIL_FLOOR","MIN_OI","PLAY_NET_EDGE",
- "MAX_LEAD_DAYS","LEAD_CAP_DAYS","BIAS_TOL","INTRADAY_HIGH_CUTOFF",
+ "MAX_LEAD_DAYS","LEAD_CAP_DAYS","BIAS_TOL","INTRADAY_HIGH_CUTOFF","NOWCAST_MIN_LHR",
  "DRESS_SIGMA_DEFAULT","DRESS_SIGMA_MIN","DRESS_SIGMA_MAX","BIAS_MIN_N",
  "BIAS_LOOKBACK","BIAS_SHRINK_K","HICONF_PWIN","TIER_CUTS","ENSEMBLE_MODELS","REF_MODELS")
 CONFIG_HASH=hashlib.sha1(repr([(k,globals()[k]) for k in _KNOB_NAMES if k in globals()]).encode()).hexdigest()[:8]
@@ -438,6 +439,127 @@ def dressed_prob(members,b,sigma):
         tot+=_phi((hi_e-m)/sigma)-_phi((lo_e-m)/sigma)
     return tot/len(members)
 
+# --------------------- nowcast SHADOW (FUTURE 5 stage 1) ---------------------
+# Built at checkpoint 1 (2026-07-13). Today's high cannot settle below the max
+# already observed at the settlement station, so between NOWCAST_MIN_LHR and
+# INTRADAY_HIGH_CUTOFF local time we truncate every calibrated member at the
+# running observed max and store a PAIRED truncated-vs-untruncated ladder
+# snapshot on the pending record. PLAYS NEVER SEE THESE NUMBERS: the
+# pre-registered gate (FUTURE 5) requires truncated CRPS AND RPS to beat
+# untruncated over 30+ graded same-day HIGH events before any pricing change.
+# Snapshots are WRITE-ONCE (first in-window snapshot wins) so later,
+# better-informed observations can never cherry-pick the comparison.
+
+def _parse_obs_max(js,start_iso):
+    """Running max (deg F) from an api.weather.gov observations payload,
+    counting only records timestamped at or after start_iso (UTC, lexicographic
+    compare on the first 16 chars). Null and non-numeric temperatures are
+    skipped defensively. Returns (max_f, n_obs) or None."""
+    if not isinstance(js,dict): return None
+    best=None; n=0
+    for f in js.get("features") or []:
+        pr=(f or {}).get("properties") or {}
+        ts=pr.get("timestamp") or ""
+        if ts[:16]<start_iso[:16]: continue
+        v=fnum(((pr.get("temperature") or {}).get("value")))
+        if v is None: continue
+        fdeg=v*9.0/5.0+32.0; n+=1
+        if best is None or fdeg>best: best=fdeg
+    return (best,n) if n else None
+
+def fetch_running_max(code,tz,target_iso):
+    """Observed running max at the settlement station since 07:00 LST of the
+    target day. NWS CLI computes the daily max from denser data than hourly
+    METARs, so this is a LOWER BOUND on the settlement value: exactly what
+    truncation needs, never more than the truth. Returns (max_f,n_obs) or None."""
+    sid=STATION_IDS.get(code)
+    if not sid: return None
+    start=dt.datetime.fromisoformat(target_iso)+dt.timedelta(hours=7-STD_OFFSET_H.get(tz,0))
+    js=fget(f"https://api.weather.gov/stations/{sid}/observations"
+            f"?start={start.strftime('%Y-%m-%dT%H:%M:%SZ')}&limit=200")
+    if not js: return None
+    return _parse_obs_max(js,start.strftime("%Y-%m-%dT%H:%M"))
+
+def _grade_nowcast(nc,settled,actual):
+    """Grade a paired shadow snapshot against Kalshi's own per-bucket settlement,
+    mirroring compute_report's RPS conventions exactly (rep-sorted, normalized,
+    last cumulative step dropped, exactly one hit required) so the two ladders
+    and the headline metric all speak the same units. CRPS uses each snapshot's
+    own mean/psd. Returns the compact graded dict or None."""
+    bs=[b for b in nc.get("buckets",[]) if b.get("rep") is not None]
+    if len(bs)<3: return None
+    bs=sorted(bs,key=lambda b:b["rep"])
+    hits=[]
+    for b in bs:
+        res=settled.get(b["ticker"])
+        if not res or res[0] not in ("yes","no"): return None
+        hits.append(1 if res[0]=="yes" else 0)
+    if sum(hits)!=1: return None
+    def _rps(key):
+        s=sum(b[key] for b in bs) or 1.0
+        F=O=0.0; tot=0.0
+        for b,h in zip(bs[:-1],hits[:-1]):
+            F+=b[key]/s; O+=h; tot+=(F-O)**2
+        return tot
+    out={"asof":nc.get("asof"),"obs_max":nc.get("obs_max"),"n_obs":nc.get("n_obs"),
+         "mean_u":nc.get("mean_u"),"mean_t":nc.get("mean_t"),
+         "rps_u":round(_rps("mp_u"),4),"rps_t":round(_rps("mp_t"),4)}
+    if actual is not None:
+        out["crps_u"]=_crps_gauss(actual,nc.get("mean_u"),nc.get("psd_u"))
+        out["crps_t"]=_crps_gauss(actual,nc.get("mean_t"),nc.get("psd_t"))
+    return out
+
+def shadow_pass(state):
+    """Collect nowcast shadow snapshots onto eligible pending records: same-day
+    HIGH markets whose city clock sits inside [NOWCAST_MIN_LHR,
+    INTRADAY_HIGH_CUTOFF) and which do not already carry one. Touches ONLY the
+    'nowcast' key on pending records; boards, plays, resolution, and every
+    existing measurement are untouched by design."""
+    preds=state.get("predictions",{})
+    if not preds: return 0
+    calib=calib_params(state); gsigma=calib.get("_gsigma",DRESS_SIGMA_DEFAULT)
+    ladders=None; members_cache={}
+    wrote=0
+    for key,p in preds.items():
+        if p.get("kind")!="HIGH" or p.get("gated") or p.get("nowcast"): continue
+        code=p.get("code"); tgt=p.get("target")
+        if code not in CITIES: continue
+        lat,lon,tz,label=CITIES[code]
+        off=STD_OFFSET_H.get(tz,0)*3600
+        lnow=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)+dt.timedelta(seconds=off)
+        if tgt!=lnow.date().isoformat(): continue
+        if not (NOWCAST_MIN_LHR<=lnow.hour<INTRADAY_HIGH_CUTOFF): continue
+        if ladders is None:
+            ladders={(l["code"],l["kind"],l["date"].isoformat()):l for l in pull_weather_markets()}
+        L=ladders.get((code,"HIGH",tgt))
+        if not L or not L.get("structure_ok",True): continue
+        if code not in members_cache:
+            hi,_lo,_o,_pm=fetch_members(lat,lon,tz); members_cache[code]=hi or {}
+        raw=members_cache[code].get(tgt,[])
+        if len(raw)<GATE_MIN_MEMBERS: continue
+        obs=fetch_running_max(code,tz,tgt)
+        if not obs: continue
+        runmax,n_obs=obs
+        cp=calib.get((code,"HIGH")) or {}
+        corr=cp.get("corr",0.0); sigma=cp.get("sigma") or gsigma
+        mem_u=[v+corr for v in raw]
+        mem_t=[max(v,runmax) for v in mem_u]
+        def _mps(ms):
+            n=len(ms); mu=sum(ms)/n; msd=pstdev(ms)
+            return mu,math.sqrt(msd*msd+sigma*sigma)
+        mu_u,psd_u=_mps(mem_u); mu_t,psd_t=_mps(mem_t)
+        p["nowcast"]={"asof":dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
+                      "obs_max":round(runmax,1),"n_obs":n_obs,
+                      "mean_u":round(mu_u,2),"psd_u":round(psd_u,3),
+                      "mean_t":round(mu_t,2),"psd_t":round(psd_t,3),
+                      "model_version":MODEL_VERSION,"cfg":CONFIG_HASH,
+                      "buckets":[{"ticker":b["ticker"],"rep":bucket_rep(b),
+                                  "mp_u":dressed_prob(mem_u,b,sigma),
+                                  "mp_t":dressed_prob(mem_t,b,sigma)} for b in L["buckets"]]}
+        wrote+=1
+    if wrote: print(f"   nowcast shadow: {wrote} snapshot(s) collected")
+    return wrote
+
 def calib_params(state):
     """Learn per (city,kind) mean-bias correction and dressing sigma from settled
     results. Uses the RAW forecast bias (logged bias plus whatever correction was
@@ -640,6 +762,7 @@ def score(state):
                     "mean_hist":(((old or {}).get("mean_hist") or [])+[[run_stamp,round(mean,2)]])[-6:],
                     "buckets":pbk,"plays":ppl}
                 if gate: rec["gated"]=gate
+                if old and old.get("nowcast"): rec["nowcast"]=old["nowcast"]   # shadow snapshots survive refreshes (write-once)
                 # FREEZE: once a run has published plays for this market, later runs must
                 # not rewrite them; the tracker has to score the board the owner actually
                 # saw. Buckets/mean/sigma keep refreshing (calibration wants the freshest
@@ -730,6 +853,9 @@ def resolve_pending(state):
             if not res or res[0] not in ("yes","no"): ok=False; continue
             hit=1 if res[0]=="yes" else 0
             rec["buckets"].append({"mp":b["mp"],"mid":b["mid"],"hit":hit,"rep":bucket_rep(b)})
+        if p.get("nowcast"):
+            g=_grade_nowcast(p["nowcast"],settled,actual)
+            if g: rec["nowcast"]=g   # nowcast shadow, graded (FUTURE 5 gate instrument)
         for pl in p.get("plays",[]):
             res=settled.get(pl["ticker"])
             if not res or res[0] not in ("yes","no"): continue
@@ -790,6 +916,16 @@ def compute_report(state):
         rme.append(sA); rmk.append(sB)
     if rme:
         rep["rps_model"]=sum(rme)/len(rme); rep["rps_market"]=sum(rmk)/len(rmk); rep["rps_n"]=len(rme)
+    # nowcast shadow tally (FUTURE 5 gate: truncated must beat untruncated on
+    # CRPS AND RPS over 30+ graded same-day HIGH events before plays may use it)
+    ncs=[r["nowcast"] for r in resolved if r.get("nowcast") and r["nowcast"].get("rps_u") is not None]
+    if ncs:
+        rep["nowcast"]={"n":len(ncs),
+            "rps_u":sum(g["rps_u"] for g in ncs)/len(ncs),
+            "rps_t":sum(g["rps_t"] for g in ncs)/len(ncs),
+            "crps_u":sum(g.get("crps_u") or 0.0 for g in ncs)/len(ncs),
+            "crps_t":sum(g.get("crps_t") or 0.0 for g in ncs)/len(ncs),
+            "wins":sum(1 for g in ncs if g["rps_t"]<g["rps_u"])}
     # calibration bins
     bins=[]
     for lo in [i/10 for i in range(10)]:
@@ -1285,6 +1421,12 @@ def render_results(rep,updated,health=None,alerts=None):
               f"<div class='kbox'><div class='v'>{rep['rps_model']:.3f}</div><div class='l'>RPS model</div></div>"
               f"<div class='kbox'><div class='v'>{rep['rps_market']:.3f}</div><div class='l'>RPS market</div></div>"
               f"<div class='kbox'><div class='v {rv}'>{(rep['rps_market']-rep['rps_model']):+.3f}</div><div class='l'>RPS edge, n={rep['rps_n']} (distance-aware; the ladder headline. The benchmark is the final board, which folds in intraday obs the model does not ingest yet: red here is a sharpness gap vs a better-informed close, not miscalibration. Calibration health lives in the table below, sd(z), and the MAE chart; edge at ENTRY prices shows in CLV.)</div></div></div>")
+        if rep.get("nowcast"):
+            nw=rep["nowcast"]
+            brier+=(f"<div class='note'>Nowcast shadow (same-day highs, FUTURE 5 gate = truncated wins CRPS and RPS at 30+ events): "
+              f"n={nw['n']}, RPS truncated {nw['rps_t']:.3f} vs untruncated {nw['rps_u']:.3f}, "
+              f"CRPS {nw['crps_t']:.2f} vs {nw['crps_u']:.2f}, truncated wins {nw['wins']}/{nw['n']}. "
+              f"Plays stay on untruncated pricing until the gate passes.</div>")
     # raw
     # calibration curve: does an X% forecast happen X% of the time?
     caltab=""
@@ -1444,7 +1586,16 @@ def main():
     os.makedirs(OUT_DIR,exist_ok=True)
     print("="*56); print("Nimbus  -",dt.datetime.now().strftime("%Y-%m-%d %H:%M")); print("="*56)
     state=load_state()
+    if os.environ.get("NIMBUS_SHADOW_RUN")=="1":
+        # Midday SHADOW run (checkpoint 1 build, FUTURE 5 stage 1): collect
+        # paired nowcast snapshots and stop. No resolving, no board refresh,
+        # no plays, no render, no Telegram: trading behavior and every
+        # existing measurement (final-snapshot semantics, CLV close) are
+        # untouched. Worst case this pass fails and nothing else notices.
+        shadow_pass(state); save_state(state)
+        print("\nShadow run complete."); return
     resolve_pending(state)
+    shadow_pass(state)   # normal runs also collect when a city sits in the window (eastern cities hit it on the morning cron)
     rows,plays,health=score(state)
     alerts=drift_alerts(state)
     rep=compute_report(state)
