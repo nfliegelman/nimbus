@@ -1278,13 +1278,13 @@ def render_results(rep,updated,health=None,alerts=None):
         brier=("<div class='kpi'>"
           f"<div class='kbox'><div class='v'>{bm:.3f}</div><div class='l'>Brier model</div></div>"
           f"<div class='kbox'><div class='v'>{bkk:.3f}</div><div class='l'>Brier market</div></div>"
-          f"<div class='kbox'><div class='v {v}'>{(bkk-bm):+.3f}</div><div class='l'>edge (lower wins)</div></div></div>")
+          f"<div class='kbox'><div class='v {v}'>{(bkk-bm):+.3f}</div><div class='l'>edge (lower wins; benchmark is the FINAL pre-settlement board)</div></div></div>")
         if rep.get("rps_n"):
             rv="up" if rep["rps_model"]<rep["rps_market"] else "red"
             brier+=("<div class='kpi'>"
               f"<div class='kbox'><div class='v'>{rep['rps_model']:.3f}</div><div class='l'>RPS model</div></div>"
               f"<div class='kbox'><div class='v'>{rep['rps_market']:.3f}</div><div class='l'>RPS market</div></div>"
-              f"<div class='kbox'><div class='v {rv}'>{(rep['rps_market']-rep['rps_model']):+.3f}</div><div class='l'>RPS edge, n={rep['rps_n']} (distance-aware; the ladder headline)</div></div></div>")
+              f"<div class='kbox'><div class='v {rv}'>{(rep['rps_market']-rep['rps_model']):+.3f}</div><div class='l'>RPS edge, n={rep['rps_n']} (distance-aware; the ladder headline. The benchmark is the final board, which folds in intraday obs the model does not ingest yet: red here is a sharpness gap vs a better-informed close, not miscalibration. Calibration health lives in the table below, sd(z), and the MAE chart; edge at ENTRY prices shows in CLV.)</div></div></div>")
     # raw
     # calibration curve: does an X% forecast happen X% of the time?
     caltab=""
