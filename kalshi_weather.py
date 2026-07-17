@@ -890,6 +890,14 @@ def resolve_pending(state):
     return n
 
 # --------------------------- reporting -----------------------------
+def _era_label(mv):
+    """Legacy iff the stamp is empty or a pre-audit stamp; every later
+    MODEL_VERSION (v11, v12, v13, ...) is the audit build. The first draft
+    matched substrings 'audit'/'capseed' and silently misfiled v13 plays under
+    Legacy for three days (caught 2026-07-16): never enumerate the NEW-era
+    stamps, enumerate the CLOSED legacy set."""
+    return "Legacy (pre-audit)" if ((not mv) or "nimbus-calib" in mv) else "Audit build (v11+)"
+
 def compute_report(state):
     resolved=[r for r in state.get("resolved",[]) if not r.get("gated")]   # quarantined records never enter any aggregate
     bk=[b for r in resolved for b in r["buckets"]]
@@ -1080,10 +1088,25 @@ def compute_report(state):
         eras=defaultdict(lambda:[0,0,0.0,0.0])
         for p in pls:
             mv=p.get("model_version") or ""
-            lab="Audit build (v11+)" if ("audit" in mv or "capseed" in mv) else "Legacy (pre-audit)"
+            lab=_era_label(mv)
             e=eras[lab]; e[0]+=1; e[1]+=1 if p["won"] else 0
             e[2]+=p["units"]; e[3]+=p["pnl"]/BASE_UNIT_USD
         rep["eras"]=sorted(((k,)+tuple(v) for k,v in eras.items()))
+        # Core vs experimental split (docket 1, registered 2026-07-13): the
+        # cheap-entry cell is an EXPERIMENT the paper ledger pays tuition on;
+        # showing it separately keeps the core strategy readable in both
+        # directions and shows the docket gate filling in public.
+        audp=[p for p in pls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
+        _cell=lambda p: p["entry"]<=0.20 or ((p.get("p_win") or 1.0)<=0.30)
+        rep["book_split"]={
+            "core":{"n":len([p for p in audp if not _cell(p)]),
+                    "w":sum(1 for p in audp if not _cell(p) and p["won"]),
+                    "stake_u":sum(p["units"] for p in audp if not _cell(p)),
+                    "net_u":sum(p["pnl"] for p in audp if not _cell(p))/BASE_UNIT_USD},
+            "exp":{"n":len([p for p in audp if _cell(p)]),
+                   "w":sum(1 for p in audp if _cell(p) and p["won"]),
+                   "stake_u":sum(p["units"] for p in audp if _cell(p)),
+                   "net_u":sum(p["pnl"] for p in audp if _cell(p))/BASE_UNIT_USD}}
     return rep
 
 # ----------------------------- render ------------------------------
@@ -1386,6 +1409,13 @@ def render_results(rep,updated,health=None,alerts=None):
               "judge it only at the pre-registered checkpoints, not daily.</div>"
               "<table><thead><tr><th>Era</th><th class='n'>Plays</th><th class='n'>W/L</th>"
               "<th class='n'>Risked</th><th class='n'>Net</th></tr></thead><tbody>"+rowsE+"</tbody></table>")
+            if rep.get("book_split"):
+                bs=rep["book_split"]; c,e=bs["core"],bs["exp"]
+                erat+=("<div class='note'>Within the audit era: <b>core book</b> (entries above 0.20, win prob above 30 percent) "
+                  f"{c['w']}/{c['n']-c['w']} for <b>{c['net_u']:+.1f}u</b> on {c['stake_u']:.1f}u risked. "
+                  f"<b>Experimental cheap-entry cell</b> (docket item 1, gate {e['n']}/40): {e['w']}/{e['n']-e['w']} for {e['net_u']:+.1f}u. "
+                  "The cell keeps trading until its pre-registered gate reads; its cost is the price of a verdict that "
+                  "cannot be argued with. If the gate condition holds, a MIN_ENTRY floor of 0.20 ships automatically.</div>")
         calsec=("<h2 class='sec'>Calibration engine</h2>"+note+"<div class='card'>"+c1+"</div>"+disp+erat)
     # time-windowed win rate row
     W=rep.get("windows",{})

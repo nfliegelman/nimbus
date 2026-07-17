@@ -346,5 +346,15 @@ class TestNowcastShadow(unittest.TestCase):
             kw.pull_weather_markets,kw.fetch_members,kw.fget=saved
 
 
+    def test_era_label_future_proof(self):
+        # v13 was misfiled under Legacy for three days because the first draft
+        # enumerated new-era stamps; the rule now enumerates the CLOSED legacy set
+        self.assertEqual(kw._era_label(""), "Legacy (pre-audit)")
+        self.assertEqual(kw._era_label("2026-07-02.v3-nimbus-calib"), "Legacy (pre-audit)")
+        for mv in ("2026-07-06.v11-audit12", "2026-07-06.v12-capseed",
+                   "2026-07-13.v13-nowcast-shadow", "2026-09-01.v14-whatever"):
+            self.assertEqual(kw._era_label(mv), "Audit build (v11+)")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
