@@ -356,5 +356,31 @@ class TestNowcastShadow(unittest.TestCase):
             self.assertEqual(kw._era_label(mv), "Audit build (v11+)")
 
 
+    def test_challenger_weighting_tally(self):
+        # two sharp providers plus one heavy awful one: skill weighting must
+        # beat count weighting decisively past warmup; dates end before the
+        # registration date so the prospective bucket stays empty
+        rows=[]
+        day=dtm.date(2026, 3, 1)
+        for i in range(120):
+            d=(day+dtm.timedelta(days=i)).isoformat()
+            actual=70+(i%7)
+            mm={"gfs025":{"n":10,"mean":actual+0.2,"sd":1.0},
+                "ecmwf_ifs025":{"n":10,"mean":actual+0.1,"sd":1.0},
+                "icon_seamless":{"n":10,"mean":actual-0.2,"sd":1.0},
+                "gem_global":{"n":40,"mean":actual+5.0,"sd":1.0}}
+            for kind in ("HIGH","LOW"):
+                rows.append({"target":d,"kind":kind,"actual":actual,"members_by_model":mm})
+        t=kw.challenger_weighting_tally(rows)
+        self.assertIsNotNone(t)
+        self.assertEqual(t["n"], 240)
+        self.assertEqual(t["n_prosp"], 0)
+        self.assertIsNone(t["adv_prosp"])
+        self.assertGreater(t["adv"], 0.5)
+        self.assertGreater(t["ci_lo"], 0.0)
+        # below the 50-record floor: no tally
+        self.assertIsNone(kw.challenger_weighting_tally(rows[:40]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

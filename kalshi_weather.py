@@ -17,7 +17,7 @@ Confidence -> units is fully tunable in UNIT knobs below; we adjust as the
 scorecard calibrates. Stdlib only.
 """
 
-import json, math, os, sys, time, webbrowser, hashlib
+import json, math, os, sys, time, webbrowser, hashlib, random
 import urllib.request, urllib.error, urllib.parse
 import datetime as dt
 from collections import defaultdict
@@ -890,6 +890,48 @@ def resolve_pending(state):
     return n
 
 # --------------------------- reporting -----------------------------
+CHALLENGER_REG_DATE="2026-07-16"   # docket item 4 registration; prospective data = targets after this date
+
+def _mix_mean(mm,w):
+    t=sum(w.get(k,0.0) for k in mm)
+    return sum(w.get(k,0.0)*v["mean"] for k,v in mm.items())/t if t else None
+
+def challenger_weighting_tally(resolved):
+    """Docket item 4 live test line: strict prior-DATE walk-forward comparing
+    the champion pool (member-count weights) against the registered challenger
+    (per-kind inverse-MSE skill weights over the last 60 prior-date
+    settlements, eps 0.25, 30-per-provider warmup) on RAW mixture means.
+    Recomputed from logged members_by_model on every render: deterministic,
+    stateless, and incapable of touching pricing. Positive = challenger
+    better. Returns None below 50 usable records."""
+    rows=[r for r in resolved if r.get("members_by_model") and r.get("actual") is not None
+          and len(r["members_by_model"])>=3]
+    if len(rows)<50: return None
+    bydate={}
+    for r in rows: bydate.setdefault(r["target"],[]).append(r)
+    models=("gfs025","ecmwf_ifs025","icon_seamless","gem_global")
+    hist={"HIGH":{k:[] for k in models},"LOW":{k:[] for k in models}}
+    diffs=[]; prosp=[]
+    for d in sorted(bydate):
+        for r in bydate[d]:
+            mm=r["members_by_model"]; a=r["actual"]; hk=hist[r["kind"]]
+            e0=abs(_mix_mean(mm,{k:v["n"] for k,v in mm.items()})-a)
+            if min(len(hk[k]) for k in models)>=30:
+                w={k:1.0/(sum(x*x for x in hk[k][-60:])/len(hk[k][-60:])+0.25) for k in mm}
+            else:
+                w={k:v["n"] for k,v in mm.items()}
+            dv=e0-abs(_mix_mean(mm,w)-a)
+            diffs.append(dv)
+            if d>CHALLENGER_REG_DATE: prosp.append(dv)
+        for r in bydate[d]:
+            for k in models:
+                if k in r["members_by_model"]:
+                    hist[r["kind"]][k].append(r["members_by_model"][k]["mean"]-r["actual"])
+    rng=random.Random(11)
+    bs=sorted(sum(rng.choices(diffs,k=len(diffs)))/len(diffs) for _ in range(2000))
+    return {"n":len(diffs),"adv":sum(diffs)/len(diffs),"ci_lo":bs[100],"ci_hi":bs[1899],
+            "n_prosp":len(prosp),"adv_prosp":(sum(prosp)/len(prosp)) if prosp else None}
+
 def _era_label(mv):
     """Legacy iff the stamp is empty or a pre-audit stamp; every later
     MODEL_VERSION (v11, v12, v13, ...) is the audit build. The first draft
@@ -934,6 +976,8 @@ def compute_report(state):
             "crps_u":sum(g.get("crps_u") or 0.0 for g in ncs)/len(ncs),
             "crps_t":sum(g.get("crps_t") or 0.0 for g in ncs)/len(ncs),
             "wins":sum(1 for g in ncs if g["rps_t"]<g["rps_u"])}
+    ch=challenger_weighting_tally(resolved)
+    if ch: rep["challenger_w"]=ch
     # calibration bins
     bins=[]
     for lo in [i/10 for i in range(10)]:
@@ -1457,6 +1501,16 @@ def render_results(rep,updated,health=None,alerts=None):
               f"n={nw['n']}, RPS truncated {nw['rps_t']:.3f} vs untruncated {nw['rps_u']:.3f}, "
               f"CRPS {nw['crps_t']:.2f} vs {nw['crps_u']:.2f}, truncated wins {nw['wins']}/{nw['n']}. "
               f"Plays stay on untruncated pricing until the gate passes.</div>")
+        if rep.get("challenger_w"):
+            ch=rep["challenger_w"]
+            gate=("GATE MET, ships next session" if (ch["n_prosp"]>=150 and (ch["adv_prosp"] or 0)>0 and ch["ci_lo"]>0)
+                  else ("RETIRED at gate" if (ch["n_prosp"]>=150 and (ch["adv_prosp"] or 0)<=0)
+                  else f"gate {ch['n_prosp']}/150 prospective records"))
+            ap="pending" if ch["adv_prosp"] is None else f"{ch['adv_prosp']:+.3f} deg"
+            brier+=(f"<div class='note'>Challenger test line (docket item 4, skill-weighted providers, registered 2026-07-16): "
+              f"full-sample advantage {ch['adv']:+.3f} deg MAE, 90 percent CI [{ch['ci_lo']:+.3f}, {ch['ci_hi']:+.3f}], n={ch['n']}; "
+              f"prospective advantage {ap}. {gate}. Pricing is untouched until the gate holds; adoption is its own "
+              f"single-knob version bump. The other live test lines: the nowcast shadow above and the cheap-entry cell in the era table.</div>")
     # raw
     # calibration curve: does an X% forecast happen X% of the time?
     caltab=""
