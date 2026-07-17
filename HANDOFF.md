@@ -2,7 +2,7 @@
 
 **Purpose of this file:** you are an AI assistant helping the owner (a hobbyist prediction-market bettor, not a professional developer) modify this program. This document tells you what the program is, how it is built, and which decisions are deliberate so you do not undo them while helping. Read it fully before proposing changes. The `README.md` is for the owner (setup instructions). `FUTURE.md` is the running list of planned improvements, known weaknesses, and the automation roadmap; read it too, and move shipped items from there into this changelog. This file is for you.
 
-**Doc version:** 2026-07-16 (v6.9). THE FULL TECHNICAL AUDIT IS COMPLETE (12 batches, 2026-07-04 to 2026-07-06); the consolidated findings register lives in AUDIT_TODO.md. Checkpoint 1 ran 2026-07-13 (changelog v6.4); the nowcast SHADOW shipped the same day (v6.5) and its gate was read 2026-07-16 (v6.6): FAILED as registered, no promotion. Update the changelog at the bottom whenever you change the code.
+**Doc version:** 2026-07-16 (v6.10). THE FULL TECHNICAL AUDIT IS COMPLETE (12 batches, 2026-07-04 to 2026-07-06); the consolidated findings register lives in AUDIT_TODO.md. Checkpoint 1 ran 2026-07-13 (changelog v6.4); the nowcast SHADOW shipped the same day (v6.5) and its gate was read 2026-07-16 (v6.6): FAILED as registered, no promotion. Update the changelog at the bottom whenever you change the code.
 
 **Audit in progress:** a full technical audit is underway. `AUDIT_TODO.md` is the working task list (batch plan, per-section checklists, session protocol); `AUDIT_ORIGINAL.md` is the owner's source brief. Any AI session working on this project during the audit must read AUDIT_TODO.md after this file and record findings in this changelog.
 
@@ -174,6 +174,8 @@ Growth: ~40 resolved records/day at ~1.2 KB each is roughly 1.5 MB/month with `i
 
 ## Changelog
 
+- **v6.10 (2026-07-16), MONEY GATE OPERATIVE + LIVE PATH-TO-PRODUCTION READOUT, MODEL_VERSION unchanged (docs + display):** Owner approved the proposed manual-money gate with the explicit message "approve the money gate". The six-condition gate is now operative in FUTURE section 2 and synced into HANDOFF TASK 6a; the original "Brier below market / beats market on Brier AND RPS" clauses are retired with the reason recorded. A "Path to production" block now renders on Results showing each condition live with MET/open status and details, unit-tested (24 tests). Status at ship time: 2/6 met (sd(z) 0.98 MET; kill legs not binding MET; plays 36/100; ROI -8.4 percent, dragged by the experimental cell; CLV CI lower bound sitting at -0.000, one good day from clearing; cheap cell 10/40).
+
 - **v6.9 (2026-07-16), CHALLENGER TEST LINE LIVE + EVIDENCE-CLOCKED ADOPTION, MODEL_VERSION unchanged (display + docs; pricing untouched):** Owner asked to parallelize toward production instead of serializing knobs at calendar checkpoints. Shipped: (1) the docket 4 skill-weighting challenger now renders as a live test line on Results, recomputed each run from logged members_by_model via the strict prior-date walk-forward (stateless, deterministic seed, cannot touch pricing), showing full-sample advantage, CI, and prospective gate progress toward 150 post-registration records; unit-tested with a synthetic sharp-vs-awful provider fixture (23 tests). (2) Docket 4 adoption decoupled from checkpoint 2 onto its own evidence clock, amended before any prospective data existed: ships as a single-knob version bump the moment 150+ prospective records show positive advantage with the full-sample CI excluding zero (~Jul 20-21 at current settlement rate), retires if prospective advantage is negative at 150. Testing is parallel (three live lines: weighting, nowcast shadow, cheap-entry cell); FLIPPING remains one knob at a time so cause and effect stay attributable. (3) FUTURE's kill-criteria copy synced to the owner-approved CLV amendment (consistency miss from the v6.7 push, owned). (4) The money-scaling gate's impossible "Brier below market" clause: a full replacement gate is PROPOSED in FUTURE section 2 (100+ plays, positive fees-inclusive ROI, CLV CI above zero, sd(z) in [0.85, 1.15], no kill fired, cheap-cell verdict read) but the operative line is deliberately unchanged until the owner approves that specific text.
 
 - **v6.8 (2026-07-16), CHECKPOINT 2 DOCKET GROWS TWO ITEMS, MODEL_VERSION unchanged (docs only):** Owner asked whether running more often would help and whether to spin up multiple experimental variants with different weightings. (1) Run frequency: DECLINED with mechanism and evidence (Decision Log). (2) Weightings: the owner's instinct was right and did not need live variants, because per-provider components (n, mean, sd) are logged on every record since v5. Under a protocol fixed before results were examined (four pre-stated candidates, strict prior-date walk-forward, paired bootstrap), per-kind inverse-MSE skill weighting beat the current member-count pool by +0.068 deg MAE (90 percent CI [+0.031, +0.105], n=379; +0.085 on the 300 post-warmup records), equal weighting was a wash, and ECMWF-anchoring was significantly worse. ICON is the strongest raw provider (2.11 deg) and GEM the weakest (3.23). Registered as docket item 4 with a PRE-COMMITTED prospective adoption test at checkpoint 2 (must keep winning on data with target after 2026-07-16); deliberately not adopted same-day: prospective confirmation is what separates a backtest artifact from an edge, and the checkpoint discipline is one knob family at a time.
@@ -310,9 +312,13 @@ policy (HANDOFF 7b); re-measure cron drift from commit timestamps against the
 audit-era baseline (+1.4h and +3.8h).
 
 TASK 6, THE REAL-MONEY QUESTION. Two SEPARATE verdicts, never blended:
-a. Manual phase 1 (owner's thumb, real dollars, FUTURE section 2 gate): 100+
-   resolved plays AND model beats market on Brier AND RPS AND fees-inclusive
-   paper P&L is green. Report pass/fail per gate.
+a. Manual phase 1 (owner's thumb, real dollars, FUTURE section 2 gate as
+   AMENDED with explicit owner approval 2026-07-16): ALL of (1) 100+ resolved
+   plays, (2) fees-inclusive ROI positive, (3) average CLV positive with 90
+   percent bootstrap CI above zero, (4) sd(z) within [0.85, 1.15], (5) neither
+   kill leg fired, (6) cheap-entry cell verdict read. Report pass/fail per
+   condition. (The original "beats market on Brier AND RPS" clause was retired:
+   checkpoint 1 proved that benchmark structurally unpassable.)
 b. Automated trading: governed solely by LIVE_TRADING_SPEC entry gates 1-5.
    Do not conflate with (a).
 
@@ -369,6 +375,7 @@ Every deliberate knob or policy change, so future tuning is auditable. Append, n
 | 2026-07-16 | Challenger test line SHIPPED to Results (docket 4 tally, recomputed per render, stateless); docket 4 adoption gate amended to its own evidence clock (150 prospective records) BEFORE any prospective data existed | Owner directive: production speed; parallel testing with serial, evidence-clocked adoption preserves attribution | none (display) |
 | 2026-07-16 | FUTURE kill-criteria copy synced to the owner-approved CLV amendment | Doc consistency: HANDOFF section 10 was amended, the FUTURE duplicate was missed in the same push | none (docs) |
 | 2026-07-16 | Money-scaling gate replacement PROPOSED in FUTURE section 2; operative line UNCHANGED pending explicit owner yes to the specific text | The current paper gate requires beating the final obs-informed board on Brier, structurally impossible per checkpoint 1; money-grade edits are never made on a general trust statement | none (proposal) |
+| 2026-07-16 | Manual-money gate AMENDMENT MADE OPERATIVE; owner approval verbatim: "approve the money gate" | Six conditions (100+ plays, ROI positive, CLV CI above zero, sd(z) 0.85-1.15, no kill fired, cheap-cell verdict read) replace the unpassable Brier clause in FUTURE 2 and HANDOFF TASK 6a; live status block added to Results (2/6 met at ship time) | none (governance + display) |
 
 - **v5.8 (2026-07-05), AUDIT BATCH 7 (auto learning + machine learning) + INTEGRITY GATE SHIPPED, MODEL_VERSION bumped to `2026-07-05.v8-audit7`:** Findings in AUDIT_TODO Sections 11-12. Summary:
   - **Gate shipped (owner-approved):** see the new guard in section 4. Validation: offline unit test fired all three per-ladder paths correctly (structure break, 60 members, 2/4 models) with only the healthy city logging; live run showed 0 false positives across all 80 real ladders. Refinements vs the 0.8 draft documented in the guard entry.

@@ -382,5 +382,19 @@ class TestNowcastShadow(unittest.TestCase):
         self.assertIsNone(kw.challenger_weighting_tally(rows[:40]))
 
 
+    def test_prod_gate_conditions(self):
+        # all-met scenario: 100 winning plays, tight positive CLV, sd(z)=1.0,
+        # cheap cell read; kill legs not binding under 150 plays
+        plays=[{"stake":10.0,"pnl":1.0,"clv":0.05,"won":True} for _ in range(100)]
+        zs=[1.0,-1.0]*20
+        gate=kw._prod_gate(plays, zs, 40)
+        self.assertEqual(len(gate), 6)
+        self.assertTrue(all(m for _,m,_ in gate))
+        # all-open scenario
+        gate2=kw._prod_gate([{"stake":10.0,"pnl":-5.0,"clv":None,"won":False}]*5, [0.1]*5, 5)
+        self.assertEqual(sum(1 for _,m,_ in gate2 if m), 1)   # only "kill not fired" holds
+        self.assertTrue(gate2[4][1])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

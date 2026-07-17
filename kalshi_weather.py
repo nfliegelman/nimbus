@@ -932,6 +932,49 @@ def challenger_weighting_tally(resolved):
     return {"n":len(diffs),"adv":sum(diffs)/len(diffs),"ci_lo":bs[100],"ci_hi":bs[1899],
             "n_prosp":len(prosp),"adv_prosp":(sum(prosp)/len(prosp)) if prosp else None}
 
+def _prod_gate(audp, zs, exp_n):
+    """The six operative manual-money conditions (FUTURE section 2, approved by
+    explicit owner sign-off 2026-07-16), evaluated live. audp = audit-era
+    plays, zs = audit-era z-scores, exp_n = cheap-cell play count. Not-binding
+    kill legs count as not fired. Returns ordered (label, met, detail)."""
+    out=[]
+    n=len(audp)
+    out.append(("100+ resolved plays", n>=100, f"{n}/100"))
+    stake=sum(p.get("stake") or 0 for p in audp); pnl=sum(p.get("pnl") or 0 for p in audp)
+    out.append(("fees-inclusive ROI positive", stake>0 and pnl>0,
+                f"{100*pnl/stake:+.1f}%" if stake else "no stakes yet"))
+    clv=[p["clv"] for p in audp if p.get("clv") is not None]
+    if len(clv)>=10:
+        rng=random.Random(7)
+        bs=sorted(sum(rng.choices(clv,k=len(clv)))/len(clv) for _ in range(2000))
+        out.append(("CLV 90% CI above zero", bs[100]>0,
+                    f"avg {sum(clv)/len(clv):+.3f}, CI [{bs[100]:+.3f}, {bs[1899]:+.3f}], n={len(clv)}"))
+    else:
+        out.append(("CLV 90% CI above zero", False, f"n={len(clv)}, too few"))
+    if len(zs)>=30:
+        m=sum(zs)/len(zs); sd=math.sqrt(sum((z-m)**2 for z in zs)/len(zs))
+        out.append(("sd(z) in [0.85, 1.15]", 0.85<=sd<=1.15, f"{sd:.2f}, n={len(zs)}"))
+    else:
+        out.append(("sd(z) in [0.85, 1.15]", False, f"n={len(zs)}, too few"))
+    fired=False; kd="not binding (under 150 plays)"
+    if n>=150 and stake>0:
+        rng=random.Random(9); rois=[]
+        for _ in range(2000):
+            smp=rng.choices(audp,k=n); s=sum(p["stake"] for p in smp)
+            rois.append(100*sum(p["pnl"] for p in smp)/s if s else 0.0)
+        rois.sort()
+        roi_fired=rois[1899]<-8.0
+        clv_fired=False
+        if len(clv)>=150:
+            rng2=random.Random(7)
+            bs2=sorted(sum(rng2.choices(clv,k=len(clv)))/len(clv) for _ in range(2000))
+            clv_fired=bs2[1899]<0
+        fired=roi_fired or clv_fired
+        kd=("ROI leg FIRED" if roi_fired else "")+(" CLV leg FIRED" if clv_fired else "") or "both legs clear"
+    out.append(("neither kill leg fired", not fired, kd))
+    out.append(("cheap-entry cell verdict read", exp_n>=40, f"{exp_n}/40"))
+    return out
+
 def _era_label(mv):
     """Legacy iff the stamp is empty or a pre-audit stamp; every later
     MODEL_VERSION (v11, v12, v13, ...) is the audit build. The first draft
@@ -1151,6 +1194,10 @@ def compute_report(state):
                    "w":sum(1 for p in audp if _cell(p) and p["won"]),
                    "stake_u":sum(p["units"] for p in audp if _cell(p)),
                    "net_u":sum(p["pnl"] for p in audp if _cell(p))/BASE_UNIT_USD}}
+        zsa=[(r["actual"]-r["mean"])/r["psd"] for r in resolved
+             if r.get("psd") and r.get("actual") is not None
+             and _era_label(r.get("model_version") or "")!="Legacy (pre-audit)"]
+        rep["prod_gate"]=_prod_gate(audp, zsa, rep["book_split"]["exp"]["n"])
     return rep
 
 # ----------------------------- render ------------------------------
@@ -1460,6 +1507,14 @@ def render_results(rep,updated,health=None,alerts=None):
                   f"<b>Experimental cheap-entry cell</b> (docket item 1, gate {e['n']}/40): {e['w']}/{e['n']-e['w']} for {e['net_u']:+.1f}u. "
                   "The cell keeps trading until its pre-registered gate reads; its cost is the price of a verdict that "
                   "cannot be argued with. If the gate condition holds, a MIN_ENTRY floor of 0.20 ships automatically.</div>")
+            if rep.get("prod_gate"):
+                metn=sum(1 for _,m,_ in rep["prod_gate"] if m)
+                items="".join(f"<div>{'MET &middot; ' if m else 'open &middot; '}{esc(lbl)}: {esc(det)}</div>"
+                              for lbl,m,det in rep["prod_gate"])
+                erat+=(f"<h2 class='sec'>Path to production</h2>"
+                  f"<div class='note'>Manual-money gate, approved by owner 2026-07-16: <b>{metn}/6 conditions met</b>. "
+                  "Real dollars start small only when all six hold at once; the kill legs can still stop everything later.</div>"
+                  f"<div class='card'>{items}</div>")
         calsec=("<h2 class='sec'>Calibration engine</h2>"+note+"<div class='card'>"+c1+"</div>"+disp+erat)
     # time-windowed win rate row
     W=rep.get("windows",{})
