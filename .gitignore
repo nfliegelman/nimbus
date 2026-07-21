@@ -1,0 +1,5 @@
+# Compiled Python bytecode. Regenerated on every run (CI runs the test suite,
+# then the workflow does `git add -A`), so it must never be tracked or it lands
+# in the boards commit as noise.
+__pycache__/
+*.pyc
