@@ -225,6 +225,28 @@ class TestPipeline(unittest.TestCase):
                            for pl in v.get("plays", []) if v["target"] == self.day)
         self.assertLessEqual(total_frozen, kw.DAILY_UNIT_CAP + 1e-9)
 
+    def test_capped_plays_not_actionable_in_rows(self):
+        # A play dropped by the exposure caps must not still render as a live sized
+        # bet in the By-city detail view. rows and plays share the SAME dicts, so the
+        # caps loop must neutralize dropped rows (units 0, no stake, capped flag) to
+        # keep the detail view honest with the actionable board.
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        rows, plays, health = kw.score(state)
+        self.assertGreater(health["capped"], 0)          # caps actually fired
+        play_ids = {id(p) for p in plays}
+        capped = [r for r in rows if r.get("capped")]
+        self.assertTrue(capped)                          # at least one row was capped
+        for r in capped:
+            self.assertEqual(r["units"], 0.0)
+            self.assertIsNone(r["stake"])
+            self.assertNotIn(id(r), play_ids)            # capped row is not actionable
+        # Conversely, every row still advertising a sized bet is a surviving play.
+        for r in rows:
+            if r.get("stake"):
+                self.assertIn(id(r), play_ids)
+
     def test_resolution_fee_and_clv(self):
         state = {"predictions": {"DAL|HIGH|2026-07-01": {
             "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "event_ticker": "EVT",

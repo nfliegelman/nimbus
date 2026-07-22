@@ -18,7 +18,7 @@ scorecard calibrates. Stdlib only.
 """
 
 import json, math, os, sys, time, webbrowser, hashlib, random
-import urllib.request, urllib.error, urllib.parse
+import urllib.request, urllib.parse
 import datetime as dt
 from collections import defaultdict
 
@@ -100,7 +100,11 @@ BIAS_MIN_N    = 5     # settled events needed before any correction applies
 BIAS_LOOKBACK = 30    # only the most recent N settlements count (season drift)
 BIAS_SHRINK_K = 5     # correction = -mean_bias * n/(n+K)
 HICONF_PWIN   = 0.65  # plays with win prob >= this get the high-confidence tag
-# tier score thresholds (effective edge in cents); tune as we calibrate
+# Legacy tier-score thresholds. Sizing is now done entirely in size_play (edge
+# bands + win-prob/plausibility/lead/proven caps); the old tier_for scorer that
+# consumed this was removed. RETAINED (unused) only to keep it in _KNOB_NAMES so
+# CONFIG_HASH and the calibration-era fingerprint stay continuous with all prior
+# records. Do not delete without accepting a one-time era split.
 TIER_CUTS = [("S", 0.12), ("A", 0.08), ("B", 0.05), ("C", 0.03)]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -619,21 +623,6 @@ def city_skill(state):
             a["bm"]+=(b["mp"]-b["hit"])**2; a["bk"]+=(b["mid"]-b["hit"])**2; a["nb"]+=1
     return {k:{"nb":a["nb"],"brier_edge":(a["bk"]-a["bm"])/a["nb"]} for k,a in agg.items() if a["nb"]>=20}
 
-TIER_RANK={"S":0,"A":1,"B":2,"C":3}
-def tier_for(net,lead,sd,skill):
-    lead_w={0:1.0,1:1.0,2:0.8,3:0.6,4:0.45}.get(lead,0.4)
-    sharp_w=1.0 if sd<=2 else 0.85 if sd<=3 else 0.7 if sd<=4 else 0.55
-    proven=skill is not None
-    hist_w=max(0.5,min(1.4,1.0+skill["brier_edge"]*8)) if proven else 1.0
-    eff=net*lead_w*sharp_w*hist_w
-    t=None
-    for name,cut in TIER_CUTS:
-        if eff>=cut: t=name; break
-    if t=="S" and not proven: t="A"
-    return t,eff,proven
-
-def units_of(t): return UNIT_MAP.get(t,0.0)
-
 def size_play(net, p_win, proven, lead=0):
     """Size from edge magnitude, then cap by win-probability, plausibility, lead time, and city track record."""
     if net < PLAY_NET_EDGE: return 0.0, ""
@@ -796,7 +785,11 @@ def score(state):
     for r in plays:
         dk=r["date"].isoformat(); ek=(dk,r["code"],r["kind"])
         if per_day[dk]+r["units"]>DAILY_UNIT_CAP+1e-9 or per_ev[ek]+r["units"]>EVENT_UNIT_CAP+1e-9:
-            dropped+=1; continue
+            # Over the daily/event exposure budget: drop from the actionable board
+            # AND neutralize the shared row object so the By-city detail view cannot
+            # still advertise it as a live sized bet (rows and plays hold the SAME
+            # dict). Persistence is capped separately in the prune loop below.
+            dropped+=1; r["capped"]=True; r["units"]=0.0; r["stake"]=None; continue
         per_day[dk]+=r["units"]; per_ev[ek]+=r["units"]; kept.append(r)
     plays=kept
     # prune ONLY plays frozen THIS run; earlier frozen history is untouchable
@@ -1105,8 +1098,7 @@ def compute_report(state):
         for p in pls: days[p["target"]].append(p)
         dk=sorted(days)
         if len(dk)>=3:
-            import random as _rnd
-            rng=_rnd.Random(len(pls)*100003+len(dk))
+            rng=random.Random(len(pls)*100003+len(dk))
             rois=[]
             for _ in range(800):
                 sample=[p for _x in range(len(dk)) for p in days[rng.choice(dk)]]
@@ -1201,7 +1193,10 @@ def compute_report(state):
     return rep
 
 # ----------------------------- render ------------------------------
-CSS=open(os.path.join(HERE,"_style.css")).read() if os.path.exists(os.path.join(HERE,"_style.css")) else ""
+_css_override=os.path.join(HERE,"_style.css")
+CSS=""
+if os.path.exists(_css_override):
+    with open(_css_override) as _f: CSS=_f.read()
 if not CSS:
  CSS=""":root{--bg:#0d1014;--panel:#14181e;--line:#232a33;--tx:#e7ecf2;--mut:#8b97a6;--dim:#4d5765;--teal:#5ad1c8;--up:#46c08a;--dn:#e3a23c;--red:#e25a4d;--gold:#e8c468}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.45}
@@ -1278,7 +1273,8 @@ def svg_line(vals,w=680,h=170,pad=26):
     def Y(v): return h-pad-(h-2*pad)*((v-lo)/rng)
     pts=" ".join(f"{X(i):.1f},{Y(v):.1f}" for i,v in enumerate(vals))
     zero=Y(0)
-    return (f"<svg viewBox='0 0 {w} {h}'><line x1='{pad}' y1='{zero:.1f}' x2='{w-pad}' y2='{zero:.1f}' "
+    aria=esc(f"Cumulative units profit and loss across {len(vals)} resolved plays, ending at {vals[-1]:+.1f} units")
+    return (f"<svg viewBox='0 0 {w} {h}' role='img' aria-label='{aria}'><line x1='{pad}' y1='{zero:.1f}' x2='{w-pad}' y2='{zero:.1f}' "
             f"stroke='#232a33'/><polyline points='{pts}' fill='none' stroke='#5ad1c8' stroke-width='2'/>"
             f"<text x='{pad}' y='14' fill='#8b97a6' font-size='11' font-family=monospace>cumulative units P&amp;L</text></svg>")
 
@@ -1289,7 +1285,8 @@ def svg_multi(series,labels,colors,w=680,h=190,pad=26,ref=None):
     lo=min(vals+([ref] if ref is not None else [])); hi=max(vals+([ref] if ref is not None else []))
     rng=(hi-lo) or 1; n=max(len(s) for s in series)
     X=lambda i: pad+(w-2*pad)*(i/max(1,n-1)); Y=lambda v: h-pad-(h-2*pad)*((v-lo)/rng)
-    out=[f"<svg viewBox='0 0 {w} {h}'>"]
+    aria=esc("Line chart comparing "+", ".join(labels)+(", reference %g"%ref if ref is not None else ""))
+    out=[f"<svg viewBox='0 0 {w} {h}' role='img' aria-label='{aria}'>"]
     if ref is not None:
         out.append(f"<line x1='{pad}' y1='{Y(ref):.1f}' x2='{w-pad}' y2='{Y(ref):.1f}' stroke='#232a33' stroke-dasharray='4 4'/>")
         out.append(f"<text x='{w-pad-8}' y='{Y(ref)-5:.1f}' fill='#8b97a6' font-size='10' font-family=monospace text-anchor='end'>{ref:g}</text>")
@@ -1311,9 +1308,10 @@ def svg_multi(series,labels,colors,w=680,h=190,pad=26,ref=None):
 
 def svg_bars(items,w=680,bar=26,gap=10,pad=90):
     if not items: return ""
-    h=pad and len(items)*(bar+gap)+16
+    h=len(items)*(bar+gap)+16
     mx=max(abs(v) for _,v in items) or 1
-    out=[f"<svg viewBox='0 0 {w} {h}'>"]
+    aria=esc("Bar chart: "+", ".join(f"{lab} {v:+.2f}" for lab,v in items))
+    out=[f"<svg viewBox='0 0 {w} {h}' role='img' aria-label='{aria}'>"]
     for i,(lab,v) in enumerate(items):
         y=8+i*(bar+gap); wpx=(w-pad-20)*(abs(v)/mx); col="#46c08a" if v>=0 else "#e25a4d"
         out.append(f"<text x='0' y='{y+bar/2+4:.0f}' fill='#e7ecf2' font-size='12'>{esc(lab)[:16]}</text>")
@@ -1325,10 +1323,6 @@ RATING_TXT={"2u":"an exceptional day. A proven-city edge worth your max size.",
             "1.5u":"a strong day. Solid, higher-probability edges.",
             "1u":"a decent day. Real but modest, or capped longshots.",
             "NO BET":"a sit-out day. Nothing clears the bar; the right move is no bet."}
-RATING={"S":("2u","an exceptional day. A proven-city edge worth your max size."),
-        "A":("1.5u","a strong day. Solid edges, good conditions."),
-        "B":("1u","a decent day. Real but modest edges."),
-        None:("NO BET","a sit-out day. Nothing clears the bar; the right move is no bet.")}
 
 def _health_strip(health,alerts=None):
     if not health and not alerts: return ""
@@ -1397,7 +1391,8 @@ def render_bets(rows,plays,updated,health=None):
             mt=f'forecast {r0["mean"]:.0f}\u00b0 \u00b1{r0["sd"]:.1f}\u00b0 &middot; {_lead(r0["lead"])} &middot; model\u2212mkt {r0["offset"]:+.1f}\u00b0'
             tr=""
             for r in sorted(rs,key=lambda x:-x["mp"]):
-                pcell=(f'{unit_badge(r["units"])} {r["side"]} @ {r["entry"]*100:.0f}\u00a2' if r.get("stake") else '<span class="dim">\u00b7</span>')
+                pcell=(f'{unit_badge(r["units"])} {r["side"]} @ {r["entry"]*100:.0f}\u00a2' if r.get("stake")
+                       else ('<span class="tag c-md">capped</span>' if r.get("capped") else '<span class="dim">\u00b7</span>'))
                 tr+=(f'<tr><td>{esc(r["bucket"])}</td><td class="n">{pct(r["mid"])}</td><td class="n model">{pct(r["mp"])}</td>'
                      f'<td class="n">{_edge(r["edge"])}</td><td class="n">{fmt_oi(r["oi"])}</td><td class="pl">{pcell}</td></tr>')
             blocks+=(f'<div class="block"><div class="bh">{hd}</div><div class="bm">{mt}</div>'
