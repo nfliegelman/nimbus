@@ -26,7 +26,10 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 60, not 30: the observed run takes about 25 minutes (two full model
+    # runs at a measured 5.8 to 13.7 minutes each, plus tests), so a 30
+    # minute cap would turn a slow API day into a red X that means nothing.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
