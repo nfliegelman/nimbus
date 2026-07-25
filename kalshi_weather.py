@@ -772,10 +772,13 @@ def score(state):
                 # data must not become the decision snapshot.
                 if old and old.get("book0"):
                     rec["book0"]=old["book0"]
-                    if old.get("book0_at"): rec["book0_at"]=old["book0_at"]
                 elif not gate:
-                    rec["book0"]=[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]
-                    rec["book0_at"]=run_stamp
+                    # Record-level scalars travel WITH the snapshot: `biased` is a
+                    # play-gate input that resolved records never stored at all, and
+                    # `lead` on the record is the LAST refresh's, not the decision
+                    # board's. A replay missing either would apply the wrong filters.
+                    rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
+                                  "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
                 # FREEZE: once a run has published plays for this market, later runs must
                 # not rewrite them; the tracker has to score the board the owner actually
                 # saw. Buckets/mean/sigma keep refreshing (calibration wants the freshest
@@ -877,14 +880,14 @@ def resolve_pending(state):
         # the snapshot is self-contained: reprice AND grade with no join back to
         # buckets[]. All or nothing: a partially graded book would silently bias a
         # replay's exposure caps, which allocate across a whole ladder.
-        b0=[]
-        for e in p.get("book0") or []:
-            sr=settled.get(e["ticker"])
-            if not sr or sr[0] not in ("yes","no"): b0=None; break
-            b0.append(dict(e,hit=1 if sr[0]=="yes" else 0))
-        if b0:
-            rec["book0"]=b0
-            if p.get("book0_at"): rec["book0_at"]=p["book0_at"]
+        b0=p.get("book0")
+        if b0 and b0.get("buckets"):
+            graded=[]
+            for e in b0["buckets"]:
+                sr=settled.get(e["ticker"])
+                if not sr or sr[0] not in ("yes","no"): graded=None; break
+                graded.append(dict(e,hit=1 if sr[0]=="yes" else 0))
+            if graded: rec["book0"]=dict(b0,buckets=graded)
         for pl in p.get("plays",[]):
             res=settled.get(pl["ticker"])
             if not res or res[0] not in ("yes","no"): continue
