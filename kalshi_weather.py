@@ -645,6 +645,13 @@ def size_play(net, p_win, proven, lead=0):
     return units, reason
 
 # ----------------------------- scoring -----------------------------
+# Fields of the write-once decision-board snapshot (book0). Enough to REPRICE a
+# ladder (mp, mid, yb, ya, oi) and to re-derive bucket probabilities under a
+# different forecast config (floor, cap, stype); ticker is the join key to the
+# settlement. Deliberately NOT in _KNOB_NAMES: this is a recording schema, not a
+# behavior knob, so CONFIG_HASH is unaffected.
+BOOK0_FIELDS=("ticker","mp","mid","yb","ya","oi","floor","cap","stype")
+
 def score(state):
     ladders=pull_weather_markets()
     needed=sorted({l["code"] for l in ladders})
@@ -752,6 +759,34 @@ def score(state):
                     "buckets":pbk,"plays":ppl}
                 if gate: rec["gated"]=gate
                 if old and old.get("nowcast"): rec["nowcast"]=old["nowcast"]   # shadow snapshots survive refreshes (write-once)
+                # BOOK0 (write-once): the order book of the FIRST healthy board for
+                # this market, i.e. the board a decision would actually have been made
+                # on. rec["buckets"] refreshes every run because calibration and CLV
+                # want the freshest prices, so by settlement the stored book is the
+                # FINAL board's: 75 percent of resolved records saw 2 or more boards,
+                # which makes the refreshed book useless for reconstructing a decision.
+                # Carried onto the resolved record and stamped with each bucket's
+                # settled outcome, book0 lets any play-selection, sizing, or pricing
+                # config be replayed offline against real history, including configs
+                # invented long after the fact. Gated boards never write it: degraded
+                # data must not become the decision snapshot.
+                if old and old.get("book0"):
+                    rec["book0"]=old["book0"]
+                elif old is None and not gate:
+                    # ONLY on a market's genuinely first log. A record already in
+                    # flight when this shipped has boards we never captured, and its
+                    # plays may have frozen on one of them, so snapshotting it now
+                    # would label a mid-life board as the decision board and quietly
+                    # corrupt every replay built on it. Those records are excluded
+                    # forever instead, which costs about two days of coverage. Same
+                    # reason a first-board gate forfeits the snapshot: better absent
+                    # than wrong.
+                    # Record-level scalars travel WITH the snapshot: `biased` is a
+                    # play-gate input that resolved records never stored at all, and
+                    # `lead` on the record is the LAST refresh's, not the decision
+                    # board's. A replay missing either would apply the wrong filters.
+                    rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
+                                  "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
                 # FREEZE: once a run has published plays for this market, later runs must
                 # not rewrite them; the tracker has to score the board the owner actually
                 # saw. Buckets/mean/sigma keep refreshing (calibration wants the freshest
@@ -849,6 +884,18 @@ def resolve_pending(state):
         if p.get("nowcast"):
             g=_grade_nowcast(p["nowcast"],settled,actual)
             if g: rec["nowcast"]=g   # nowcast shadow, graded (FUTURE 5 gate instrument)
+        # book0 -> resolved record, each entry stamped with its settled outcome so
+        # the snapshot is self-contained: reprice AND grade with no join back to
+        # buckets[]. All or nothing: a partially graded book would silently bias a
+        # replay's exposure caps, which allocate across a whole ladder.
+        b0=p.get("book0")
+        if b0 and b0.get("buckets"):
+            graded=[]
+            for e in b0["buckets"]:
+                sr=settled.get(e["ticker"])
+                if not sr or sr[0] not in ("yes","no"): graded=None; break
+                graded.append(dict(e,hit=1 if sr[0]=="yes" else 0))
+            if graded: rec["book0"]=dict(b0,buckets=graded)
         for pl in p.get("plays",[]):
             res=settled.get(pl["ticker"])
             if not res or res[0] not in ("yes","no"): continue

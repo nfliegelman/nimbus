@@ -272,6 +272,162 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(r.get("cfg"), "deadbeef")
         self.assertIsNotNone(r.get("crps"))
 
+    def test_book0_is_write_once_and_skips_gated_boards(self):
+        """book0 must freeze at the FIRST healthy board. If it tracked refreshes it
+        would record the final board's prices, which is not the board any decision
+        was made on, and every offline replay built on it would be fiction."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy] + [self._lad("PHX", ok=False)])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        key = "DAL|HIGH|" + self.day
+        b0 = state["predictions"][key]["book0"]
+        first = [dict(e) for e in b0["buckets"]]
+        self.assertTrue(first)
+        self.assertEqual(sorted(first[0]), sorted(kw.BOOK0_FIELDS))
+        self.assertTrue(b0.get("at"))
+        # record-level play-gate inputs travel with the snapshot
+        self.assertIn("biased", b0); self.assertIn("lead", b0); self.assertIn("mean", b0)
+        # a structurally gated ladder must never supply the decision snapshot
+        self.assertIsNone(state["predictions"].get("PHX|HIGH|" + self.day, {}).get("book0"))
+
+        def moved(code, ok=True):
+            l = self._lad(code, ok)
+            for b in l["buckets"]:
+                b["yb"] = round(b["yb"] + 0.10, 2); b["ya"] = round(b["ya"] + 0.10, 2)
+            return l
+        self._wire([moved(c) for c in healthy] + [moved("PHX", ok=False)])
+        kw.score(state)
+        rec = state["predictions"][key]
+        self.assertEqual(rec["book0"]["buckets"], first)           # snapshot frozen
+        self.assertEqual(rec["book0"]["at"], b0["at"])
+        self.assertNotEqual([b["yb"] for b in rec["buckets"]],
+                            [e["yb"] for e in first])              # live book really moved
+
+    def test_book0_never_stamps_a_record_already_in_flight(self):
+        """A market already pending when book0 shipped has boards we never saw, and
+        its plays may have frozen on one. Snapshotting it now would label a mid-life
+        board as the decision board, so it must be skipped forever instead."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        key = "DAL|HIGH|" + self.day
+        # simulate a pre-existing record: present, no book0, already carrying plays
+        state = {"predictions": {key: {
+            "code": "DAL", "kind": "HIGH", "target": self.day, "event_ticker": "EDAL",
+            "logged_at": "old", "first_logged": "old", "lead": 1, "mean": 90.0,
+            "sd": 1.0, "psd": 1.5, "bias_corr": 0.0, "sigma": 1.1, "buckets": [],
+            "plays": [{"ticker": "DALB1", "side": "Buy YES", "entry": 0.28, "net": 0.05,
+                       "edge": 0.06, "tier": "B", "units": 1.0, "stake": 10.0,
+                       "p_win": 0.5, "mp": 0.5, "mid": 0.27, "sub": "", "bid": "x"}],
+            "plays_logged_at": "old", "plays_lead": 1, "plays_model_version": "t"}},
+            "resolved": []}
+        kw.score(state)
+        self.assertIsNone(state["predictions"][key].get("book0"))   # skipped, not mislabeled
+        # a market seen for the first time in this same run DOES get one
+        self.assertIsNotNone(state["predictions"]["ATL|HIGH|" + self.day].get("book0"))
+
+    def test_book0_carries_to_resolved_with_settled_hits(self):
+        """The resolved snapshot must be self-contained (reprice + grade) and must
+        keep the DECISION board's prices, not the refreshed ones."""
+        state = {"predictions": {"DAL|HIGH|2026-07-01": {
+            "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "event_ticker": "EVT",
+            "logged_at": "x", "lead": 1, "mean": 95.2, "sd": 1.4, "psd": 1.8,
+            "bias_corr": 0.0, "sigma": 1.1, "model_version": "t", "cfg": "deadbeef",
+            "buckets": [
+                {"ticker": "A", "bid": "94-95", "sub": "", "floor": 94, "cap": 95,
+                 "stype": "between", "mp": 0.42, "mid": 0.40, "yb": 0.38, "ya": 0.42, "oi": 500},
+                {"ticker": "B", "bid": "96+", "sub": "", "floor": 96, "cap": None,
+                 "stype": "greater", "mp": 0.20, "mid": 0.30, "yb": 0.28, "ya": 0.32, "oi": 500}],
+            "book0": {"at": "2026-06-30T02:07Z", "mean": 95.0, "biased": False, "lead": 1,
+                      "buckets": [
+                {"ticker": "A", "mp": 0.50, "mid": 0.31, "yb": 0.29, "ya": 0.33, "oi": 480,
+                 "floor": 94, "cap": 95, "stype": "between"},
+                {"ticker": "B", "mp": 0.14, "mid": 0.24, "yb": 0.22, "ya": 0.26, "oi": 460,
+                 "floor": 96, "cap": None, "stype": "greater"}]},
+            "plays": []}},
+            "resolved": []}
+        kw.fetch_settled_event = lambda evt: {"A": ("yes", 95.0), "B": ("no", 95.0)}
+        kw.TODAY = dtm.date(2026, 7, 5)
+        kw.resolve_pending(state)
+        r = state["resolved"][0]
+        self.assertEqual(len(r["book0"]["buckets"]), 2)
+        a = next(e for e in r["book0"]["buckets"] if e["ticker"] == "A")
+        self.assertEqual(a["hit"], 1)
+        self.assertEqual(next(e for e in r["book0"]["buckets"] if e["ticker"] == "B")["hit"], 0)
+        self.assertEqual(a["mid"], 0.31)      # decision board, NOT the refreshed 0.40
+        self.assertEqual(a["oi"], 480)
+        self.assertEqual(r["book0"]["at"], "2026-06-30T02:07Z")
+        self.assertEqual(r["book0"]["lead"], 1)          # decision-board lead, a filter input
+        self.assertIs(r["book0"]["biased"], False)       # play-gate input preserved
+
+    def test_book0_dropped_when_any_bucket_ungraded(self):
+        """Partial books bias replayed exposure caps, so it is all or nothing."""
+        state = {"predictions": {"DAL|HIGH|2026-07-01": {
+            "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "event_ticker": "EVT",
+            "logged_at": "x", "lead": 1, "mean": 95.2, "sd": 1.4, "psd": 1.8,
+            "bias_corr": 0.0, "sigma": 1.1, "model_version": "t", "cfg": "deadbeef",
+            "buckets": [
+                {"ticker": "A", "bid": "94-95", "sub": "", "floor": 94, "cap": 95,
+                 "stype": "between", "mp": 0.42, "mid": 0.40, "yb": 0.38, "ya": 0.42, "oi": 500}],
+            "book0": {"at": "z", "mean": 95.0, "biased": False, "lead": 1, "buckets": [
+                {"ticker": "A", "mp": 0.50, "mid": 0.31, "yb": 0.29, "ya": 0.33, "oi": 480,
+                 "floor": 94, "cap": 95, "stype": "between"},
+                {"ticker": "GONE", "mp": 0.10, "mid": 0.12, "yb": 0.10, "ya": 0.14, "oi": 300,
+                 "floor": 96, "cap": None, "stype": "greater"}]},
+            "plays": []}},
+            "resolved": []}
+        kw.fetch_settled_event = lambda evt: {"A": ("yes", 95.0)}   # GONE never settles
+        kw.TODAY = dtm.date(2026, 7, 5)
+        kw.resolve_pending(state)
+        r = state["resolved"][0]
+        self.assertIsNone(r.get("book0"))
+        self.assertTrue(r["buckets"])        # the record itself still resolves normally
+
+    def test_replay_champion_reproduces_live_selection(self):
+        """The replay engine's champion config must pick EXACTLY what score() picked.
+        If it drifts, every challenger number it produces is fiction. This is the
+        equivalence proof for replay_selection.py."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        rows, plays, health = kw.score(state)
+        live = sorted((p["ticker"], p["side"], p["entry"], p["units"]) for p in plays)
+        self.assertTrue(live, "fixture produced no live plays to compare against")
+
+        # build resolved-shaped records from the same boards, with arbitrary outcomes
+        recs = []
+        for key, p in state["predictions"].items():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "book0": dict(b0, buckets=gb)})
+        replayed = rs.replay(recs, rs.cfg("champion"))
+        got = sorted((p["ticker"], p["side"], p["entry"], p["units"]) for p in replayed)
+        self.assertEqual(got, live)
+
+    def test_replay_min_entry_floor_excludes_cheap_plays(self):
+        """A knob must actually bite: the 0.20 floor drops every cheaper entry and
+        never invents a play the champion did not have available."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "book0": dict(b0, buckets=gb)})
+        base = rs.replay(recs, rs.cfg("champion"))
+        floored = rs.replay(recs, rs.cfg("floor", min_entry=0.20))
+        self.assertTrue(all(p["entry"] >= 0.20 for p in floored))
+        base_ids = {(p["ticker"], p["side"]) for p in base}
+        self.assertTrue({(p["ticker"], p["side"]) for p in floored} <= base_ids)
+
 
 class TestState(unittest.TestCase):
     def test_load_state_refuses_bad_files(self):
