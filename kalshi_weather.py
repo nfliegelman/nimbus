@@ -37,7 +37,7 @@ SUSPECT_EDGE  = 0.20     # net edge above this is treated as noise, capped to 1u
 EDGE_2U       = 0.14     # net edge for a 2u ceiling (also needs proven city + win prob >= .55)
 EDGE_1_5U     = 0.08     # net edge for a 1.5u ceiling
 # Stamp every logged bet so history survives model changes and tunes can be compared.
-MODEL_VERSION = "2026-07-13.v13-nowcast-shadow"
+MODEL_VERSION = "2026-07-25.v14-skillpool"
 # Exposure caps (audit batch 8). Measured before caps: 54.5u staked on a single
 # target date against a $500 bankroll, and up to 5 plays stacked on one ladder
 # (31 of 44 played events carried 2+), i.e. multiples of one settlement number.
@@ -99,6 +99,12 @@ DRESS_SIGMA_MAX     = 3.0
 BIAS_MIN_N    = 5     # settled events needed before any correction applies
 BIAS_LOOKBACK = 30    # only the most recent N settlements count (season drift)
 BIAS_SHRINK_K = 5     # correction = -mean_bias * n/(n+K)
+# --- provider weighting (docket 4, adopted 2026-07-25 on its pre-registered gate) ---
+# Per-kind inverse-MSE pooling. Values are the ones the gate was measured
+# under; changing any of them makes the measured advantage inapplicable.
+PROVIDER_W_WARMUP   = 30    # prior settlements per provider PER KIND before weighting engages
+PROVIDER_W_LOOKBACK = 60    # most recent settlements per provider that count
+PROVIDER_W_EPS      = 0.25  # floors a lucky provider: without it one tiny MSE takes the cloud
 HICONF_PWIN   = 0.65  # plays with win prob >= this get the high-confidence tag
 # Legacy tier-score thresholds. Sizing is now done entirely in size_play (edge
 # bands + win-prob/plausibility/lead/proven caps); the old tier_for scorer that
@@ -165,6 +171,7 @@ _KNOB_NAMES=("BANKROLL","BASE_UNIT_USD","UNIT_MAP","WINPROB_CAP","SUSPECT_EDGE",
  "GATE_MIN_MEMBERS","GATE_MIN_MODELS","TAIL_FLOOR","MIN_OI","PLAY_NET_EDGE",
  "MAX_LEAD_DAYS","LEAD_CAP_DAYS","BIAS_TOL","INTRADAY_HIGH_CUTOFF","NOWCAST_MIN_LHR",
  "DRESS_SIGMA_DEFAULT","DRESS_SIGMA_MIN","DRESS_SIGMA_MAX","BIAS_MIN_N",
+ "PROVIDER_W_WARMUP","PROVIDER_W_LOOKBACK","PROVIDER_W_EPS",
  "BIAS_LOOKBACK","BIAS_SHRINK_K","HICONF_PWIN","TIER_CUTS","ENSEMBLE_MODELS","REF_MODELS")
 CONFIG_HASH=hashlib.sha1(repr([(k,globals()[k]) for k in _KNOB_NAMES if k in globals()]).encode()).hexdigest()[:8]
 MON={"JAN":1,"FEB":2,"MAR":3,"APR":4,"MAY":5,"JUN":6,"JUL":7,"AUG":8,"SEP":9,"OCT":10,"NOV":11,"DEC":12}
@@ -431,13 +438,78 @@ def _crps_gauss(y,mu,s):
     pdf=math.exp(-0.5*z*z)/math.sqrt(2*math.pi)
     return round(s*(z*(2.0*_phi(z)-1.0)+2.0*pdf-1.0/math.sqrt(math.pi)),3)
 
-def dressed_prob(members,b,sigma):
+def _pm_values(pm,kind,day):
+    """{model: [raw member values]} for one city/kind/day. Unlike _pm_summary this
+    keeps the individual members, which provider weighting needs."""
+    key="hi" if kind=="HIGH" else "lo"
+    return {m:((d.get(key) or {}).get(day) or []) for m,d in (pm or {}).items()}
+
+def provider_weights(state):
+    """Docket 4, ADOPTED 2026-07-25 after its pre-registered gate fired (199/150
+    prospective records, prospective advantage +0.022 deg, full-sample advantage
+    +0.053 deg with 90% CI [+0.024, +0.083]).
+
+    Per-KIND inverse-MSE provider weights: w_i proportional to
+    1/(MSE_i + PROVIDER_W_EPS), MSE over that provider's last PROVIDER_W_LOOKBACK
+    prior-date settlements of that kind. Highs and lows are learned separately
+    because a provider good at daytime maxima is not automatically good at
+    overnight minima.
+
+    Returns {} for a kind until EVERY provider has PROVIDER_W_WARMUP settlements
+    there, so the member-count pool remains the warmup behavior and a thin
+    provider history can never dominate. The epsilon floors the weight of a
+    provider on a lucky streak: without it, one near-zero MSE would take the
+    entire cloud."""
+    hist={"HIGH":defaultdict(list),"LOW":defaultdict(list)}
+    for r in sorted(state.get("resolved",[]),key=lambda x:x.get("target","")):
+        if r.get("gated") or r.get("actual") is None: continue
+        if r.get("kind") not in hist: continue
+        for m,v in (r.get("members_by_model") or {}).items():
+            if v.get("mean") is not None: hist[r["kind"]][m].append(v["mean"]-r["actual"])
+    out={}
+    for kind,per in hist.items():
+        if any(len(per.get(m,[]))<PROVIDER_W_WARMUP for m in ENSEMBLE_MODELS): continue
+        w={}
+        for m in ENSEMBLE_MODELS:
+            e=per[m][-PROVIDER_W_LOOKBACK:]
+            w[m]=1.0/((sum(x*x for x in e)/len(e))+PROVIDER_W_EPS)
+        out[kind]=w
+    return out
+
+def weighted_cloud(pvals,wmap,corr):
+    """Bias-corrected member cloud plus per-member weights implementing wmap.
+    Each provider's members SHARE that provider's weight, so a 51-member model no
+    longer outvotes a 21-member one on member count alone; it outvotes it only if
+    its measured skill earns it. Returns (members, weights) or None when any
+    provider is missing, in which case the caller keeps the pooled cloud."""
+    if not wmap or not pvals: return None
+    if any(not pvals.get(m) for m in ENSEMBLE_MODELS): return None
+    members,wts=[],[]
+    for m in ENSEMBLE_MODELS:
+        vs=pvals[m]; per=wmap[m]/len(vs)
+        for v in vs: members.append(v+corr); wts.append(per)
+    return members,wts
+
+def wmean_wsd(members,wts):
+    """Weighted mean and weighted population sd of the member cloud."""
+    tw=sum(wts)
+    if not tw: return (sum(members)/len(members),pstdev(members))
+    mean=sum(w*v for w,v in zip(wts,members))/tw
+    var=sum(w*(v-mean)**2 for w,v in zip(wts,members))/tw
+    return mean,math.sqrt(max(var,0.0))
+
+def dressed_prob(members,b,sigma,weights=None):
     """Bucket probability from a Gaussian-kernel-dressed ensemble. Each member is
     smeared with N(member, sigma^2); the bucket prob is the average kernel mass
     inside the bucket's real-valued interval. NWS rounds half-up, so the integer
     bucket [lo,hi] covers real temperatures [lo-0.5, hi+0.5). This replaces raw
     member counting, whose 1-degree bucket probs are dominated by sampling noise."""
     lo,hi=bucket_range(b); lo_e,hi_e=lo-0.5,hi+0.5
+    if weights:
+        tot=tw=0.0
+        for m,w in zip(members,weights):
+            tot+=w*(_phi((hi_e-m)/sigma)-_phi((lo_e-m)/sigma)); tw+=w
+        return tot/tw if tw else 0.0
     tot=0.0
     for m in members:
         tot+=_phi((hi_e-m)/sigma)-_phi((lo_e-m)/sigma)
@@ -671,6 +743,7 @@ def score(state):
     rows,plays=[],[]
     skill=city_skill(state); preds=state.setdefault("predictions",{})
     calib=calib_params(state); gsigma=calib.get("_gsigma",DRESS_SIGMA_DEFAULT)
+    pw=provider_weights(state)   # docket 4 (v14); {} per kind until every provider clears warmup
     for L in ladders:
         code,kind,tdate=L["code"],L["kind"],L["date"]
         # Lead and local hour come from the CITY's clock, never the runner's.
@@ -701,8 +774,15 @@ def score(state):
         # learned calibration for this city/kind: shift by bias correction, dress with sigma
         cp=calib.get((code,kind)) or {}
         corr=cp.get("corr",0.0); sigma=cp.get("sigma") or gsigma
-        members=[v+corr for v in raw_members]
-        n=len(members); msd=pstdev(members); mean=sum(members)/n
+        # provider weighting (docket 4, v14): weight the cloud by measured per-kind
+        # skill when every provider has cleared warmup, else keep the member-count
+        # pool exactly as before.
+        wc=weighted_cloud(_pm_values(pms.get(code),kind,tdate.isoformat()),pw.get(kind),corr)
+        if wc: members,mwts=wc
+        else:  members,mwts=[v+corr for v in raw_members],None
+        n=len(members)
+        if mwts: mean,msd=wmean_wsd(members,mwts)
+        else:    msd=pstdev(members); mean=sum(members)/n
         sd=math.sqrt(msd*msd+sigma*sigma)   # predictive spread incl. dressing
         ov=sum(b["ya"] for b in L["buckets"])-1.0
         wsum=sum((b["yb"]+b["ya"])/2 for b in L["buckets"])
@@ -710,7 +790,7 @@ def score(state):
         offset=mean-mkt_mean; biased=abs(offset)>BIAS_TOL
         pbk,ppl=[],[]
         for b in L["buckets"]:
-            mp=dressed_prob(members,b,sigma); mid=(b["yb"]+b["ya"])/2
+            mp=dressed_prob(members,b,sigma,mwts); mid=(b["yb"]+b["ya"])/2
             # decisions use the clamped prob; displays and logs keep raw mp
             mp_e=min(max(mp,TAIL_FLOOR),1.0-TAIL_FLOOR)
             cost=(b["ya"]-b["yb"])/2+fee(mid)+0.01; edge=mp_e-mid

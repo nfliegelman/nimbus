@@ -429,6 +429,69 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue({(p["ticker"], p["side"]) for p in floored} <= base_ids)
 
 
+class TestProviderWeighting(unittest.TestCase):
+    """Docket 4 (v14): per-kind inverse-MSE provider pooling."""
+
+    def _res(self, kind, errs_by_model, tgt):
+        return {"code": "DAL", "kind": kind, "target": tgt, "actual": 90.0,
+                "mean": 90.0, "bias": 0.0, "sd": 1.0, "psd": 1.5, "bias_corr": 0.0,
+                "sigma": 1.1, "buckets": [],
+                "members_by_model": {m: {"n": 30, "mean": 90.0 + e, "sd": 1.0}
+                                     for m, e in errs_by_model.items()}}
+
+    def test_warmup_returns_no_weights(self):
+        """Below warmup the model must keep the member-count pool untouched."""
+        errs = {m: 1.0 for m in kw.ENSEMBLE_MODELS}
+        st = {"resolved": [self._res("HIGH", errs, f"2026-07-{i+1:02d}") for i in range(10)]}
+        self.assertEqual(kw.provider_weights(st), {})
+
+    def test_weights_favor_the_accurate_provider_and_are_per_kind(self):
+        res = []
+        for i in range(kw.PROVIDER_W_WARMUP + 5):
+            # on HIGHs gem is bad and icon is good; on LOWs the roles reverse
+            hi = {"gfs025": 1.0, "ecmwf_ifs025": 1.0, "icon_seamless": 0.1, "gem_global": 4.0}
+            lo = {"gfs025": 1.0, "ecmwf_ifs025": 1.0, "icon_seamless": 4.0, "gem_global": 0.1}
+            res.append(self._res("HIGH", hi, f"2026-06-{i+1:02d}"))
+            res.append(self._res("LOW", lo, f"2026-06-{i+1:02d}"))
+        w = kw.provider_weights({"resolved": res})
+        self.assertIn("HIGH", w); self.assertIn("LOW", w)
+        self.assertGreater(w["HIGH"]["icon_seamless"], w["HIGH"]["gem_global"])
+        self.assertGreater(w["LOW"]["gem_global"], w["LOW"]["icon_seamless"])   # learned separately
+        # epsilon must stop a near-perfect provider from taking the whole cloud
+        self.assertLess(w["HIGH"]["icon_seamless"] / sum(w["HIGH"].values()), 0.95)
+
+    def test_gated_and_unsettled_records_never_teach_weights(self):
+        good = {m: 1.0 for m in kw.ENSEMBLE_MODELS}
+        res = [self._res("HIGH", good, f"2026-06-{i+1:02d}") for i in range(kw.PROVIDER_W_WARMUP + 2)]
+        base = kw.provider_weights({"resolved": res})["HIGH"]
+        poisoned = dict(res[0]); poisoned["gated"] = "ladder structure"
+        poisoned["members_by_model"] = {m: {"n": 30, "mean": 190.0, "sd": 1.0} for m in kw.ENSEMBLE_MODELS}
+        after = kw.provider_weights({"resolved": res + [poisoned]})["HIGH"]
+        self.assertEqual(base, after)
+
+    def test_weighted_cloud_matches_mixture_mean_and_falls_back(self):
+        """The weighted cloud's mean must equal the weighted mixture mean, which is
+        the exact quantity the docket 4 gate measured."""
+        pvals = {"gfs025": [80.0] * 4, "ecmwf_ifs025": [90.0] * 2,
+                 "icon_seamless": [100.0] * 8, "gem_global": [70.0] * 1}
+        wmap = {"gfs025": 1.0, "ecmwf_ifs025": 1.0, "icon_seamless": 1.0, "gem_global": 1.0}
+        members, wts = kw.weighted_cloud(pvals, wmap, 0.0)
+        mean, _ = kw.wmean_wsd(members, wts)
+        self.assertAlmostEqual(mean, (80 + 90 + 100 + 70) / 4, places=9)   # equal weight per PROVIDER
+        self.assertNotAlmostEqual(mean, sum(members) / len(members), places=3)  # not per MEMBER
+        # a missing provider forfeits weighting rather than silently reweighting
+        self.assertIsNone(kw.weighted_cloud({"gfs025": [80.0]}, wmap, 0.0))
+        self.assertIsNone(kw.weighted_cloud(pvals, None, 0.0))
+
+    def test_unweighted_dressed_prob_is_bit_identical(self):
+        """Warmup and missing-provider paths must reproduce v13 pricing exactly."""
+        mem = [88.0, 89.0, 90.0, 91.0]
+        b = {"stype": "between", "floor": 89, "cap": 90}
+        self.assertEqual(kw.dressed_prob(mem, b, 1.1), kw.dressed_prob(mem, b, 1.1, None))
+        flat = kw.dressed_prob(mem, b, 1.1)
+        self.assertAlmostEqual(kw.dressed_prob(mem, b, 1.1, [1.0] * 4), flat, places=12)
+
+
 class TestState(unittest.TestCase):
     def test_load_state_refuses_bad_files(self):
         # STATE_PATH is module-relative (absolute); it MUST be monkeypatched to a
