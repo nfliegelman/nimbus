@@ -429,6 +429,88 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue({(p["ticker"], p["side"]) for p in floored} <= base_ids)
 
 
+class TestNowcastLive(unittest.TestCase):
+    """v15: the nowcast observed max now floors the member cloud for same-day
+    HIGHs. Promoted on its re-registered gate (55 binding events, CRPS 1.277 vs
+    1.578, per-event RPS 38-4).
+
+    The city clock is pinned via the offset fetch_members returns, so these
+    assertions do not depend on when the suite happens to run. Without that a
+    same-day HIGH reads as `realized` after 14:00 local and is never priced,
+    which made the first draft of this test pass or fail by time of day."""
+
+    def setUp(self):
+        self._saved = (kw.pull_weather_markets, kw.fetch_members, kw.fetch_ref,
+                       kw.fetch_run_meta, kw.fetch_settled_event, kw.fget, kw.shadow_pass)
+        kw.fget = _no_network
+        kw.shadow_pass = lambda st: 0          # snapshots are injected by hand here
+
+    def tearDown(self):
+        (kw.pull_weather_markets, kw.fetch_members, kw.fetch_ref,
+         kw.fetch_run_meta, kw.fetch_settled_event, kw.fget, kw.shadow_pass) = self._saved
+
+    def _clock(self, local_hour=10):
+        """Offset that puts the city clock at local_hour today, and that day."""
+        now = dtm.datetime.now(dtm.timezone.utc).replace(tzinfo=None)
+        off_h = local_hour - now.hour
+        if off_h == 0: off_h = 1               # a 0 offset falls back to the CITIES table
+        off = off_h * 3600
+        return off, (now + dtm.timedelta(seconds=off)).date()
+
+    def _run(self, kind, day, off, nowcast, lead_days=0):
+        bkts = [{"ticker": "T1", "floor": None, "cap": 90, "stype": "less", "sub": "", "yb": .12, "ya": .14, "oi": 900},
+                {"ticker": "T2", "floor": 90, "cap": 91, "stype": "between", "sub": "", "yb": .26, "ya": .28, "oi": 900},
+                {"ticker": "T3", "floor": 92, "cap": 93, "stype": "between", "sub": "", "yb": .36, "ya": .38, "oi": 900},
+                {"ticker": "T4", "floor": 93, "cap": None, "stype": "greater", "sub": "", "yb": .22, "ya": .24, "oi": 900}]
+        kw.pull_weather_markets = lambda: [{"code": "DAL", "kind": kind, "date": day,
+                                            "event_ticker": "E", "structure_ok": True, "buckets": bkts}]
+        vals = [88.0 + j * 0.02 for j in range(140)]   # every member well BELOW the injected floor
+        iso = day.isoformat()
+        pm = {m: {"hi": {iso: vals}, "lo": {iso: vals}} for m in kw.ENSEMBLE_MODELS}
+        kw.fetch_members = lambda lat, lon, tz: ({iso: vals}, {iso: vals}, off, pm)
+        kw.fetch_ref = lambda *a: {}
+        kw.fetch_run_meta = lambda: {}
+        key = f"DAL|{kind}|{iso}"
+        pre = {"code": "DAL", "kind": kind, "target": iso, "event_ticker": "E",
+               "logged_at": "old", "first_logged": "old", "lead": lead_days, "mean": 88.0,
+               "sd": 1.0, "psd": 1.5, "bias_corr": 0.0, "sigma": 1.1, "buckets": [], "plays": []}
+        if nowcast: pre["nowcast"] = nowcast
+        state = {"predictions": {key: pre}, "resolved": []}
+        kw.score(state)
+        return state["predictions"][key]
+
+    def test_same_day_high_is_floored_at_the_observed_max(self):
+        off, day = self._clock(10)
+        rec = self._run("HIGH", day, off, {"obs_max": 95.0, "n_obs": 9})
+        self.assertEqual(rec.get("nowcast_floor"), 95.0)
+        self.assertGreaterEqual(rec["mean"], 95.0)   # cloud sat at ~88, pulled up to the floor
+
+    def test_no_snapshot_means_no_truncation(self):
+        off, day = self._clock(10)
+        rec = self._run("HIGH", day, off, None)
+        self.assertIsNone(rec.get("nowcast_floor"))
+        self.assertLess(rec["mean"], 90.0)
+
+    def test_future_high_is_never_truncated(self):
+        """Isolates the lead guard: tomorrow's high cannot use today's obs."""
+        off, day = self._clock(10)
+        rec = self._run("HIGH", day + dtm.timedelta(days=1), off,
+                        {"obs_max": 95.0, "n_obs": 9}, lead_days=1)
+        self.assertIsNone(rec.get("nowcast_floor"))
+        self.assertLess(rec["mean"], 90.0)
+
+    def test_lows_are_never_truncated(self):
+        off, day = self._clock(10)
+        rec = self._run("LOW", day + dtm.timedelta(days=1), off,
+                        {"obs_max": 95.0, "n_obs": 9}, lead_days=1)
+        self.assertIsNone(rec.get("nowcast_floor"))
+        self.assertLess(rec["mean"], 90.0)
+
+    def test_floor_never_lowers_a_member(self):
+        """Truncation is a floor, not a replacement: members above it are kept."""
+        self.assertEqual([max(v, 95.0) for v in [88.0, 96.0, 99.0]], [95.0, 96.0, 99.0])
+
+
 class TestProviderWeighting(unittest.TestCase):
     """Docket 4 (v14): per-kind inverse-MSE provider pooling."""
 
