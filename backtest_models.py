@@ -143,7 +143,10 @@ def run(records, args):
             mm, a, kind = r["members_by_model"], r["actual"], r["kind"]
             for name, wfn, bias in SLATE:
                 if bias != "roll30": continue
-                w = wfn(mm, hk)
+                # prov_hist[kind], NOT a stale `hk` from the scoring loop above:
+                # that leaked the last-scored record's KIND into every config's
+                # bias history, so a LOW could be weighted by HIGH-derived skill.
+                w = wfn(mm, prov_hist[kind])
                 if not w: continue
                 raw = _mix_mean(mm, w)
                 if raw is not None: bias_hist[name][(r["code"], kind)].append(raw - a)
