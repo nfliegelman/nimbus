@@ -1340,6 +1340,23 @@ def compute_report(state):
              if r.get("psd") and r.get("actual") is not None
              and _era_label(r.get("model_version") or "")!="Legacy (pre-audit)"]
         rep["prod_gate"]=_prod_gate(audp, zsa, rep["book_split"]["exp"]["n"])
+    # Spread-skill (FUTURE 2b, gate n>=100): does the spread the model REPORTS
+    # predict how wrong it turns out to be? Read 2026-07-25 at n=804 as +0.250
+    # with a 90% CI excluding zero, which is what earns spread a place on the
+    # boards. Recomputed live so the claim on the page is never stale.
+    sp=[(r["sd"],abs(r["mean"]-r["actual"])) for r in resolved
+        if r.get("sd") and r.get("actual") is not None and r.get("mean") is not None]
+    if len(sp)>=100:
+        nn=len(sp)
+        mx=sum(a for a,_ in sp)/nn; my=sum(b for _,b in sp)/nn
+        cov=sum((a-mx)*(b-my) for a,b in sp)/nn
+        sx=math.sqrt(sum((a-mx)**2 for a,_ in sp)/nn); sy=math.sqrt(sum((b-my)**2 for _,b in sp)/nn)
+        bands=[]
+        for lab,lo,hi in (("tight",0.0,SPREAD_TIGHT),("normal",SPREAD_TIGHT,SPREAD_WIDE),("wide",SPREAD_WIDE,1e9)):
+            sel=[b for a,b in sp if lo<a<=hi]
+            if sel: bands.append((lab,len(sel),sum(sel)/len(sel)))
+        rep["spread_skill"]={"n":nn,"corr":(cov/(sx*sy) if sx and sy else 0.0),"bands":bands}
+
     return rep
 
 # ----------------------------- render ------------------------------
@@ -1372,7 +1389,8 @@ tr.play td{background:rgba(70,192,138,.05)}
 .rating .big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;line-height:1;padding:8px 14px;border-radius:10px}.rating .txt{color:var(--mut);font-size:13px}.rating .txt b{color:var(--tx)}
 .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.kbox{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 16px;min-width:120px}
 .kbox .v{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600}.kbox .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
-.tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}.c-hi{background:rgba(70,192,138,.14);color:var(--up)}.c-md{background:rgba(227,162,60,.14);color:var(--dn)}.c-lo{background:rgba(125,139,156,.12);color:var(--mut)}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}.c-hi{background:rgba(70,192,138,.14);color:var(--up)}
+.c-wide{background:rgba(227,162,60,.14);color:var(--dn)}.c-md{background:rgba(227,162,60,.14);color:var(--dn)}.c-lo{background:rgba(125,139,156,.12);color:var(--mut)}
 .block{margin:14px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}.bh{padding:10px 12px;font-weight:600;border-bottom:1px solid var(--line)}.bm{padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mut);border-bottom:1px solid var(--line)}.block td,.block th{padding:8px 12px}
 .tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 0}.tab{flex:0 0 auto;background:transparent;border:1px solid transparent;color:var(--mut);font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}.tab:hover{color:var(--tx);background:var(--panel)}.tab.active{color:var(--tx);background:var(--panel);border-color:var(--line)}.panel{display:none}.panel.active{display:block}
 .empty{padding:20px;border:1px dashed var(--line);border-radius:10px;color:var(--mut);background:var(--panel)}.empty b{color:var(--tx)}
@@ -1390,6 +1408,22 @@ tr.play td{background:rgba(70,192,138,.05)}
 .pflag{font-size:11.5px;font-weight:600;color:var(--dn);background:rgba(227,162,60,.14);padding:2px 8px;border-radius:6px}
 .pdata{padding:8px 16px;font-size:11.5px;color:var(--dim);border-top:1px solid var(--line)}
 svg{max-width:100%;height:auto}.card{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;margin:10px 0}"""
+
+# --- spread display (FUTURE 2b spread-skill check, READ 2026-07-25 at n=804) ---
+# corr(member sd, realized absolute error) = +0.250, 90% CI [+0.186, +0.317],
+# so the spread the model reports really does predict how wrong it will be.
+# Cut points are the measured sd quartiles over 804 settlements, and the error
+# each band actually realized: tight 1.52 deg, normal 1.65, wide 2.32. Display
+# only: these are NOT in _KNOB_NAMES because nothing here touches pricing.
+SPREAD_TIGHT = 1.69   # sd at or below this is the narrowest measured quartile
+SPREAD_WIDE  = 2.80   # sd above this is the widest measured quartile
+
+def spread_label(sd):
+    """(tag text, css class) for a forecast spread, or None when unremarkable."""
+    if sd is None: return None
+    if sd <= SPREAD_TIGHT: return ("tight spread", "c-hi")
+    if sd > SPREAD_WIDE:   return ("wide spread", "c-wide")
+    return None
 
 def esc(s): return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 def pct(x): return "%.0f%%"%(x*100)
@@ -1509,14 +1543,17 @@ def render_bets(rows,plays,updated,health=None):
             pw=("win prob %.0f%%"%(r["p_win"]*100)) if r.get("p_win") is not None else ""
             flag=(f'<span class="pflag">{esc(r["size_reason"])}</span>') if r.get("size_reason") else ""
             if r.get("hiconf"): flag='<span class="tag c-hi">high confidence</span>'+flag
+            _sp=spread_label(r.get("sd"))
+            sptag=(f'<span class="tag {_sp[1]}">{_sp[0]}</span>') if _sp else ""
             ptab+=(f'<div class="pcard {sc}"><div class="ptop">'
                    f'<div><div class="pcity">{city} &middot; {mk} &middot; {r["date"].strftime("%b %d")}</div>'
                    f'<div class="prange">{esc(r["bucket"])}</div></div>'
                    f'<div class="pside {sb}">{word}<div class="psub">{r["entry"]*100:.0f}\u00a2</div></div></div>'
                    f'<div class="pbar">{unit_badge(r["units"])}'
-                   f'<span class="pwin">{pw}</span>{flag}</div>'
+                   f'<span class="pwin">{pw}</span>{sptag}{flag}</div>'
                    f'<div class="pdata">model {pct(r["mp"])} &middot; market {pct(r["mid"])} &middot; '
-                   f'edge +{pct(abs(r["edge"]))} &middot; net +{r["net"]*100:.0f}\u00a2 &middot; OI {fmt_oi(r["oi"])}</div></div>')
+                   f'edge +{pct(abs(r["edge"]))} &middot; net +{r["net"]*100:.0f}\u00a2 &middot; '
+                   f'spread \u00b1{r["sd"]:.1f}\u00b0 &middot; OI {fmt_oi(r["oi"])}</div></div>')
     else:
         ptab=('<div class="empty"><b>No bets today.</b> Run in the morning; same-day lows are already '
               'realized and same-day highs after ~2pm too. Realized / offset ladders under By city are '
@@ -1652,6 +1689,18 @@ def render_results(rep,updated,health=None,alerts=None):
                   f"<b>Experimental cheap-entry cell</b> (docket item 1, gate {e['n']}/40): {e['w']}/{e['n']-e['w']} for {e['net_u']:+.1f}u. "
                   "The cell keeps trading until its pre-registered gate reads; its cost is the price of a verdict that "
                   "cannot be argued with. If the gate condition holds, a MIN_ENTRY floor of 0.20 ships automatically.</div>")
+            if rep.get("spread_skill"):
+                ss=rep["spread_skill"]
+                rowsS="".join(f"<tr><td>{esc(l)}</td><td class='n'>{c}</td><td class='n'>{e:.2f}&deg;</td></tr>"
+                              for l,c,e in ss["bands"])
+                erat+=("<h2 class='sec'>Forecast spread vs actual error</h2>"
+                  f"<div class='note'>The spread the model reports is an honest confidence signal: "
+                  f"correlation with realized error is <b>{ss['corr']:+.2f}</b> over {ss['n']} settlements "
+                  "(pre-registered check, gate n=100). A wide-spread day really is a worse day, so the "
+                  "bets page now tags each pick. This measures the SIZE of the miss, not direction, and "
+                  "it is a tendency across many days rather than a promise about any single one.</div>"
+                  "<table><thead><tr><th>Spread band</th><th class='n'>Events</th>"
+                  "<th class='n'>Avg miss</th></tr></thead><tbody>"+rowsS+"</tbody></table>")
             if rep.get("prod_gate"):
                 metn=sum(1 for _,m,_ in rep["prod_gate"] if m)
                 items="".join(f"<div>{'MET &middot; ' if m else 'open &middot; '}{esc(lbl)}: {esc(det)}</div>"

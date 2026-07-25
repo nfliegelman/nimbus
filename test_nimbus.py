@@ -429,6 +429,67 @@ class TestPipeline(unittest.TestCase):
         self.assertTrue({(p["ticker"], p["side"]) for p in floored} <= base_ids)
 
 
+class TestSpreadDisplay(unittest.TestCase):
+    """Surfacing forecast spread, earned by the spread-skill check reading
+    +0.250 with a CI excluding zero at n=804. Display only: no pricing path."""
+
+    def test_bands_follow_the_measured_quartiles(self):
+        self.assertEqual(kw.spread_label(kw.SPREAD_TIGHT)[0], "tight spread")
+        self.assertIsNone(kw.spread_label(kw.SPREAD_TIGHT + 0.01))
+        self.assertIsNone(kw.spread_label(kw.SPREAD_WIDE))
+        self.assertEqual(kw.spread_label(kw.SPREAD_WIDE + 0.01)[0], "wide spread")
+        self.assertIsNone(kw.spread_label(None))
+        self.assertLess(kw.SPREAD_TIGHT, kw.SPREAD_WIDE)
+
+    def test_report_exposes_spread_skill_only_past_its_gate(self):
+        def ev(sd, err, i):
+            return {"code": "DAL", "kind": "HIGH", "target": f"2026-07-{(i % 28) + 1:02d}", "lead": 1,
+                    "actual": 90, "mean": 90 + err, "bias": err, "sd": sd, "psd": 1.5,
+                    "bias_corr": 0, "sigma": 1.1,
+                    "buckets": [{"mp": 0.5, "mid": 0.5, "hit": 1, "rep": 90.5}], "plays": []}
+        thin = {"resolved": [ev(1.0, 0.5, i) for i in range(50)], "predictions": {}}
+        self.assertNotIn("spread_skill", kw.compute_report(thin))
+        # wide spreads paired with big misses must produce a positive correlation
+        rs = [ev(1.0, 0.4, i) for i in range(60)] + [ev(3.5, 3.0, i) for i in range(60)]
+        rep = kw.compute_report({"resolved": rs, "predictions": {}})
+        ss = rep.get("spread_skill")
+        self.assertIsNotNone(ss)
+        self.assertGreater(ss["corr"], 0.5)
+        self.assertEqual(ss["n"], 120)
+        labels = [b[0] for b in ss["bands"]]
+        self.assertIn("tight", labels); self.assertIn("wide", labels)
+
+    def test_wide_spread_pick_is_tagged_on_the_board(self):
+        r = {"code": "DAL", "label": "Dallas (DAL)", "kind": "HIGH",
+             "date": dtm.date(2026, 7, 26), "lead": 1, "bucket": "94 to 95", "ticker": "T",
+             "mid": 0.30, "mp": 0.42, "edge": 0.12, "side": "Buy YES", "entry": 0.33,
+             "net": 0.06, "oi": 900, "sd": kw.SPREAD_WIDE + 1.0, "mean": 94.5,
+             "overround": 0.03, "offset": 0.2, "biased": False, "realized": False,
+             "tier": "B", "eff": 0.06, "p_win": 0.42, "size_reason": "", "hiconf": False,
+             "units": 1.0, "stake": 10.0}
+        health = {"ladders": 1, "cities": 1, "cities_failed": [], "gated": [],
+                  "capped": 0, "new_24h": 1, "run_utc": "2026-07-26T00:00Z"}
+
+        def board(rec):
+            """Render into a THROWAWAY dir. render_bets writes docs/index.html,
+            and a test must never touch the real generated boards."""
+            saved = kw.OUT_DIR
+            try:
+                with tempfile.TemporaryDirectory() as d:
+                    kw.OUT_DIR = d
+                    kw.render_bets([rec], [rec], "now", health)
+                    with open(os.path.join(d, "index.html"), encoding="utf-8") as fp:
+                        return fp.read()
+            finally:
+                kw.OUT_DIR = saved
+
+        html = board(r)
+        self.assertIn("wide spread", html)
+        self.assertIn("spread &plusmn;", html.replace("\u00b1", "&plusmn;"))
+        self.assertIn("tight spread", board(dict(r, sd=kw.SPREAD_TIGHT - 0.1)))
+        self.assertNotIn("wide spread", board(dict(r, sd=kw.SPREAD_TIGHT - 0.1)))
+
+
 class TestNowcastLive(unittest.TestCase):
     """v15: the nowcast observed max now floors the member cloud for same-day
     HIGHs. Promoted on its re-registered gate (55 binding events, CRPS 1.277 vs
