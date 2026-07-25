@@ -37,7 +37,7 @@ SUSPECT_EDGE  = 0.20     # net edge above this is treated as noise, capped to 1u
 EDGE_2U       = 0.14     # net edge for a 2u ceiling (also needs proven city + win prob >= .55)
 EDGE_1_5U     = 0.08     # net edge for a 1.5u ceiling
 # Stamp every logged bet so history survives model changes and tunes can be compared.
-MODEL_VERSION = "2026-07-25.v14-skillpool"
+MODEL_VERSION = "2026-07-25.v15-nowcast-live"
 # Exposure caps (audit batch 8). Measured before caps: 54.5u staked on a single
 # target date against a $500 bankroll, and up to 5 plays stacked on one ladder
 # (31 of 44 played events carried 2+), i.e. multiples of one settlement number.
@@ -756,6 +756,10 @@ def score(state):
         if lead<0: continue
         lhr=lnow.hour
         realized=(lead==0 and kind=="LOW") or (lead==0 and kind=="HIGH" and lhr>=INTRADAY_HIGH_CUTOFF)
+        # the pending record is needed BEFORE pricing now: it carries the nowcast
+        # snapshot whose observed max floors the member cloud.
+        key=f"{code}|{kind}|{tdate.isoformat()}"
+        old=preds.get(key)
         raw_members=fc[code][kind].get(tdate.isoformat(),[])
         # ---- integrity GATE (0.8, approved; quarantine amendment, batch 8) ----
         # A gated ladder still LOGS its record, flagged "gated", so the exclusion
@@ -780,6 +784,26 @@ def score(state):
         wc=weighted_cloud(_pm_values(pms.get(code),kind,tdate.isoformat()),pw.get(kind),corr)
         if wc: members,mwts=wc
         else:  members,mwts=[v+corr for v in raw_members],None
+        # NOWCAST TRUNCATION (FUTURE 5, PROMOTED to live pricing at v15 on its
+        # re-registered gate: 55 binding events vs a gate of 25, truncated wins
+        # mean CRPS 1.277 vs 1.578 and the per-event RPS majority 38 to 4).
+        # Today's high cannot settle below what the settlement station has
+        # ALREADY recorded, so every member is floored at the running observed
+        # max. The observation is a lower bound on the CLI daily max by
+        # construction (NWS computes it from denser data than hourly METARs), so
+        # this can never claim more than the truth. It also moves the forecast
+        # toward the outcome rather than away: measured over 200 graded events
+        # the signed bias improves from -0.324 to -0.087 deg and MAE from 1.753
+        # to 1.637, so the bias learner sees a BETTER forecast and does not
+        # fight the truncation.
+        # The floor comes from the snapshot shadow_pass wrote earlier THIS run,
+        # not a fresh fetch: it is the exact quantity the gate graded, and it
+        # costs no extra API calls.
+        nowcast_floor=None
+        if kind=="HIGH" and lead==0 and old and old.get("nowcast"):
+            _rm=old["nowcast"].get("obs_max")
+            if _rm is not None:
+                members=[max(v,_rm) for v in members]; nowcast_floor=_rm
         n=len(members)
         if mwts: mean,msd=wmean_wsd(members,mwts)
         else:    msd=pstdev(members); mean=sum(members)/n
@@ -821,8 +845,6 @@ def score(state):
                             "entry":entry,"net":net,"edge":edge,"tier":tier,"units":units,
                             "stake":round(units*BASE_UNIT_USD,2),"p_win":p_win,"mp":mp,"mid":mid})
         if not realized:
-            key=f"{code}|{kind}|{tdate.isoformat()}"
-            old=preds.get(key)
             if gate and old and old.get("plays"):
                 pass   # degraded data must never overwrite a record holding frozen plays
             else:
@@ -837,6 +859,7 @@ def score(state):
                     "cfg":CONFIG_HASH,
                     "mean_hist":(((old or {}).get("mean_hist") or [])+[[run_stamp,round(mean,2)]])[-6:],
                     "buckets":pbk,"plays":ppl}
+                if nowcast_floor is not None: rec["nowcast_floor"]=nowcast_floor
                 if gate: rec["gated"]=gate
                 if old and old.get("nowcast"): rec["nowcast"]=old["nowcast"]   # shadow snapshots survive refreshes (write-once)
                 # BOOK0 (write-once): the order book of the FIRST healthy board for
