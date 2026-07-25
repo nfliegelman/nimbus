@@ -1,0 +1,97 @@
+name: validate
+# Automates the CLAUDE.md pre-commit validation checklist on every pull request,
+# so a change never depends on someone having a terminal, a Unix shell, or a
+# machine they are willing to point at Kalshi. The owner works from a Windows
+# work laptop and a phone; the project is deliberately built so that machine
+# never touches Kalshi, which left the mandated sandbox double-run with nowhere
+# to run. GitHub is that machine.
+#
+# WORKFLOW SEPARATION (CLAUDE.md): this file is separate from run.yml and holds
+# `contents: read`. It CANNOT commit, push, or write state under any code path,
+# because the token it is handed has no write scope. The sandbox step runs the
+# procedure CLAUDE.md itself prescribes: copy the tree, delete the copy's .git,
+# run there. Live `weather_state.json` and `docs/` are never the working
+# directory of a model run, and the final step asserts they are byte-unchanged.
+#
+# Its concurrency group is deliberately NOT `nimbus`: sharing run.yml's group
+# would let a pull request cancel a scheduled trading run.
+on:
+  pull_request:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: nimbus-validate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile every script
+        run: |
+          python -m py_compile kalshi_weather.py
+          python -m py_compile test_nimbus.py
+          python -m py_compile backtest_models.py
+          python -m py_compile replay_selection.py
+
+      - name: Test suite
+        run: python test_nimbus.py
+
+      - name: Em dash convention
+        # Checked on the files we actively author. Markdown is excluded because
+        # audit/AUDIT_ORIGINAL.md is a preserved verbatim transcript containing
+        # one em dash; rewriting a historical record to satisfy a lint rule is
+        # exactly the kind of tidying this project forbids.
+        run: |
+          # the escape form, never a literal: a literal here would make this
+          # very check fail on its own source file
+          if grep -rn $'\u2014' --include='*.py' --include='*.yml' . ; then
+            echo "::error::em dash found; the repository convention is zero em dashes"
+            exit 1
+          fi
+          echo "no em dashes in .py or .yml"
+
+      - name: Read-only tools smoke test
+        # These never touch state, but a crash here would silently rot the
+        # measurement instruments between checkpoints.
+        run: |
+          python backtest_models.py > /dev/null
+          python replay_selection.py > /dev/null
+          echo "backtest_models.py and replay_selection.py both run clean"
+
+      - name: Sandbox double-run against live market data
+        # The CLAUDE.md procedure, automated. Runs in a COPY with its .git
+        # removed, so the model cannot reach the repository even if it tried,
+        # and this job holds no write scope regardless. Twice, because the
+        # checklist requires confirming a second run completes on the state the
+        # first one wrote. No secrets are passed, so the Telegram notifier
+        # stays inert and a validation run can never message anyone.
+        env:
+          CI: "true"
+        run: |
+          SBX="${RUNNER_TEMP}/nimbus-sbx"
+          rm -rf "$SBX"
+          cp -r . "$SBX"
+          rm -rf "$SBX/.git"
+          cd "$SBX"
+          echo "----- run 1 -----"
+          python kalshi_weather.py
+          echo "----- run 2 -----"
+          python kalshi_weather.py
+          test -s docs/index.html   || { echo "::error::index.html missing or empty"; exit 1; }
+          test -s docs/results.html || { echo "::error::results.html missing or empty"; exit 1; }
+          echo "both boards rendered"
+
+      - name: Prove live state and boards were never touched
+        run: |
+          if ! git diff --exit-code --stat -- weather_state.json docs/ ; then
+            echo "::error::a validation run modified tracked state or boards; this must never happen"
+            exit 1
+          fi
+          echo "weather_state.json and docs/ are byte-unchanged"
