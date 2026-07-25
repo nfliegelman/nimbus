@@ -304,6 +304,28 @@ class TestPipeline(unittest.TestCase):
         self.assertNotEqual([b["yb"] for b in rec["buckets"]],
                             [e["yb"] for e in first])              # live book really moved
 
+    def test_book0_never_stamps_a_record_already_in_flight(self):
+        """A market already pending when book0 shipped has boards we never saw, and
+        its plays may have frozen on one. Snapshotting it now would label a mid-life
+        board as the decision board, so it must be skipped forever instead."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        key = "DAL|HIGH|" + self.day
+        # simulate a pre-existing record: present, no book0, already carrying plays
+        state = {"predictions": {key: {
+            "code": "DAL", "kind": "HIGH", "target": self.day, "event_ticker": "EDAL",
+            "logged_at": "old", "first_logged": "old", "lead": 1, "mean": 90.0,
+            "sd": 1.0, "psd": 1.5, "bias_corr": 0.0, "sigma": 1.1, "buckets": [],
+            "plays": [{"ticker": "DALB1", "side": "Buy YES", "entry": 0.28, "net": 0.05,
+                       "edge": 0.06, "tier": "B", "units": 1.0, "stake": 10.0,
+                       "p_win": 0.5, "mp": 0.5, "mid": 0.27, "sub": "", "bid": "x"}],
+            "plays_logged_at": "old", "plays_lead": 1, "plays_model_version": "t"}},
+            "resolved": []}
+        kw.score(state)
+        self.assertIsNone(state["predictions"][key].get("book0"))   # skipped, not mislabeled
+        # a market seen for the first time in this same run DOES get one
+        self.assertIsNotNone(state["predictions"]["ATL|HIGH|" + self.day].get("book0"))
+
     def test_book0_carries_to_resolved_with_settled_hits(self):
         """The resolved snapshot must be self-contained (reprice + grade) and must
         keep the DECISION board's prices, not the refreshed ones."""

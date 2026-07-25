@@ -772,7 +772,15 @@ def score(state):
                 # data must not become the decision snapshot.
                 if old and old.get("book0"):
                     rec["book0"]=old["book0"]
-                elif not gate:
+                elif old is None and not gate:
+                    # ONLY on a market's genuinely first log. A record already in
+                    # flight when this shipped has boards we never captured, and its
+                    # plays may have frozen on one of them, so snapshotting it now
+                    # would label a mid-life board as the decision board and quietly
+                    # corrupt every replay built on it. Those records are excluded
+                    # forever instead, which costs about two days of coverage. Same
+                    # reason a first-board gate forfeits the snapshot: better absent
+                    # than wrong.
                     # Record-level scalars travel WITH the snapshot: `biased` is a
                     # play-gate input that resolved records never stored at all, and
                     # `lead` on the record is the LAST refresh's, not the decision
