@@ -594,7 +594,10 @@ def shadow_pass(state):
     preds=state.get("predictions",{})
     if not preds: return 0
     calib=calib_params(state); gsigma=calib.get("_gsigma",DRESS_SIGMA_DEFAULT)
-    ladders=None; members_cache={}
+    ladders=None; members_cache={}; pm_cache={}
+    # v15: the shadow must price its paired snapshot the SAME way production
+    # does, or the ongoing tally measures a model that is no longer running.
+    pw=provider_weights(state)
     wrote=0
     for key,p in preds.items():
         if p.get("kind")!="HIGH" or p.get("gated") or p.get("nowcast"): continue
@@ -610,7 +613,7 @@ def shadow_pass(state):
         L=ladders.get((code,"HIGH",tgt))
         if not L or not L.get("structure_ok",True): continue
         if code not in members_cache:
-            hi,_lo,_o,_pm=fetch_members(lat,lon,tz); members_cache[code]=hi or {}
+            hi,_lo,_o,_pm=fetch_members(lat,lon,tz); members_cache[code]=hi or {}; pm_cache[code]=_pm
         raw=members_cache[code].get(tgt,[])
         if len(raw)<GATE_MIN_MEMBERS: continue
         obs=fetch_running_max(code,tz,tgt)
@@ -618,10 +621,20 @@ def shadow_pass(state):
         runmax,n_obs=obs
         cp=calib.get((code,"HIGH")) or {}
         corr=cp.get("corr",0.0); sigma=cp.get("sigma") or gsigma
-        mem_u=[v+corr for v in raw]
+        # Same skill-weighted cloud production uses (docket 4), then the same
+        # truncation production applies (FUTURE 5). Before v15 this snapshot was
+        # built from the POOLED cloud, which was harmless while the shadow only
+        # had to gate itself (its comparison is internal), but is wrong now that
+        # truncation is live: a monitor has to watch the model that is actually
+        # running. Falls back to the pooled cloud on warmup or a missing
+        # provider, exactly as production does.
+        wc=weighted_cloud(_pm_values(pm_cache.get(code),"HIGH",tgt),pw.get("HIGH"),corr)
+        if wc: mem_u,wts=wc
+        else:  mem_u,wts=[v+corr for v in raw],None
         mem_t=[max(v,runmax) for v in mem_u]
         def _mps(ms):
-            n=len(ms); mu=sum(ms)/n; msd=pstdev(ms)
+            if wts: mu,msd=wmean_wsd(ms,wts)
+            else:   mu=sum(ms)/len(ms); msd=pstdev(ms)
             return mu,math.sqrt(msd*msd+sigma*sigma)
         mu_u,psd_u=_mps(mem_u); mu_t,psd_t=_mps(mem_t)
         p["nowcast"]={"asof":dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
@@ -630,8 +643,8 @@ def shadow_pass(state):
                       "mean_t":round(mu_t,2),"psd_t":round(psd_t,3),
                       "model_version":MODEL_VERSION,"cfg":CONFIG_HASH,
                       "buckets":[{"ticker":b["ticker"],"rep":bucket_rep(b),
-                                  "mp_u":dressed_prob(mem_u,b,sigma),
-                                  "mp_t":dressed_prob(mem_t,b,sigma)} for b in L["buckets"]]}
+                                  "mp_u":dressed_prob(mem_u,b,sigma,wts),
+                                  "mp_t":dressed_prob(mem_t,b,sigma,wts)} for b in L["buckets"]]}
         wrote+=1
     if wrote: print(f"   nowcast shadow: {wrote} snapshot(s) collected")
     return wrote
@@ -1340,6 +1353,23 @@ def compute_report(state):
              if r.get("psd") and r.get("actual") is not None
              and _era_label(r.get("model_version") or "")!="Legacy (pre-audit)"]
         rep["prod_gate"]=_prod_gate(audp, zsa, rep["book_split"]["exp"]["n"])
+    # Spread-skill (FUTURE 2b, gate n>=100): does the spread the model REPORTS
+    # predict how wrong it turns out to be? Read 2026-07-25 at n=804 as +0.250
+    # with a 90% CI excluding zero, which is what earns spread a place on the
+    # boards. Recomputed live so the claim on the page is never stale.
+    sp=[(r["sd"],abs(r["mean"]-r["actual"])) for r in resolved
+        if r.get("sd") and r.get("actual") is not None and r.get("mean") is not None]
+    if len(sp)>=100:
+        nn=len(sp)
+        mx=sum(a for a,_ in sp)/nn; my=sum(b for _,b in sp)/nn
+        cov=sum((a-mx)*(b-my) for a,b in sp)/nn
+        sx=math.sqrt(sum((a-mx)**2 for a,_ in sp)/nn); sy=math.sqrt(sum((b-my)**2 for _,b in sp)/nn)
+        bands=[]
+        for lab,lo,hi in (("tight",0.0,SPREAD_TIGHT),("normal",SPREAD_TIGHT,SPREAD_WIDE),("wide",SPREAD_WIDE,1e9)):
+            sel=[b for a,b in sp if lo<a<=hi]
+            if sel: bands.append((lab,len(sel),sum(sel)/len(sel)))
+        rep["spread_skill"]={"n":nn,"corr":(cov/(sx*sy) if sx and sy else 0.0),"bands":bands}
+
     return rep
 
 # ----------------------------- render ------------------------------
@@ -1372,7 +1402,12 @@ tr.play td{background:rgba(70,192,138,.05)}
 .rating .big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;line-height:1;padding:8px 14px;border-radius:10px}.rating .txt{color:var(--mut);font-size:13px}.rating .txt b{color:var(--tx)}
 .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.kbox{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 16px;min-width:120px}
 .kbox .v{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600}.kbox .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
-.tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}.c-hi{background:rgba(70,192,138,.14);color:var(--up)}.c-md{background:rgba(227,162,60,.14);color:var(--dn)}.c-lo{background:rgba(125,139,156,.12);color:var(--mut)}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}.c-hi{background:rgba(70,192,138,.14);color:var(--up)}
+.c-wide{background:rgba(227,162,60,.14);color:var(--dn)}
+.gloss{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.gloss summary{cursor:pointer;color:var(--teal);font-size:13px;font-weight:600}
+.gloss dl{margin:10px 0 2px}.gloss dt{font-weight:600;font-size:12.5px;margin-top:10px}
+.gloss dd{margin:2px 0 0;font-size:12.5px;color:var(--mut);line-height:1.5}.c-md{background:rgba(227,162,60,.14);color:var(--dn)}.c-lo{background:rgba(125,139,156,.12);color:var(--mut)}
 .block{margin:14px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}.bh{padding:10px 12px;font-weight:600;border-bottom:1px solid var(--line)}.bm{padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mut);border-bottom:1px solid var(--line)}.block td,.block th{padding:8px 12px}
 .tabs{display:flex;gap:4px;overflow-x:auto;padding:6px 0}.tab{flex:0 0 auto;background:transparent;border:1px solid transparent;color:var(--mut);font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}.tab:hover{color:var(--tx);background:var(--panel)}.tab.active{color:var(--tx);background:var(--panel);border-color:var(--line)}.panel{display:none}.panel.active{display:block}
 .empty{padding:20px;border:1px dashed var(--line);border-radius:10px;color:var(--mut);background:var(--panel)}.empty b{color:var(--tx)}
@@ -1390,6 +1425,22 @@ tr.play td{background:rgba(70,192,138,.05)}
 .pflag{font-size:11.5px;font-weight:600;color:var(--dn);background:rgba(227,162,60,.14);padding:2px 8px;border-radius:6px}
 .pdata{padding:8px 16px;font-size:11.5px;color:var(--dim);border-top:1px solid var(--line)}
 svg{max-width:100%;height:auto}.card{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;margin:10px 0}"""
+
+# --- spread display (FUTURE 2b spread-skill check, READ 2026-07-25 at n=804) ---
+# corr(member sd, realized absolute error) = +0.250, 90% CI [+0.186, +0.317],
+# so the spread the model reports really does predict how wrong it will be.
+# Cut points are the measured sd quartiles over 804 settlements, and the error
+# each band actually realized: tight 1.52 deg, normal 1.65, wide 2.32. Display
+# only: these are NOT in _KNOB_NAMES because nothing here touches pricing.
+SPREAD_TIGHT = 1.69   # sd at or below this is the narrowest measured quartile
+SPREAD_WIDE  = 2.80   # sd above this is the widest measured quartile
+
+def spread_label(sd):
+    """(tag text, css class) for a forecast spread, or None when unremarkable."""
+    if sd is None: return None
+    if sd <= SPREAD_TIGHT: return ("tight spread", "c-hi")
+    if sd > SPREAD_WIDE:   return ("wide spread", "c-wide")
+    return None
 
 def esc(s): return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 def pct(x): return "%.0f%%"%(x*100)
@@ -1509,14 +1560,17 @@ def render_bets(rows,plays,updated,health=None):
             pw=("win prob %.0f%%"%(r["p_win"]*100)) if r.get("p_win") is not None else ""
             flag=(f'<span class="pflag">{esc(r["size_reason"])}</span>') if r.get("size_reason") else ""
             if r.get("hiconf"): flag='<span class="tag c-hi">high confidence</span>'+flag
+            _sp=spread_label(r.get("sd"))
+            sptag=(f'<span class="tag {_sp[1]}">{_sp[0]}</span>') if _sp else ""
             ptab+=(f'<div class="pcard {sc}"><div class="ptop">'
                    f'<div><div class="pcity">{city} &middot; {mk} &middot; {r["date"].strftime("%b %d")}</div>'
                    f'<div class="prange">{esc(r["bucket"])}</div></div>'
                    f'<div class="pside {sb}">{word}<div class="psub">{r["entry"]*100:.0f}\u00a2</div></div></div>'
                    f'<div class="pbar">{unit_badge(r["units"])}'
-                   f'<span class="pwin">{pw}</span>{flag}</div>'
+                   f'<span class="pwin">{pw}</span>{sptag}{flag}</div>'
                    f'<div class="pdata">model {pct(r["mp"])} &middot; market {pct(r["mid"])} &middot; '
-                   f'edge +{pct(abs(r["edge"]))} &middot; net +{r["net"]*100:.0f}\u00a2 &middot; OI {fmt_oi(r["oi"])}</div></div>')
+                   f'edge +{pct(abs(r["edge"]))} &middot; net +{r["net"]*100:.0f}\u00a2 &middot; '
+                   f'spread \u00b1{r["sd"]:.1f}\u00b0 &middot; OI {fmt_oi(r["oi"])}</div></div>')
     else:
         ptab=('<div class="empty"><b>No bets today.</b> Run in the morning; same-day lows are already '
               'realized and same-day highs after ~2pm too. Realized / offset ladders under By city are '
@@ -1567,13 +1621,52 @@ def render_bets(rows,plays,updated,health=None):
 
 def unit_str(u): return "2u" if u>=2 else "1.5u" if u>=1.5 else "1u" if u>=1 else "0u"
 
+# Plain-English glossary (FUTURE 4). Every metric on this page is a term of
+# art, and a track record nobody can read is a track record nobody can check.
+# Rendered on BOTH the populated and the empty results page: a reader looking
+# at their first board, before anything has settled, is exactly who needs it.
+# Collapsed by default so it never competes with the numbers; no JS.
+GLOSSARY=("<h2 class='sec'>What these words mean</h2>"
+              "<details class='gloss'><summary>Plain English, one line each</summary>"
+              "<dl>"
+              "<dt>Brier / RPS</dt><dd>Scores for how good the probabilities were, not just "
+              "whether a bet won. Lower is better. RPS is the fairer one here because it gives "
+              "partial credit for missing by one degree instead of five.</dd>"
+              "<dt>CRPS</dt><dd>The same idea for the whole forecast range rather than one bucket. "
+              "Lower is better.</dd>"
+              "<dt>Calibration</dt><dd>Do things the model calls 70 percent actually happen about "
+              "70 percent of the time? If yes the model is honest, and profit is then a question "
+              "of prices and fees rather than of forecasting.</dd>"
+              "<dt>sd(z)</dt><dd>Whether the model's confidence is right-sized. Near 1.0 is healthy. "
+              "Below 1 means it is too cautious, above 1 means it is overconfident.</dd>"
+              "<dt>Spread</dt><dd>How much the weather models disagree with each other today. "
+              "Measured here: wide-spread days really do miss by more, so treat a wide tag as a "
+              "reason for less conviction.</dd>"
+              "<dt>Shift and width</dt><dd>Corrections the model learned from your own settled "
+              "results. Shift shoves a city's forecast up or down; width sets how sure it is.</dd>"
+              "<dt>CLV</dt><dd>Whether the market moved toward your position after you entered. "
+              "Positive means you got a better price than the market later agreed on, which is "
+              "the earliest honest sign of an edge, long before win-loss noise settles down.</dd>"
+              "<dt>Edge and net</dt><dd>Edge is how far the model disagrees with the market price. "
+              "Net is what survives after the spread and Kalshi's fee. Only net is real.</dd>"
+              "<dt>ROI</dt><dd>Profit divided by the money actually put at risk, fees included.</dd>"
+              "<dt>Unit (1u)</dt><dd>One bet-sized chunk of the bankroll. Sizes are 2u, 1.5u, 1u "
+              "or no bet.</dd>"
+              "<dt>Frozen play</dt><dd>Once a pick appears on a board it is scored forever as it "
+              "was, even if a later run would have picked differently. The tracker always matches "
+              "a board you actually saw.</dd>"
+              "<dt>Gated / quarantined</dt><dd>A city sat out because its data came in degraded. "
+              "It is still recorded so the sit-out can be judged later.</dd>"
+              "</dl></details>")
+
 def render_results(rep,updated,health=None,alerts=None):
     if not rep.get("plays"):
         body=('<div class="empty"><b>No resolved bets yet.</b> This tracker fills in automatically once your '
               'logged plays settle on Kalshi. Every run pulls Kalshi\'s official result and settled temperature, '
               'marks each bet win/loss, and updates the charts, per-city and per-unit tables, and margins below. '
               'Give it a couple weeks of morning runs.</div>')
-        html=head("results",updated,_health_strip(health,alerts))+"<h2 class='sec'>Results tracker</h2>"+body+"</div></body></html>"
+        html=(head("results",updated,_health_strip(health,alerts))+"<h2 class='sec'>Results tracker</h2>"
+              +body+GLOSSARY+"</div></body></html>")
         with open(os.path.join(OUT_DIR,"results.html"),"w",encoding="utf-8") as fp: fp.write(html); return
     p=rep["pnl"]; cls="up" if p["net"]>=0 else "red"
     kpis=("<div class='kpi'>"
@@ -1652,6 +1745,18 @@ def render_results(rep,updated,health=None,alerts=None):
                   f"<b>Experimental cheap-entry cell</b> (docket item 1, gate {e['n']}/40): {e['w']}/{e['n']-e['w']} for {e['net_u']:+.1f}u. "
                   "The cell keeps trading until its pre-registered gate reads; its cost is the price of a verdict that "
                   "cannot be argued with. If the gate condition holds, a MIN_ENTRY floor of 0.20 ships automatically.</div>")
+            if rep.get("spread_skill"):
+                ss=rep["spread_skill"]
+                rowsS="".join(f"<tr><td>{esc(l)}</td><td class='n'>{c}</td><td class='n'>{e:.2f}&deg;</td></tr>"
+                              for l,c,e in ss["bands"])
+                erat+=("<h2 class='sec'>Forecast spread vs actual error</h2>"
+                  f"<div class='note'>The spread the model reports is an honest confidence signal: "
+                  f"correlation with realized error is <b>{ss['corr']:+.2f}</b> over {ss['n']} settlements "
+                  "(pre-registered check, gate n=100). A wide-spread day really is a worse day, so the "
+                  "bets page now tags each pick. This measures the SIZE of the miss, not direction, and "
+                  "it is a tendency across many days rather than a promise about any single one.</div>"
+                  "<table><thead><tr><th>Spread band</th><th class='n'>Events</th>"
+                  "<th class='n'>Avg miss</th></tr></thead><tbody>"+rowsS+"</tbody></table>")
             if rep.get("prod_gate"):
                 metn=sum(1 for _,m,_ in rep["prod_gate"] if m)
                 items="".join(f"<div>{'MET &middot; ' if m else 'open &middot; '}{esc(lbl)}: {esc(det)}</div>"
@@ -1763,7 +1868,7 @@ def render_results(rep,updated,health=None,alerts=None):
                 f'<td class="n {"up" if r["pnl"]>=0 else "red"}">{r["pnl"]/BASE_UNIT_USD:+.1f}u</td></tr>'
                 for r in rep.get("recent",[])[:60])
     html=(head("results",updated,_health_strip(health,alerts))+
-      "<h2 class='sec'>Performance</h2>"+kpis+winrow+honest+chart+brier+calsec+
+      "<h2 class='sec'>Performance</h2>"+kpis+winrow+honest+chart+brier+calsec+GLOSSARY+
       "<h2 class='sec'>By city</h2><div class='card'>"+city_bars+"</div>"
       "<table><thead><tr><th>City</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+ct+"</tbody></table>"
       "<h2 class='sec'>By unit size</h2>"
