@@ -490,6 +490,45 @@ class TestSpreadDisplay(unittest.TestCase):
         self.assertNotIn("wide spread", board(dict(r, sd=kw.SPREAD_TIGHT - 0.1)))
 
 
+class TestGlossary(unittest.TestCase):
+    """FUTURE 4: a track record nobody can read is a track record nobody can
+    check. The glossary must actually render, and must not shout over the data."""
+
+    def _results_html(self, rep):
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    return fp.read()
+        finally:
+            kw.OUT_DIR = saved
+
+    def _rich_state(self):
+        rs = []
+        for i in range(40):
+            rs.append({"code": "DAL", "kind": "HIGH", "target": f"2026-07-{(i % 28) + 1:02d}",
+                       "lead": 1, "actual": 91, "mean": 90.4, "bias": -0.6, "sd": 1.0 + (i % 4),
+                       "psd": 1.5, "bias_corr": 0, "sigma": 1.1, "model_version": "2026-07-25.v15",
+                       "buckets": [{"mp": 0.5, "mid": 0.5, "hit": i % 2, "rep": 90.5}], "plays": []})
+        return {"resolved": rs, "predictions": {}}
+
+    def test_glossary_renders_and_stays_collapsed(self):
+        html = self._results_html(kw.compute_report(self._rich_state()))
+        self.assertIn("What these words mean", html)
+        for term in ("Calibration", "CLV", "Spread", "Frozen play", "Gated"):
+            self.assertIn(term, html)
+        # collapsed by default: a details element with no open attribute
+        self.assertIn("<details class='gloss'>", html)
+        self.assertNotIn("<details class='gloss' open", html)
+
+    def test_glossary_never_introduces_an_em_dash(self):
+        html = self._results_html(kw.compute_report(self._rich_state()))
+        start = html.find("What these words mean")
+        self.assertNotIn("\u2014", html[start:start + 4000])
+
+
 class TestNowcastLive(unittest.TestCase):
     """v15: the nowcast observed max now floors the member cloud for same-day
     HIGHs. Promoted on its re-registered gate (55 binding events, CRPS 1.277 vs
@@ -729,6 +768,58 @@ class TestNowcastShadow(unittest.TestCase):
         finally:
             kw.pull_weather_markets,kw.fetch_members,kw.fget=saved
 
+
+    def test_shadow_prices_the_same_cloud_production_does(self):
+        """v15: once truncation is live, the paired snapshot must be built from
+        the skill-weighted cloud production uses. A monitor that watches a model
+        which is no longer running is worse than no monitor."""
+        code = next(iter(kw.STATION_IDS))
+        lat, lon, tz, label = kw.CITIES[code]
+        off = kw.STD_OFFSET_H.get(tz, 0) * 3600
+        lnow = dtm.datetime.now(dtm.timezone.utc).replace(tzinfo=None) + dtm.timedelta(seconds=off)
+        tgt = lnow.date().isoformat()
+        # Widen the collection window for the duration of the test instead of
+        # skipping outside 9am-2pm local. A test that only runs for five hours a
+        # day is one that fails to catch a regression the other nineteen.
+        win = (kw.NOWCAST_MIN_LHR, kw.INTRADAY_HIGH_CUTOFF)
+        kw.NOWCAST_MIN_LHR, kw.INTRADAY_HIGH_CUTOFF = 0, 24
+        # ICON forecasts much colder than the rest; weighting must move the mean
+        per = {"gfs025": [90.0] * 40, "ecmwf_ifs025": [90.0] * 40,
+               "icon_seamless": [80.0] * 40, "gem_global": [90.0] * 40}
+        pooled = [v for vs in per.values() for v in vs]
+        pm = {m: {"hi": {tgt: vs}, "lo": {tgt: vs}} for m, vs in per.items()}
+        bkts = [{"ticker": "T1", "floor": None, "cap": 88, "stype": "less", "sub": "", "yb": .1, "ya": .2, "oi": 900},
+                {"ticker": "T2", "floor": 88, "cap": 92, "stype": "between", "sub": "", "yb": .3, "ya": .4, "oi": 900},
+                {"ticker": "T3", "floor": 92, "cap": None, "stype": "greater", "sub": "", "yb": .3, "ya": .4, "oi": 900}]
+        saved = (kw.pull_weather_markets, kw.fetch_members, kw.fetch_running_max)
+        try:
+            kw.pull_weather_markets = lambda: [{"code": code, "kind": "HIGH",
+                                                "date": dtm.date.fromisoformat(tgt), "event_ticker": "E",
+                                                "structure_ok": True, "buckets": bkts}]
+            kw.fetch_members = lambda a, b, c: ({tgt: pooled}, {tgt: pooled}, off, pm)
+            kw.fetch_running_max = lambda *a: (70.0, 5)      # below the cloud: never binds
+            # history that makes ICON look terrible, so weighting must discount it
+            res = []
+            for i in range(kw.PROVIDER_W_WARMUP + 5):
+                res.append({"code": code, "kind": "HIGH", "target": f"2026-06-{(i % 28) + 1:02d}",
+                            "actual": 90.0, "mean": 90.0, "bias": 0.0, "sd": 1.0, "psd": 1.5,
+                            "bias_corr": 0.0, "sigma": 1.1, "buckets": [], "plays": [],
+                            "members_by_model": {"gfs025": {"n": 40, "mean": 90.2, "sd": 1.0},
+                                                 "ecmwf_ifs025": {"n": 40, "mean": 90.1, "sd": 1.0},
+                                                 "icon_seamless": {"n": 40, "mean": 80.0, "sd": 1.0},
+                                                 "gem_global": {"n": 40, "mean": 90.3, "sd": 1.0}}})
+            state = {"predictions": {f"{code}|HIGH|{tgt}":
+                        {"code": code, "kind": "HIGH", "target": tgt, "plays": []}},
+                     "resolved": res}
+            self.assertTrue(kw.provider_weights(state).get("HIGH"), "fixture failed to clear warmup")
+            wrote = kw.shadow_pass(state)
+            self.assertEqual(wrote, 1)
+            nc = state["predictions"][f"{code}|HIGH|{tgt}"]["nowcast"]
+            # unweighted pooling would sit near 87.5; discounting ICON pulls it up
+            self.assertGreater(nc["mean_u"], 88.0, "snapshot still built from the pooled cloud")
+        finally:
+            (kw.pull_weather_markets, kw.fetch_members, kw.fetch_running_max) = saved
+            kw.NOWCAST_MIN_LHR, kw.INTRADAY_HIGH_CUTOFF = win
 
     def test_era_label_future_proof(self):
         # v13 was misfiled under Legacy for three days because the first draft
