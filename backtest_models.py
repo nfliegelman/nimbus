@@ -74,19 +74,37 @@ def _era(mv):
 # ------------------------------------------------------------------ #
 #  WEIGHTING SCHEMES: mm (+ per-kind provider-error history) -> weights
 # ------------------------------------------------------------------ #
-def w_member_count(mm, hk):  return {k: v["n"] for k, v in mm.items()}          # champion
-def w_equal(mm, hk):         return {k: 1.0 for k in mm}                        # one model, one vote
+# Since 2026-07-28 members_by_model may also carry EVIDENCE-ONLY AI providers
+# (AI_MODELS below) beside the four pricing providers. Every incumbent config
+# filters to the core four via _core(), which is what live pricing does; the
+# AI providers are raced only by the explicitly AI-aware candidates. Without
+# the filter, the champion row here would quietly stop matching live pricing
+# the day the first AI-bearing record settles.
+AI_MODELS = ("ncep_aigefs025", "ecmwf_aifs025")
+
+def _core(mm): return {k: v for k, v in mm.items() if k in MODELS}
+
+def w_member_count(mm, hk):  return {k: v["n"] for k, v in _core(mm).items()}   # champion
+def w_equal(mm, hk):         return {k: 1.0 for k in _core(mm)}                 # one model, one vote
 
 def w_skill_invmse(mm, hk):
     """Per-kind inverse-MSE skill weights over last 60 prior-date settlements,
     eps 0.25, 30-per-provider warmup. Docket item 4 challenger."""
     if all(len(hk[k]) >= 30 for k in MODELS):
-        return {k: 1.0 / (sum(x * x for x in hk[k][-60:]) / len(hk[k][-60:]) + 0.25) for k in mm}
-    return {k: v["n"] for k, v in mm.items()}   # warmup: fall back to member count
+        return {k: 1.0 / (sum(x * x for x in hk[k][-60:]) / len(hk[k][-60:]) + 0.25) for k in _core(mm)}
+    return {k: v["n"] for k, v in _core(mm).items()}   # warmup: fall back to member count
 
 def _single(model):
     def w(mm, hk): return {model: 1.0} if model in mm else None
     return w
+
+def w_member_count_with_ai(mm, hk):
+    """Core pool plus both AI providers, member-count weighted. Scores ONLY the
+    records where both AI providers are present, so its rows are a subset and
+    the pairwise-CI column stays blank until coverage is complete; the FUTURE 5
+    adoption gate reads this row at 150+ AI-bearing settlements."""
+    if any(k not in mm for k in AI_MODELS): return None
+    return {k: v["n"] for k, v in mm.items() if k in MODELS + AI_MODELS}
 
 # ------------------------------------------------------------------ #
 #  CANDIDATE SLATE  (pre-register here; the harness scores all of them)
@@ -101,6 +119,12 @@ SLATE = [
     ("ECMWF only + roll30",                   _single("ecmwf_ifs025"),  "roll30"),
     ("ICON only + roll30",                    _single("icon_seamless"), "roll30"),
     ("GEM only + roll30",                     _single("gem_global"),    "roll30"),
+    # AI race, added 2026-07-28 with the FUTURE 5 evidence logging. These rows
+    # stay empty until AI-bearing records settle; the adoption gate is
+    # registered in FUTURE 5 and reads at 150+ settlements carrying both.
+    ("member-count + AI providers + roll30",  w_member_count_with_ai,   "roll30"),
+    ("AIGEFS only + roll30",                  _single("ncep_aigefs025"), "roll30"),
+    ("AIFS-ENS only + roll30",                _single("ecmwf_aifs025"),  "roll30"),
 ]
 CHAMPION = SLATE[0][0]
 

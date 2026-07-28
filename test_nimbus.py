@@ -134,14 +134,17 @@ class TestPipeline(unittest.TestCase):
 
     def setUp(self):
         self._saved = (kw.pull_weather_markets, kw.fetch_members, kw.fetch_ref,
-                       kw.fetch_run_meta, kw.fetch_settled_event, kw.fget)
+                       kw.fetch_run_meta, kw.fetch_settled_event, kw.fget,
+                       kw.fetch_ai_members)
         kw.fget = _no_network
+        kw.fetch_ai_members = lambda *a: {}     # AI evidence absent unless a test injects it
         self.tom = (dtm.datetime.now(dtm.timezone.utc) + dtm.timedelta(days=1)).date()
         self.day = self.tom.isoformat()
 
     def tearDown(self):
         (kw.pull_weather_markets, kw.fetch_members, kw.fetch_ref,
-         kw.fetch_run_meta, kw.fetch_settled_event, kw.fget) = self._saved
+         kw.fetch_run_meta, kw.fetch_settled_event, kw.fget,
+         kw.fetch_ai_members) = self._saved
 
     def _bkt(self, t, f, c, st, yb, ya):
         return {"ticker": t, "floor": f, "cap": c, "stype": st, "sub": "", "yb": yb, "ya": ya, "oi": 900}
@@ -576,6 +579,60 @@ class TestPipeline(unittest.TestCase):
                         for r in recs]
         self.assertEqual(len(rs.replay(legacy_tight, rs.cfg("proxy_keep", max_sd=1.0))), len(base))
 
+    def test_ai_evidence_models_log_without_touching_pricing(self):
+        """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
+        in members_by_model and change NOTHING else. The AI fixture is wildly off
+        (82 deg vs the pool's 91) precisely so any contamination of the mean, the
+        spread, the buckets, or the plays would show."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        d = self.day
+        self._wire([self._lad(c) for c in healthy])
+        kw.fetch_ai_members = lambda lat, lon, tz: {
+            m: {"hi": {d: [80.0 + j for j in range(5)]}, "lo": {d: [60.0] * 5}}
+            for m in kw.AI_ENSEMBLE_MODELS}
+        s1 = {"predictions": {}, "resolved": []}
+        kw.score(s1)
+        self._wire([self._lad(c) for c in healthy])
+        kw.fetch_ai_members = lambda *a: {}
+        s2 = {"predictions": {}, "resolved": []}
+        kw.score(s2)
+        k = "DAL|HIGH|" + d
+        r1, r2 = s1["predictions"][k], s2["predictions"][k]
+        mm = r1["members_by_model"]
+        for m in kw.AI_ENSEMBLE_MODELS:
+            self.assertIn(m, mm)
+            self.assertEqual(mm[m]["n"], 5)
+            self.assertAlmostEqual(mm[m]["mean"], 82.0, places=6)
+        for m in kw.ENSEMBLE_MODELS:
+            self.assertIn(m, mm)
+        self.assertNotIn("gated", r1)
+        self.assertEqual(r1["mean"], r2["mean"])
+        self.assertEqual(r1["sd"], r2["sd"])
+        self.assertEqual([b["mp"] for b in r1["buckets"]], [b["mp"] for b in r2["buckets"]])
+        self.assertEqual(r1["plays"], r2["plays"])
+        self.assertEqual(r1["book0"]["sd"], r2["book0"]["sd"])
+
+    def test_ai_models_never_rescue_the_model_count_gate(self):
+        """Two core providers plus two AI providers is still 2/4 models. The gate
+        counts pricing providers only; evidence logging must not weaken it."""
+        d = self.day
+        def two_core(lat, lon, tz):
+            pm = {m: {"hi": {d: [90.6 + j * 0.052 for j in range(50)]}, "lo": {d: [70.0] * 50}}
+                  for m in kw.ENSEMBLE_MODELS[:2]}
+            hi = [v for m in pm.values() for v in m["hi"][d]]
+            return {d: hi}, {d: [70.0] * 100}, -18000, pm
+        self._wire([self._lad(c) for c in ["DAL", "ATL", "SEA", "BOS", "LV"]], fm=two_core)
+        kw.fetch_ai_members = lambda lat, lon, tz: {
+            m: {"hi": {d: [90.0] * 31}, "lo": {d: [70.0] * 31}} for m in kw.AI_ENSEMBLE_MODELS}
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        rec = state["predictions"]["DAL|HIGH|" + d]
+        self.assertTrue(rec.get("gated"))
+        self.assertIn("2/4 models", rec["gated"])
+        # the quarantined record still logs the evidence models for later audit
+        for m in kw.AI_ENSEMBLE_MODELS:
+            self.assertIn(m, rec["members_by_model"])
+
 
 class TestSpreadDisplay(unittest.TestCase):
     """Surfacing forecast spread, earned by the spread-skill check reading
@@ -689,13 +746,16 @@ class TestNowcastLive(unittest.TestCase):
 
     def setUp(self):
         self._saved = (kw.pull_weather_markets, kw.fetch_members, kw.fetch_ref,
-                       kw.fetch_run_meta, kw.fetch_settled_event, kw.fget, kw.shadow_pass)
+                       kw.fetch_run_meta, kw.fetch_settled_event, kw.fget, kw.shadow_pass,
+                       kw.fetch_ai_members)
         kw.fget = _no_network
         kw.shadow_pass = lambda st: 0          # snapshots are injected by hand here
+        kw.fetch_ai_members = lambda *a: {}    # AI evidence models never price anyway
 
     def tearDown(self):
         (kw.pull_weather_markets, kw.fetch_members, kw.fetch_ref,
-         kw.fetch_run_meta, kw.fetch_settled_event, kw.fget, kw.shadow_pass) = self._saved
+         kw.fetch_run_meta, kw.fetch_settled_event, kw.fget, kw.shadow_pass,
+         kw.fetch_ai_members) = self._saved
 
     def _clock(self, local_hour=10):
         """Offset that puts the city clock at local_hour today, and that day."""
@@ -1040,6 +1100,27 @@ class TestNowcastShadow(unittest.TestCase):
         self.assertGreater(t["ci_lo"], 0.0)
         # below the 50-record floor: no tally
         self.assertIsNone(kw.challenger_weighting_tally(rows[:40]))
+
+    def test_challenger_tally_ignores_ai_evidence_models(self):
+        # AI providers ride members_by_model since 2026-07-28 but have no error
+        # history in the tally: rows carrying them must produce the exact same
+        # tally as rows without them, and must not crash the skill weights
+        rows=[]; rows_ai=[]
+        day=dtm.date(2026, 3, 1)
+        for i in range(120):
+            d=(day+dtm.timedelta(days=i)).isoformat()
+            actual=70+(i%7)
+            mm={"gfs025":{"n":10,"mean":actual+0.2,"sd":1.0},
+                "ecmwf_ifs025":{"n":10,"mean":actual+0.1,"sd":1.0},
+                "icon_seamless":{"n":10,"mean":actual-0.2,"sd":1.0},
+                "gem_global":{"n":40,"mean":actual+5.0,"sd":1.0}}
+            mm_ai=dict(mm, ncep_aigefs025={"n":31,"mean":actual-9.0,"sd":1.0},
+                       ecmwf_aifs025={"n":51,"mean":actual+9.0,"sd":1.0})
+            for kind in ("HIGH","LOW"):
+                rows.append({"target":d,"kind":kind,"actual":actual,"members_by_model":mm})
+                rows_ai.append({"target":d,"kind":kind,"actual":actual,"members_by_model":mm_ai})
+        self.assertEqual(kw.challenger_weighting_tally(rows),
+                         kw.challenger_weighting_tally(rows_ai))
 
 
     def test_prod_gate_conditions(self):
