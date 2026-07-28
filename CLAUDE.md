@@ -43,8 +43,9 @@ whether or not anything looks broken afterward.
 2. **Never delete, regenerate, normalize, reformat, reorder, truncate, or
    `.gitignore` `weather_state.json`.** It is live state, deliberately committed
    by the scheduled workflow. It is large and machine-written, so it will look
-   generated. It is not. There is no `.gitignore` in this repository; do not add
-   one that excludes state files.
+   generated. It is not. The repository's `.gitignore` covers compiled Python
+   bytecode and nothing else; never add a pattern to it that excludes state
+   files. `git check-ignore -v weather_state.json` must keep returning nothing.
 
 3. **Never `git push --force`, never `git reset --hard`, never `git checkout .`
    without first checking whether the cron has committed.** The workflow pushes
@@ -95,7 +96,7 @@ whether or not anything looks broken afterward.
 ## Validation required before any commit touching code
 
 1. `python3 -m py_compile kalshi_weather.py`
-2. `python3 test_nimbus.py` (currently 23 tests; all must pass, and new
+2. `python3 test_nimbus.py` (currently 48 tests; all must pass, and new
    behavior needs a new test)
 3. Sandbox double-run per the procedure above: run the script twice, confirm it
    completes, confirm no unintended plays freeze, and confirm any new display
