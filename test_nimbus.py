@@ -257,6 +257,7 @@ class TestPipeline(unittest.TestCase):
                  "stype": "between", "mp": 0.42, "mid": 0.40, "yb": 0.38, "ya": 0.42, "oi": 500},
                 {"ticker": "B", "bid": "96+", "sub": "96+", "floor": 96, "cap": None,
                  "stype": "greater", "mp": 0.20, "mid": 0.30, "yb": 0.28, "ya": 0.32, "oi": 500}],
+            "plays_logged_at": "2026-07-02T21:38Z",
             "plays": [{"ticker": "A", "bid": "94-95", "sub": "94-95", "side": "Buy YES",
                        "entry": 0.42, "net": 0.05, "edge": 0.06, "tier": "A", "units": 1.5,
                        "stake": 15.0, "p_win": 0.42, "mp": 0.42, "mid": 0.34}]}},
@@ -271,6 +272,13 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(pl["clv"], 0.06); self.assertEqual(pl["close_mid"], 0.40)
         self.assertEqual(r.get("cfg"), "deadbeef")
         self.assertIsNotNone(r.get("crps"))
+        # p_win must survive settlement: the docket 1 cheap-entry cell is
+        # registered as "entry <= 0.20 OR p_win <= 0.30", and dropping the
+        # field here silently reduced that gate to its entry arm alone
+        self.assertEqual(pl["p_win"], 0.42)
+        # entry board of the frozen plays: without it, bet-timing analysis can
+        # only proxy the entry time from the record's first log
+        self.assertEqual(r.get("plays_logged_at"), "2026-07-02T21:38Z")
 
     def test_book0_is_write_once_and_skips_gated_boards(self):
         """book0 must freeze at the FIRST healthy board. If it tracked refreshes it
@@ -303,6 +311,71 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(rec["book0"]["at"], b0["at"])
         self.assertNotEqual([b["yb"] for b in rec["buckets"]],
                             [e["yb"] for e in first])              # live book really moved
+
+    def test_board_tape_appends_once_per_run_and_tracks_price_moves(self):
+        """The tape exists to answer "what if we had frozen at a later board", so it
+        must APPEND where book0 freezes, must not double-write within a run, and must
+        record each board's own prices rather than the first board's."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        key = "DAL|HIGH|" + self.day
+        tape = state["predictions"][key]["tape"]
+        self.assertEqual(len(tape), 1)
+        at0, mean0, biased0, lead0, fp0, rows0 = tape[0]
+        self.assertEqual(at0, state["predictions"][key]["book0"]["at"])   # tape[0] IS the decision board
+        self.assertEqual(len(rows0), len(state["predictions"][key]["book0"]["buckets"]))
+        self.assertIn(biased0, (0, 1))
+
+        # a second board in the SAME run stamp must not append a duplicate row
+        kw.score(state)
+        self.assertEqual(len(state["predictions"][key]["tape"]), 1)
+
+        # a later board at a new stamp appends, and carries its own moved prices
+        def moved(code, ok=True):
+            l = self._lad(code, ok)
+            for b in l["buckets"]:
+                b["yb"] = round(b["yb"] + 0.10, 2); b["ya"] = round(b["ya"] + 0.10, 2)
+            return l
+        self._wire([moved(c) for c in healthy])
+        # run_stamp is derived from the clock inside score(), so age the stored row
+        # rather than patching time: the next run then carries a genuinely new stamp
+        state["predictions"][key]["tape"][0][0] = "2020-01-01T00:00Z"
+        kw.score(state)
+        tape = state["predictions"][key]["tape"]
+        self.assertEqual(len(tape), 2)
+        self.assertEqual(tape[0][0], "2020-01-01T00:00Z")     # earlier boards are never rewritten
+        self.assertEqual(tape[1][4], fp0)                     # same ladder -> same fingerprint
+        self.assertNotEqual([r[3] for r in tape[1][5]], [r[3] for r in rows0])   # ya really moved
+        # book0 stays frozen while the tape grows: that is the whole point
+        self.assertEqual(state["predictions"][key]["book0"]["at"], at0)
+
+    def test_board_tape_skips_gated_boards_and_untaped_records(self):
+        """A gated ladder is degraded data and must never enter a replay, and a record
+        with no book0 has boards nobody captured, so "board k" would be meaningless."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy] + [self._lad("PHX", ok=False)])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        self.assertIsNone(state["predictions"].get("PHX|HIGH|" + self.day, {}).get("tape"))
+        self.assertIsNotNone(state["predictions"]["DAL|HIGH|" + self.day].get("tape"))
+        # a record already in flight (no book0) is never taped
+        key = "ATL|HIGH|" + self.day
+        state["predictions"][key].pop("book0")
+        state["predictions"][key].pop("tape", None)
+        self._wire([self._lad(c) for c in healthy])
+        kw.score(state)
+        self.assertIsNone(state["predictions"][key].get("tape"))
+
+        # AND a record that HAS book0 but no tape predates the tape: its board 0 was
+        # never captured, so starting now would label a mid-life board as the
+        # decision board. Holding book0 is not sufficient to earn a tape.
+        key2 = "SEA|HIGH|" + self.day
+        state["predictions"][key2].pop("tape")
+        self.assertIsNotNone(state["predictions"][key2].get("book0"))
+        kw.score(state)
+        self.assertIsNone(state["predictions"][key2].get("tape"))
 
     def test_book0_never_stamps_a_record_already_in_flight(self):
         """A market already pending when book0 shipped has boards we never saw, and
@@ -344,12 +417,21 @@ class TestPipeline(unittest.TestCase):
                  "floor": 94, "cap": 95, "stype": "between"},
                 {"ticker": "B", "mp": 0.14, "mid": 0.24, "yb": 0.22, "ya": 0.26, "oi": 460,
                  "floor": 96, "cap": None, "stype": "greater"}]},
+            "tape": [["2026-06-30T02:07Z", 95.0, 0, 1, "abc12345",
+                      [[0.5, 0.31, 0.29, 0.33, 480.0], [0.14, 0.24, 0.22, 0.26, 460.0]]],
+                     ["2026-06-30T21:38Z", 95.3, 0, 1, "abc12345",
+                      [[0.55, 0.36, 0.34, 0.38, 500.0], [0.12, 0.20, 0.18, 0.22, 470.0]]]],
             "plays": []}},
             "resolved": []}
         kw.fetch_settled_event = lambda evt: {"A": ("yes", 95.0), "B": ("no", 95.0)}
         kw.TODAY = dtm.date(2026, 7, 5)
         kw.resolve_pending(state)
         r = state["resolved"][0]
+        # the tape rides along with a graded book0: both are needed to replay a
+        # later board, since the tape's rows are positional against book0's ladder
+        self.assertEqual(len(r["tape"]), 2)
+        self.assertEqual(r["tape"][1][0], "2026-06-30T21:38Z")
+        self.assertEqual(r["tape"][1][5][0][1], 0.36)    # the later board's own mid
         self.assertEqual(len(r["book0"]["buckets"]), 2)
         a = next(e for e in r["book0"]["buckets"] if e["ticker"] == "A")
         self.assertEqual(a["hit"], 1)
@@ -374,6 +456,7 @@ class TestPipeline(unittest.TestCase):
                  "floor": 94, "cap": 95, "stype": "between"},
                 {"ticker": "GONE", "mp": 0.10, "mid": 0.12, "yb": 0.10, "ya": 0.14, "oi": 300,
                  "floor": 96, "cap": None, "stype": "greater"}]},
+            "tape": [["z", 95.0, 0, 1, "abc12345", [[0.5, 0.31, 0.29, 0.33, 480.0]]]],
             "plays": []}},
             "resolved": []}
         kw.fetch_settled_event = lambda evt: {"A": ("yes", 95.0)}   # GONE never settles
@@ -381,6 +464,9 @@ class TestPipeline(unittest.TestCase):
         kw.resolve_pending(state)
         r = state["resolved"][0]
         self.assertIsNone(r.get("book0"))
+        # a tape without a graded book0 has no ladder to index into: it is not
+        # replayable, so keeping it would only cost bytes
+        self.assertIsNone(r.get("tape"))
         self.assertTrue(r["buckets"])        # the record itself still resolves normally
 
     def test_replay_champion_reproduces_live_selection(self):
@@ -830,6 +916,43 @@ class TestNowcastShadow(unittest.TestCase):
                    "2026-07-13.v13-nowcast-shadow", "2026-09-01.v14-whatever"):
             self.assertEqual(kw._era_label(mv), "Audit build (v11+)")
 
+
+    def test_play_pwin_falls_back_to_raw_mp(self):
+        # Plays settled before the retention fix carry mp but no p_win. The
+        # docket 1 cell must still be read as REGISTERED on them, so p_win is
+        # reconstructed the way entry-time computed it: clamped mp for YES,
+        # 1 - clamped mp for NO.
+        self.assertEqual(kw.play_pwin({"p_win": 0.42, "mp": 0.9, "side": "Buy YES"}), 0.42)
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.42, "side": "Buy YES"}), 0.42)
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.42, "side": "Buy NO"}), 0.58)
+        # the clamp binds only in the deep tails, far from the 0.30 threshold
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.001, "side": "Buy YES"}), kw.TAIL_FLOOR)
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.999, "side": "Buy NO"}), kw.TAIL_FLOOR)
+        self.assertIsNone(kw.play_pwin({"side": "Buy YES"}))
+        # a p_win of 0.0 must not be mistaken for a missing field
+        self.assertEqual(kw.play_pwin({"p_win": 0.0, "mp": 0.42, "side": "Buy YES"}), 0.0)
+
+    def test_cheap_entry_cell_reads_both_registered_arms(self):
+        # A dear-entry play the model expects to lose belongs in the cheap cell
+        # via the p_win arm. Before the fix it was filed under the CORE book,
+        # flattering the core and starving the gate.
+        def play(entry, mp, side, won=False):
+            return {"entry": entry, "mp": mp, "side": side, "won": won, "units": 1.0,
+                    "stake": 10.0, "pnl": -10.0, "clv": 0.0, "contracts": int(10.0 // entry),
+                    "lead": 1, "tier": "B", "mid": entry, "margin": 0.0, "edge": 0.0,
+                    "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "sub": "",
+                    "close_mid": entry, "actual": 95,
+                    "model_version": "2026-07-06.v11-audit12"}
+        state = {"predictions": {}, "resolved": [{
+            "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "lead": 1, "actual": 95,
+            "mean": 95.0, "bias": 0.0, "psd": 1.5, "sd": 1.5,
+            "buckets": [{"mp": 0.4, "mid": 0.4, "hit": 1, "rep": 95.0}],
+            "plays": [play(0.60, 0.25, "Buy YES"),    # p_win arm: 0.25 <= 0.30
+                      play(0.10, 0.80, "Buy YES"),    # entry arm: 0.10 <= 0.20
+                      play(0.60, 0.60, "Buy YES", True)]}]}   # core
+        rep = kw.compute_report(state)
+        self.assertEqual(rep["book_split"]["exp"]["n"], 2)
+        self.assertEqual(rep["book_split"]["core"]["n"], 1)
 
     def test_challenger_weighting_tally(self):
         # two sharp providers plus one heavy awful one: skill weighting must

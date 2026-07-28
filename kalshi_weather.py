@@ -737,6 +737,39 @@ def size_play(net, p_win, proven, lead=0):
 # behavior knob, so CONFIG_HASH is unaffected.
 BOOK0_FIELDS=("ticker","mp","mid","yb","ya","oi","floor","cap","stype")
 
+# Board tape (FUTURE docket 7, bet-timing replay). book0 preserves the FIRST
+# board and rec["buckets"] holds the LAST, so the boards in between were being
+# discarded: "would freezing at a later board have been better" had no stored
+# answer, and the natural entry-board split (67 plays on the 12:17 board vs 15
+# on 21:38) is far too lopsided to settle it observationally. The tape records
+# every healthy board as a compact positional row so a replay can re-run
+# selection at board k instead of board 0.
+#
+# Encoding, measured against alternatives before choosing: [at, mean, biased,
+# lead, fp, [[mp, mid, yb, ya, oi], ...]] costs ~234 B/board, about 20 percent
+# of a full book0 snapshot, and adds roughly 1.1-1.7 MB/month. Keying every
+# bucket by id instead was 342 B/board; the fingerprint buys the same safety
+# for a third of the bytes.
+#
+# `fp` is a hash of the board's ticker tuple. Bucket values are POSITIONAL, so
+# a replay must confirm a board's fp matches book0's before indexing into it;
+# Kalshi can add a strike mid-life (never observed in 81 paired boards, but
+# never observed is not never). A board whose fp differs is skipped by the
+# replay rather than silently misaligned.
+#
+# Only records that also carry book0 are taped, so tape[0] IS the decision
+# board by construction. A record already in flight has boards nobody captured,
+# which would make "board k" mean nothing. Gated boards are never taped, same
+# rule as book0: degraded data must not enter a replay.
+# Deliberately NOT in _KNOB_NAMES: recording schema, not a behavior knob, so
+# CONFIG_HASH is unaffected.
+TAPE_MAX_BOARDS=8   # records have never seen more than 5; this is a runaway guard
+
+def _tape_row(run_stamp, mean, biased, lead, pbk):
+    fp=hashlib.sha1("|".join(b["ticker"] for b in pbk).encode()).hexdigest()[:8]
+    return [run_stamp, round(mean,2), 1 if biased else 0, lead, fp,
+            [[round(b["mp"],4), b["mid"], b["yb"], b["ya"], round(b["oi"],1)] for b in pbk]]
+
 def score(state):
     ladders=pull_weather_markets()
     needed=sorted({l["code"] for l in ladders})
@@ -903,6 +936,23 @@ def score(state):
                     # board's. A replay missing either would apply the wrong filters.
                     rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
                                   "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
+                # BOARD TAPE (append-once per run stamp): every healthy board this
+                # market is seen on, so a replay can ask what freezing at board k
+                # would have done. Gated boards are skipped.
+                # A record must be taped from its FIRST board or not at all. Holding
+                # book0 is not sufficient: the 46 records already in flight when the
+                # tape shipped have a book0 from an earlier run, so starting their
+                # tape now would make tape[0] a mid-life board while every reader
+                # takes it for the decision board. That is the same trap book0 itself
+                # guards against, and it silently corrupts the replay rather than
+                # failing loudly. Those records are excluded forever instead, costing
+                # about two days of coverage. Better absent than wrong.
+                prior=(old or {}).get("tape")
+                if not gate and rec.get("book0") and (prior is not None or old is None):
+                    tape=list(prior or [])
+                    if len(tape)<TAPE_MAX_BOARDS and not any(t[0]==run_stamp for t in tape):
+                        tape.append(_tape_row(run_stamp,mean,biased,lead,pbk))
+                    if tape: rec["tape"]=tape
                 # FREEZE: once a run has published plays for this market, later runs must
                 # not rewrite them; the tracker has to score the board the owner actually
                 # saw. Buckets/mean/sigma keep refreshing (calibration wants the freshest
@@ -1012,6 +1062,17 @@ def resolve_pending(state):
                 if not sr or sr[0] not in ("yes","no"): graded=None; break
                 graded.append(dict(e,hit=1 if sr[0]=="yes" else 0))
             if graded: rec["book0"]=dict(b0,buckets=graded)
+        # The tape rides along only when book0 graded: the two are read together
+        # (book0 supplies the ladder geometry the tape's positional rows index
+        # into, plus the settled hits), so a tape without a graded book0 is not
+        # replayable and would only cost bytes.
+        if rec.get("book0") and p.get("tape"): rec["tape"]=p["tape"]
+        # Entry board of the frozen plays. Dropping this was the reason the
+        # bet-timing question could only be answered through a first_logged
+        # proxy: plays freeze at the first PLAYABLE board, which is not always
+        # the record's first board, so the proxy is an assumption, not a fact.
+        if p.get("plays") and p.get("plays_logged_at"):
+            rec["plays_logged_at"]=p["plays_logged_at"]
         for pl in p.get("plays",[]):
             res=settled.get(pl["ticker"])
             if not res or res[0] not in ("yes","no"): continue
@@ -1038,6 +1099,7 @@ def resolve_pending(state):
                                  "stake":pl["stake"],"contracts":contracts,"won":won,"pnl":round(pnl,2),
                                  "margin":mv,"actual":rec["actual"],"mp":pl["mp"],"mid":pl["mid"],
                                  "edge":pl.get("edge"),"lead":p.get("plays_lead",p.get("lead")),
+                                 "p_win":pl.get("p_win"),
                                  "close_mid":cmid,"clv":clv,
                                  "model_version":p.get("plays_model_version") or p.get("model_version","")})
         if ok and rec["buckets"]:
@@ -1138,6 +1200,31 @@ def _era_label(mv):
     Legacy for three days (caught 2026-07-16): never enumerate the NEW-era
     stamps, enumerate the CLOSED legacy set."""
     return "Legacy (pre-audit)" if ((not mv) or "nimbus-calib" in mv) else "Audit build (v11+)"
+
+def play_pwin(p):
+    """Model probability that a SETTLED play's position wins. Prefer the value
+    frozen at entry; fall back to reconstructing it from the retained raw mp.
+
+    The fallback exists because resolve_pending dropped p_win when copying a
+    frozen play into its resolved record (shipped v7, caught 2026-07-28), so
+    every play settled before the fix carries mp but not p_win. That silently
+    killed the second arm of the docket 1 cheap-entry cell ("entry <= 0.20 OR
+    p_win <= 0.30"), which is a REGISTERED gate definition: the cell must be
+    read as registered, not as the narrowed entry-only version the missing
+    field left behind. Measured at the time of the fix, the dead arm had cost
+    nothing (all 83 audit-era plays with p_win <= 0.30 also had entry <= 0.20,
+    so cell membership was 14 either way), but that is luck, not a guarantee.
+
+    Reconstruction is exact at the 0.30 threshold that matters. Entry-time
+    p_win uses mp clamped into [TAIL_FLOOR, 1-TAIL_FLOOR] while the logged mp
+    is raw, so the two can differ only where the clamp binds, at raw mp below
+    0.015 or above 0.985. Backfilling the stored records instead was rejected:
+    weather_state.json is live state and is never rewritten."""
+    if p.get("p_win") is not None: return p["p_win"]
+    mp=p.get("mp")
+    if mp is None: return None
+    mp_e=min(max(mp,TAIL_FLOOR),1.0-TAIL_FLOOR)
+    return mp_e if p.get("side")=="Buy YES" else 1.0-mp_e
 
 def compute_report(state):
     resolved=[r for r in state.get("resolved",[]) if not r.get("gated")]   # quarantined records never enter any aggregate
@@ -1339,7 +1426,9 @@ def compute_report(state):
         # showing it separately keeps the core strategy readable in both
         # directions and shows the docket gate filling in public.
         audp=[p for p in pls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
-        _cell=lambda p: p["entry"]<=0.20 or ((p.get("p_win") or 1.0)<=0.30)
+        def _cell(p):
+            pw=play_pwin(p)
+            return p["entry"]<=0.20 or (pw is not None and pw<=0.30)
         rep["book_split"]={
             "core":{"n":len([p for p in audp if not _cell(p)]),
                     "w":sum(1 for p in audp if not _cell(p) and p["won"]),
