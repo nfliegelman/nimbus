@@ -174,5 +174,19 @@ These highly-upvoted threads offer broad insights: the passive_income thread by 
 
 Each takeaway above is supported by trader comments as cited. 
 
-**Questions with little or no discussion:** We found *no community discussion* on the number of skilled participants or share of “sharp” traders (Q1), any official liquidity or volume stats, or explicit settlement disputes beyond those noted. No threads specifically addressed how many professional sharps exist or open leaderboards. These remain unknown from the searched sources.  
+**Questions with little or no discussion:** We found *no community discussion* on the number of skilled participants or share of “sharp” traders (Q1), any official liquidity or volume stats, or explicit settlement disputes beyond those noted. No threads specifically addressed how many professional sharps exist or open leaderboards. These remain unknown from the searched sources.
+
+---
+
+# Addendum 2026-07-28: stfarm follow-up (Predict & Profit repositories reviewed)
+
+The owner surfaced a Reddit thread in which stfarm (the trader already quoted in sections 1, 3, and 5) describes an automated Kalshi weather bot hooked into a 31-member GFS ensemble, plus a link to his GitHub profile (github.com/stfarm, display name Steve Farmer). A session reviewed everything public on 2026-07-28. Findings, each directly verifiable:
+
+- **No model code is public.** `predict-and-profit-kalshi-bot` contains exactly a README and a requirements.txt across 3 commits. The README is an architecture overview whose links lead to a Gumroad storefront. A second showcase repo (`jade-ai-orchestration-showcase`) is explicitly a sanitized architecture demo with no runnable code, and the remaining repos are old tutorial forks.
+- **The bot is a paid product, not an open project.** predictandprofit.io (ItsMoreThanSoftware LLC) sells "Full Python Bot v2.3" for $75 and a $9.99 ebook. The site publishes no track record and no quantified performance claim; the strongest statement is "built and run daily on real money by a senior data engineer", beside a standard risk disclaimer. The thread the owner saw functions as product marketing: one commenter praises the author's book, another asks to move to private messages.
+- **Claim drift across posts:** a 31-member GFS ensemble (Mar 2026, section 3 above), a 62-member hybrid ensemble (repo README, Apr 2026), "up to 164 forecasts" in v2.0 (May 2026, section 3 above), and v2.3 now for sale. Possibly normal product iteration, but nothing verifiable at any step.
+- **The described architecture contains nothing Nimbus lacks, and omits everything the post-mortems say matters.** The README describes 31 GFS members via Open-Meteo plus 31 NOAA "AIGEFS" AI members, a trigger that trades when ensemble spread converges and model-vs-book divergence is significant, a fee-adjusted abort, and Postgres logging. It never mentions settlement stations, the CLI/LST settlement window, calibration learning, play freezing, exposure caps, or any measured record: the exact failure modes section 7's post-mortems identify as what kills weather bots.
+- **His useful public advice was already ingested here at audit batch 6** (minimum price floor, fee-to-edge check, maker-only execution, ensemble consensus) and is implemented or spec'd in Nimbus.
+
+Two ideas survived review as worth evidence-gated evaluation and were filed in FUTURE.md on 2026-07-28: AI ensemble providers as evidence-only logging (AIGEFS and ECMWF AIFS-ENS now sit on the same keyless Open-Meteo ensemble API Nimbus already uses), and a spread-convergence play filter as a proposed docket 6 replay candidate (independently motivated by our own 2026-07-25 spread-skill read). Verdict otherwise: nothing to adopt. There is no evidence his private code outperforms Nimbus, and "he is having more success" rests entirely on the self-report of someone selling the bot. The only performance evidence this project acts on is its own settlement-verified record.
 

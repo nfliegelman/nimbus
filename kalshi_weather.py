@@ -81,12 +81,27 @@ ENSEMBLE_MODELS = ["gfs025", "ecmwf_ifs025", "icon_seamless", "gem_global"]
 # short-lead CONUS model. Their skill vs the pooled ensemble is judged from
 # settled results before any blending decision (audit batches 4-5).
 REF_MODELS = ["ncep_nbm_conus", "ncep_hrrr_conus"]
+# AI ensembles, EVIDENCE-ONLY (FUTURE 5, added 2026-07-28): NOAA's AI-augmented
+# GEFS (31 members) and ECMWF's AIFS ensemble (51), served by the same keyless
+# ensemble API. Fetched in their OWN per-model calls and logged into
+# members_by_model beside the four pricing providers; they never enter the
+# pooled cloud, the weighted cloud, or the integrity gate's member and model
+# counts (every pricing path iterates ENSEMBLE_MODELS, and the gate counts
+# pms, which these never join). Pricing is identical with or without them,
+# unit-tested. Promotion into pricing requires its own pre-registered gate
+# (FUTURE 5); the race runs in backtest_models.py once settlements carry them.
+# Deliberately NOT in _KNOB_NAMES: evidence logging, not a behavior knob, so
+# CONFIG_HASH is unaffected.
+AI_ENSEMBLE_MODELS = ["ncep_aigefs025", "ecmwf_aifs025"]
 # Open-Meteo publishes per-model run metadata at
 # api.open-meteo.com/data/{id}/static/meta.json; forecast responses themselves
 # carry no run id. Ensemble-API model names map to different metadata ids.
 META_IDS = {"gfs025":"ncep_gefs025","ecmwf_ifs025":"ecmwf_ifs025",
             "icon_seamless":"dwd_icon_eps","gem_global":"cmc_gem_geps",
-            "ncep_nbm_conus":"ncep_nbm_conus","ncep_hrrr_conus":"ncep_hrrr_conus"}
+            "ncep_nbm_conus":"ncep_nbm_conus","ncep_hrrr_conus":"ncep_hrrr_conus",
+            # AI evidence models; the divergent spellings are Open-Meteo's own
+            # (ensemble id aigefs vs metadata id aigfs, verified live 2026-07-28)
+            "ncep_aigefs025":"ncep_aigfs025","ecmwf_aifs025":"ecmwf_aifs025_ensemble"}
 # --- calibration (learned automatically from settled results) ---
 # Kernel dressing: each member is smeared with a Gaussian so 1-degree bucket
 # probabilities are smooth instead of noisy member counts. Width is learned per
@@ -347,6 +362,39 @@ def fetch_members(lat,lon,tz):
         permodel[model]={"hi":mh,"lo":ml}
         time.sleep(0.2)
     return highs,lows,offset,permodel
+
+def fetch_ai_members(lat,lon,tz):
+    """AI ensemble members (AI_ENSEMBLE_MODELS), same LST windowing as
+    fetch_members, returned in their OWN per-model dict. Evidence-only: the
+    caller merges the summaries into members_by_model for logging and the
+    skill tables; the members never join the pricing cloud or the gate counts.
+    Each model is its own request so an AI outage, a renamed id, or a slow
+    response can never degrade the pricing fetch."""
+    permodel={}
+    std_off=STD_OFFSET_H.get(tz,0)*3600
+    for model in AI_ENSEMBLE_MODELS:
+        u=(f"https://ensemble-api.open-meteo.com/v1/ensemble?latitude={lat}&longitude={lon}"
+           f"&hourly=temperature_2m&models={model}&temperature_unit=fahrenheit"
+           f"&timezone={urllib.parse.quote(tz)}&forecast_days=10")
+        d=fget(u)
+        if not d: continue
+        dst_shift=dt.timedelta(seconds=(d.get("utc_offset_seconds",0)-std_off))
+        h=d.get("hourly",{}); times=h.get("time",[])
+        lst_days=[]
+        for t in times:
+            try: lst_days.append((dt.datetime.fromisoformat(t)-dst_shift).date().isoformat())
+            except ValueError: lst_days.append(t[:10])
+        mh,ml={},{}
+        for k in [k for k in h if k.startswith("temperature_2m")]:
+            dv={}
+            for day,v in zip(lst_days,h[k]):
+                if v is not None: dv.setdefault(day,[]).append(v)
+            for day,vs in dv.items():
+                if vs:
+                    mh.setdefault(day,[]).append(max(vs)); ml.setdefault(day,[]).append(min(vs))
+        permodel[model]={"hi":mh,"lo":ml}
+        time.sleep(0.2)
+    return permodel
 
 def fetch_ref(lat,lon,tz):
     """Reference point forecasts (NBM + HRRR) as CLI-day max/min per target date,
@@ -735,6 +783,12 @@ def size_play(net, p_win, proven, lead=0):
 # different forecast config (floor, cap, stype); ticker is the join key to the
 # settlement. Deliberately NOT in _KNOB_NAMES: this is a recording schema, not a
 # behavior knob, so CONFIG_HASH is unaffected.
+# Since 2026-07-28 the snapshot also freezes `sd`, the member sd of the DECISION
+# board. The record-level `sd` refreshes with the forecast every run, so by
+# settlement it describes the final board; the docket 6 spread-convergence
+# candidates filter on what was knowable when the decision was made, which only
+# this frozen copy preserves. Snapshots written before that date have no `sd`
+# and the replay tool falls back to the record's final-board sd, saying so.
 BOOK0_FIELDS=("ticker","mp","mid","yb","ya","oi","floor","cap","stype")
 
 # Board tape (FUTURE docket 7, bet-timing replay). book0 preserves the FIRST
@@ -774,12 +828,13 @@ def score(state):
     ladders=pull_weather_markets()
     needed=sorted({l["code"] for l in ladders})
     print(f"Forecasts for {len(needed)} cities ({'+'.join(ENSEMBLE_MODELS)})...")
-    fc,offs,pms,refs={},{},{},{}
+    fc,offs,pms,refs,ai_pms={},{},{},{},{}
     fetch_failed=[]; gated=[]
     for code in needed:
         lat,lon,tz,label=CITIES[code]
         hi,lo,off,pm=fetch_members(lat,lon,tz); fc[code]={"HIGH":hi,"LOW":lo}; offs[code]=off; pms[code]=pm
         refs[code]=fetch_ref(lat,lon,tz)
+        ai_pms[code]=fetch_ai_members(lat,lon,tz)   # evidence-only, never priced
         if not hi and not lo: fetch_failed.append(code)
     run_meta=fetch_run_meta()
     run_stamp=dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
@@ -900,7 +955,12 @@ def score(state):
                     "lead":lead,"mean":mean,"sd":msd,"psd":sd,"bias_corr":corr,"sigma":sigma,
                     "model_version":MODEL_VERSION,"biased":biased,"offset":offset,
                     "model_runs":run_meta,
-                    "members_by_model":_pm_summary(pms.get(code),kind,tdate.isoformat()),
+                    # core providers first, AI evidence models beside them. The
+                    # gate's model count above reads pms only, so these can
+                    # never rescue a thin ladder, and every pricing path
+                    # iterates ENSEMBLE_MODELS, so they are never priced.
+                    "members_by_model":{**_pm_summary(pms.get(code),kind,tdate.isoformat()),
+                                        **_pm_summary(ai_pms.get(code),kind,tdate.isoformat())},
                     "ref":_ref_for(refs.get(code),kind,tdate.isoformat()),
                     "cfg":CONFIG_HASH,
                     "mean_hist":(((old or {}).get("mean_hist") or [])+[[run_stamp,round(mean,2)]])[-6:],
@@ -935,6 +995,7 @@ def score(state):
                     # `lead` on the record is the LAST refresh's, not the decision
                     # board's. A replay missing either would apply the wrong filters.
                     rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
+                                  "sd":msd,
                                   "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
                 # BOARD TAPE (append-once per run stamp): every healthy board this
                 # market is seen on, so a replay can ask what freezing at board k
@@ -1122,17 +1183,22 @@ def challenger_weighting_tally(resolved):
     Recomputed from logged members_by_model on every render: deterministic,
     stateless, and incapable of touching pricing. Positive = challenger
     better. Returns None below 50 usable records."""
+    models=("gfs025","ecmwf_ifs025","icon_seamless","gem_global")
+    # Count and score CORE providers only. members_by_model may also carry
+    # evidence-only AI providers (since 2026-07-28); they have no error history
+    # here, would KeyError the skill weights, and must not dilute the docket 4
+    # comparison, which is defined over the four pricing providers.
     rows=[r for r in resolved if r.get("members_by_model") and r.get("actual") is not None
-          and len(r["members_by_model"])>=3]
+          and len([k for k in r["members_by_model"] if k in models])>=3]
     if len(rows)<50: return None
     bydate={}
     for r in rows: bydate.setdefault(r["target"],[]).append(r)
-    models=("gfs025","ecmwf_ifs025","icon_seamless","gem_global")
     hist={"HIGH":{k:[] for k in models},"LOW":{k:[] for k in models}}
     diffs=[]; prosp=[]
     for d in sorted(bydate):
         for r in bydate[d]:
-            mm=r["members_by_model"]; a=r["actual"]; hk=hist[r["kind"]]
+            mm={k:v for k,v in r["members_by_model"].items() if k in models}
+            a=r["actual"]; hk=hist[r["kind"]]
             e0=abs(_mix_mean(mm,{k:v["n"] for k,v in mm.items()})-a)
             if min(len(hk[k]) for k in models)>=30:
                 w={k:1.0/(sum(x*x for x in hk[k][-60:])/len(hk[k][-60:])+0.25) for k in mm}
