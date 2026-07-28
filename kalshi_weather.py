@@ -131,6 +131,27 @@ TIER_CUTS = [("S", 0.12), ("A", 0.08), ("B", 0.05), ("C", 0.03)]
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(HERE, "docs")
 STATE_PATH = os.path.join(HERE, "weather_state.json")
+# State archive (HANDOFF 7b, ratified audit batch 3, AMENDED 2026-07-28).
+# The original policy said "at 3 MB, archive resolved records older than 120
+# days". Those two numbers were never mutually satisfiable: at the growth rate
+# of the day (1.5 MB/month) the file reaches 120 days of history at about 6 MB,
+# so the trigger would always fire while nothing was old enough to move, and
+# the policy would run as a permanent no-op. Measured 2026-07-28 with the file
+# at 2.37 MB and its whole history 27 days old: zero records qualified.
+#
+# The amendment derives both numbers from the one real constraint instead of
+# picking them independently. The pricing path deliberately reads the LIVE file
+# only, and its longest lookback is calibration's BIAS_LOOKBACK of 30
+# settlements per city/kind, which at roughly one settlement per pair per day
+# is about 30 calendar days. ARCHIVE_KEEP_DAYS is that with 50 percent
+# headroom. ARCHIVE_TRIGGER_MB is then the steady-state size that window
+# implies at current growth (about 0.117 MB/day with the board tape, so 45 days
+# is roughly 5.3 MB), rounded up so the trigger cannot fire before the window
+# can answer it. Re-derive both together if growth changes; changing one alone
+# recreates the original inconsistency.
+ARCHIVE_PATH = os.path.join(HERE, "weather_state_archive.json")
+ARCHIVE_KEEP_DAYS = 45     # resolved records younger than this stay in the live file
+ARCHIVE_TRIGGER_MB = 6.0   # live-file size that starts a split
 KBASE = "https://api.elections.kalshi.com/trade-api/v2"
 # -------------------------------------------------------------------
 
@@ -1691,7 +1712,11 @@ def _health_strip(health,alerts=None):
     if fails: s+="<span class='chip neg'>fetch failed: <b>%s</b></span>"%esc(", ".join(fails))
     if health.get("capped"): s+="<span class='chip'>cap trimmed <b>%d</b> plays</span>"%health["capped"]
     if health.get("new_24h") is not None: s+="<span class='chip'>new plays 24h <b>%d</b></span>"%health["new_24h"]
-    if health.get("state_kb"): s+="<span class='chip'>state <b>%d KB</b> / <b>%d</b> resolved</span>"%(health["state_kb"],health.get("resolved_n",0))
+    if health.get("state_kb"):
+        # After a 7b split the live count alone would understate the record, so
+        # the archived half is named rather than quietly dropped from the chip.
+        s+="<span class='chip'>state <b>%d KB</b> / <b>%d</b> resolved</span>"%(health["state_kb"],health.get("resolved_n",0))
+        if health.get("archived_n"): s+="<span class='chip'>archived <b>%d</b></span>"%health["archived_n"]
     for g in (health.get("gated") or []):
         s+="<span class='chip neg'>gated: <b>%s</b></span>"%esc(g)
     for a in (alerts or []):
@@ -2062,6 +2087,81 @@ def save_state(s):
     with open(tmp,"w",encoding="utf-8") as f: json.dump(s,f,indent=1,default=str)
     os.replace(tmp,STATE_PATH)
 
+def load_archive():
+    """Resolved records previously split out of the live state file, same shape
+    as state["resolved"]. A MISSING archive is normal (nothing has split yet).
+    An UNREADABLE one is fatal for the same reason a corrupt state file is:
+    reporting would silently show a shorter track record than the one that
+    exists, and a quietly truncated history is exactly the dishonesty the
+    load_state guard was written to prevent."""
+    if not os.path.exists(ARCHIVE_PATH): return []
+    try:
+        with open(ARCHIVE_PATH,encoding="utf-8") as f: a=json.load(f)
+    except Exception as e:
+        print("FATAL: weather_state_archive.json is unreadable:",str(e)[:120])
+        print("Refusing to report on a partial track record. Restore it from git history, then rerun.")
+        sys.exit(3)
+    if not isinstance(a,list):
+        print("FATAL: weather_state_archive.json schema is wrong (need a list of resolved records).")
+        print("Restore it from git history, then rerun.")
+        sys.exit(3)
+    return a
+
+def _rec_key(r): return (r.get("code"),r.get("kind"),r.get("target"))
+
+def reporting_view(state):
+    """Live state plus archived resolved records, for REPORTING ONLY.
+
+    Never saved: save_state writes the live dict, so the split survives a run.
+    Every gate in this project counts over the whole history (150 plays, 800
+    buckets, 500 tail buckets), so reporting must see both halves or archiving
+    would silently reset the counters the governance depends on.
+
+    Dedupes by (code, kind, target): an interrupted split can leave a record in
+    both files, and a duplicate would double-count in every aggregate."""
+    arch=load_archive()
+    if not arch: return state
+    live=list(state.get("resolved",[]))
+    seen={_rec_key(r) for r in live}
+    return dict(state,resolved=[r for r in arch if _rec_key(r) not in seen]+live)
+
+def archive_pass(state):
+    """HANDOFF 7b, as amended 2026-07-28. Once the live file passes
+    ARCHIVE_TRIGGER_MB, resolved records with a target older than
+    ARCHIVE_KEEP_DAYS move into the archive file. The pricing path keeps
+    reading the live file only, so calibration always learns from a bounded
+    recent window; reporting reads both through reporting_view.
+
+    Write order is deliberate and is the whole safety argument: the archive is
+    written and replaced FIRST, and only then are those records dropped from
+    the live dict. A crash in between leaves a record in BOTH files, which
+    reporting_view dedupes and the next run re-splits cleanly. The opposite
+    order could lose a settlement permanently, and the track record cannot be
+    recreated at any price.
+
+    Live and archived sets are complementary halves of one partition computed
+    from a single predicate, so no record can fall between them."""
+    try: size_mb=os.path.getsize(STATE_PATH)/1e6
+    except OSError: return 0
+    if size_mb<ARCHIVE_TRIGGER_MB: return 0
+    cutoff=(TODAY-dt.timedelta(days=ARCHIVE_KEEP_DAYS)).isoformat()
+    def old(r): return (r.get("target") or "9999-99-99")<cutoff
+    movers=[r for r in state.get("resolved",[]) if old(r)]
+    if not movers:
+        print(f"  archive: live state {size_mb:.2f} MB is past the {ARCHIVE_TRIGGER_MB} MB trigger,"
+              f" but no resolved record predates {cutoff} yet.")
+        return 0
+    arch=load_archive()
+    seen={_rec_key(r) for r in arch}
+    arch=arch+[r for r in movers if _rec_key(r) not in seen]
+    tmp=ARCHIVE_PATH+".tmp"
+    with open(tmp,"w",encoding="utf-8") as f: json.dump(arch,f,indent=1,default=str)
+    os.replace(tmp,ARCHIVE_PATH)
+    state["resolved"]=[r for r in state.get("resolved",[]) if not old(r)]
+    print(f"  archive: moved {len(movers)} resolved records older than {cutoff}"
+          f" into {os.path.basename(ARCHIVE_PATH)} ({len(arch)} archived in total)")
+    return len(movers)
+
 def notify_telegram(plays,health,alerts,rep):
     """Phone ping after each run (FUTURE item 4, shipped audit batch 10).
     Fires ONLY when TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID exist in the
@@ -2141,13 +2241,24 @@ def main():
     resolve_pending(state)
     shadow_pass(state)   # normal runs also collect when a city sits in the window (eastern cities hit it on the morning cron)
     rows,plays,health=score(state)
+    # drift_alerts deliberately stays on the LIVE state: its four alarms are all
+    # recent-window instruments, it writes calib_snapshot back into the state it
+    # is handed, and its A4 leg reads the same live-only calibration production
+    # prices from. After a split its A1 baseline becomes "recent vs the retained
+    # window" rather than "recent vs all time", which is the more honest
+    # comparison for a drift alarm anyway.
     alerts=drift_alerts(state)
-    rep=compute_report(state)
+    archive_pass(state)
+    # Reporting reads live PLUS archive, so every pre-registered gate keeps
+    # counting over the whole track record after a split.
+    rep=compute_report(reporting_view(state))
     save_state(state)
     updated=dt.datetime.now().astimezone().strftime("%b %d %Y, %I:%M %p %Z")
     try:
         health["state_kb"]=os.path.getsize(STATE_PATH)//1024
         health["resolved_n"]=len(state.get("resolved",[]))
+        if os.path.exists(ARCHIVE_PATH):
+            health["archived_n"]=len(load_archive())
     except OSError: pass
     render_bets(rows,plays,updated,health); render_results(rep,updated,health,alerts)
     notify_telegram(plays,health,alerts,rep)
