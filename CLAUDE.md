@@ -41,11 +41,17 @@ whether or not anything looks broken afterward.
    ```
 
 2. **Never delete, regenerate, normalize, reformat, reorder, truncate, or
-   `.gitignore` `weather_state.json`.** It is live state, deliberately committed
-   by the scheduled workflow. It is large and machine-written, so it will look
-   generated. It is not. The repository's `.gitignore` covers compiled Python
-   bytecode and nothing else; never add a pattern to it that excludes state
-   files. `git check-ignore -v weather_state.json` must keep returning nothing.
+   `.gitignore` `weather_state.json` or `weather_state_archive.json`.** Both are
+   live state, deliberately committed by the scheduled workflow. They are large
+   and machine-written, so they will look generated. They are not. The archive
+   holds settled records split out of the live file once it passes its size
+   trigger (HANDOFF 7b); it is the older half of the same track record, and the
+   two files are only meaningful together. Reporting merges them, so deleting or
+   truncating the archive silently shortens the record every gate is counted
+   against. The repository's `.gitignore` covers compiled Python bytecode and
+   nothing else; never add a pattern to it that excludes state files.
+   `git check-ignore -v weather_state.json weather_state_archive.json` must keep
+   returning nothing.
 
 3. **Never `git push --force`, never `git reset --hard`, never `git checkout .`
    without first checking whether the cron has committed.** The workflow pushes
@@ -96,7 +102,7 @@ whether or not anything looks broken afterward.
 ## Validation required before any commit touching code
 
 1. `python3 -m py_compile kalshi_weather.py`
-2. `python3 test_nimbus.py` (currently 55 tests; all must pass, and new
+2. `python3 test_nimbus.py` (currently 60 tests; all must pass, and new
    behavior needs a new test)
 3. Sandbox double-run per the procedure above: run the script twice, confirm it
    completes, confirm no unintended plays freeze, and confirm any new display
@@ -127,7 +133,7 @@ settle records, or receive write access.
 
 ## Recovery
 
-Every version of the state file is in git history (roughly 69 commits and
+Every version of the state file is in git history (roughly 140 commits and
 counting). If state is ever damaged:
 
 ```
@@ -138,3 +144,9 @@ git checkout <good-commit-sha> -- weather_state.json
 Verify the restored file parses and its `resolved` count is plausible before
 committing. Recovery is straightforward as long as history has not been
 rewritten, which is why the force-push prohibition above is absolute.
+
+Once `weather_state_archive.json` exists, restore both files from the SAME
+commit. They are one record split in two, and mixing commits can drop the
+settlements that were in flight between them or duplicate them across the
+split. A duplicate is survivable (reporting dedupes by city, kind, and target);
+a gap is not.

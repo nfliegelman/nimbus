@@ -180,6 +180,8 @@ Each takeaway above is supported by trader comments as cited.
 
 # Addendum 2026-07-28: stfarm follow-up (Predict & Profit repositories reviewed)
 
+*Companion document: `audit/JULY_REDDIT_AUDIT.md`, an owner-supplied investigation brief on the same subject, added verbatim 2026-07-28. It is a research scope, NOT approval to change strategy behavior, and it says so in its own first section. Several of its "reproduce this" items were already answered by the work below and by v6.19 through v6.24; several others remain genuinely open. Anyone executing that brief should read this addendum first to avoid re-running settled questions, and should note that its snapshot figures (46 tests, 262 resolved plays, a six-play v15 era) predate the current state.*
+
 The owner surfaced a Reddit thread in which stfarm (the trader already quoted in sections 1, 3, and 5) describes an automated Kalshi weather bot hooked into a 31-member GFS ensemble, plus a link to his GitHub profile (github.com/stfarm, display name Steve Farmer). A session reviewed everything public on 2026-07-28. Findings, each directly verifiable:
 
 - **No model code is public.** `predict-and-profit-kalshi-bot` contains exactly a README and a requirements.txt across 3 commits. The README is an architecture overview whose links lead to a Gumroad storefront. A second showcase repo (`jade-ai-orchestration-showcase`) is explicitly a sanitized architecture demo with no runnable code, and the remaining repos are old tutorial forks.

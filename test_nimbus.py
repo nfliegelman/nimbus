@@ -900,6 +900,125 @@ class TestState(unittest.TestCase):
                 kw.STATE_PATH = saved
 
 
+class TestArchive(unittest.TestCase):
+    """HANDOFF 7b split, as amended 2026-07-28. The track record cannot be
+    recreated, so the load-bearing property is that no settlement can be lost:
+    live and archived sets must always partition the whole history."""
+
+    def _res(self, target):
+        return {"code": "DAL", "kind": "HIGH", "target": target, "actual": 90.0,
+                "mean": 90.0, "bias": 0.0, "sd": 1.0, "psd": 1.5, "bias_corr": 0.0,
+                "sigma": 1.1, "buckets": [{"mp": 0.5, "mid": 0.5, "hit": 1, "rep": 90.5}],
+                "plays": []}
+
+    def _paths(self, td):
+        kw.STATE_PATH = os.path.join(td, "weather_state.json")
+        kw.ARCHIVE_PATH = os.path.join(td, "weather_state_archive.json")
+
+    def _big_state(self, days_old_list):
+        """A state whose file is over the trigger, with records at given ages."""
+        recs = []
+        for n in days_old_list:
+            recs.append(self._res((dtm.date.today() - dtm.timedelta(days=n)).isoformat()))
+        return {"predictions": {}, "resolved": recs}
+
+    def _write_over_trigger(self, state):
+        """Write the state file, then pad it past the trigger without touching
+        the records, so size and content are independent in these tests."""
+        kw.save_state(state)
+        with open(kw.STATE_PATH, "a", encoding="utf-8") as f:
+            f.write(" " * int(kw.ARCHIVE_TRIGGER_MB * 1e6))
+
+    def test_no_split_below_the_trigger(self):
+        saved = (kw.STATE_PATH, kw.ARCHIVE_PATH)
+        with tempfile.TemporaryDirectory() as td:
+            self._paths(td)
+            try:
+                st = self._big_state([200, 300])       # old enough, but file is small
+                kw.save_state(st)
+                self.assertEqual(kw.archive_pass(st), 0)
+                self.assertEqual(len(st["resolved"]), 2)
+                self.assertFalse(os.path.exists(kw.ARCHIVE_PATH))
+            finally:
+                (kw.STATE_PATH, kw.ARCHIVE_PATH) = saved
+
+    def test_trigger_without_old_records_is_a_graceful_noop(self):
+        """The exact defect the amendment fixes: the old 120-day window could
+        fire into a history far younger than itself and silently do nothing.
+        It must stay a no-op that loses nothing, not an error and not a split."""
+        saved = (kw.STATE_PATH, kw.ARCHIVE_PATH)
+        with tempfile.TemporaryDirectory() as td:
+            self._paths(td)
+            try:
+                st = self._big_state([1, 5, 20])       # whole history younger than the window
+                self._write_over_trigger(st)
+                self.assertEqual(kw.archive_pass(st), 0)
+                self.assertEqual(len(st["resolved"]), 3)
+                self.assertFalse(os.path.exists(kw.ARCHIVE_PATH))
+            finally:
+                (kw.STATE_PATH, kw.ARCHIVE_PATH) = saved
+
+    def test_split_partitions_history_and_loses_nothing(self):
+        saved = (kw.STATE_PATH, kw.ARCHIVE_PATH)
+        with tempfile.TemporaryDirectory() as td:
+            self._paths(td)
+            try:
+                ages = [1, 10, 44, 46, 90, 200]        # 3 inside the window, 3 outside
+                st = self._big_state(ages)
+                before = {(r["code"], r["kind"], r["target"]) for r in st["resolved"]}
+                self._write_over_trigger(st)
+                moved = kw.archive_pass(st)
+                self.assertEqual(moved, 3)
+                live = {(r["code"], r["kind"], r["target"]) for r in st["resolved"]}
+                arch = {(r["code"], r["kind"], r["target"]) for r in kw.load_archive()}
+                self.assertEqual(len(live), 3)
+                self.assertEqual(len(arch), 3)
+                self.assertEqual(live | arch, before)      # nothing lost
+                self.assertEqual(live & arch, set())       # nothing double-counted
+                # every retained record is inside the window, every moved one outside
+                cut = (dtm.date.today() - dtm.timedelta(days=kw.ARCHIVE_KEEP_DAYS)).isoformat()
+                self.assertTrue(all(t >= cut for _, _, t in live))
+                self.assertTrue(all(t < cut for _, _, t in arch))
+            finally:
+                (kw.STATE_PATH, kw.ARCHIVE_PATH) = saved
+
+    def test_reporting_view_restores_the_whole_record_and_dedupes(self):
+        """Every pre-registered gate counts over the full history, so a split
+        must not reset those counters. An interrupted split can leave a record
+        in both files; the merge must count it once."""
+        saved = (kw.STATE_PATH, kw.ARCHIVE_PATH)
+        with tempfile.TemporaryDirectory() as td:
+            self._paths(td)
+            try:
+                st = self._big_state([1, 10, 44, 46, 90, 200])
+                self._write_over_trigger(st)
+                full_n = kw.compute_report(st)["n_events"]
+                kw.archive_pass(st)
+                self.assertEqual(kw.compute_report(st)["n_events"], 3)          # live alone is short
+                view = kw.reporting_view(st)
+                self.assertEqual(kw.compute_report(view)["n_events"], full_n)   # merged is whole
+                self.assertIsNot(view, st)
+                self.assertEqual(len(st["resolved"]), 3)                        # view never mutates live
+                # simulate a crash between writing the archive and trimming live
+                st["resolved"] = st["resolved"] + kw.load_archive()
+                self.assertEqual(kw.compute_report(kw.reporting_view(st))["n_events"], full_n)
+            finally:
+                (kw.STATE_PATH, kw.ARCHIVE_PATH) = saved
+
+    def test_unreadable_archive_is_fatal_not_a_shorter_record(self):
+        saved = (kw.STATE_PATH, kw.ARCHIVE_PATH)
+        with tempfile.TemporaryDirectory() as td:
+            self._paths(td)
+            try:
+                self.assertEqual(kw.load_archive(), [])          # absent is normal
+                with open(kw.ARCHIVE_PATH, "w") as f: f.write("{ corrupt")
+                with self.assertRaises(SystemExit): kw.load_archive()
+                with open(kw.ARCHIVE_PATH, "w") as f: json.dump({"resolved": []}, f)
+                with self.assertRaises(SystemExit): kw.load_archive()
+            finally:
+                (kw.STATE_PATH, kw.ARCHIVE_PATH) = saved
+
+
 class TestNowcastShadow(unittest.TestCase):
     """Checkpoint 1 build (FUTURE 5 stage 1): truncation math, obs parsing,
     grading, and the guarantees that keep the shadow a shadow."""
