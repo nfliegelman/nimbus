@@ -271,6 +271,10 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(pl["clv"], 0.06); self.assertEqual(pl["close_mid"], 0.40)
         self.assertEqual(r.get("cfg"), "deadbeef")
         self.assertIsNotNone(r.get("crps"))
+        # p_win must survive settlement: the docket 1 cheap-entry cell is
+        # registered as "entry <= 0.20 OR p_win <= 0.30", and dropping the
+        # field here silently reduced that gate to its entry arm alone
+        self.assertEqual(pl["p_win"], 0.42)
 
     def test_book0_is_write_once_and_skips_gated_boards(self):
         """book0 must freeze at the FIRST healthy board. If it tracked refreshes it
@@ -830,6 +834,43 @@ class TestNowcastShadow(unittest.TestCase):
                    "2026-07-13.v13-nowcast-shadow", "2026-09-01.v14-whatever"):
             self.assertEqual(kw._era_label(mv), "Audit build (v11+)")
 
+
+    def test_play_pwin_falls_back_to_raw_mp(self):
+        # Plays settled before the retention fix carry mp but no p_win. The
+        # docket 1 cell must still be read as REGISTERED on them, so p_win is
+        # reconstructed the way entry-time computed it: clamped mp for YES,
+        # 1 - clamped mp for NO.
+        self.assertEqual(kw.play_pwin({"p_win": 0.42, "mp": 0.9, "side": "Buy YES"}), 0.42)
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.42, "side": "Buy YES"}), 0.42)
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.42, "side": "Buy NO"}), 0.58)
+        # the clamp binds only in the deep tails, far from the 0.30 threshold
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.001, "side": "Buy YES"}), kw.TAIL_FLOOR)
+        self.assertAlmostEqual(kw.play_pwin({"mp": 0.999, "side": "Buy NO"}), kw.TAIL_FLOOR)
+        self.assertIsNone(kw.play_pwin({"side": "Buy YES"}))
+        # a p_win of 0.0 must not be mistaken for a missing field
+        self.assertEqual(kw.play_pwin({"p_win": 0.0, "mp": 0.42, "side": "Buy YES"}), 0.0)
+
+    def test_cheap_entry_cell_reads_both_registered_arms(self):
+        # A dear-entry play the model expects to lose belongs in the cheap cell
+        # via the p_win arm. Before the fix it was filed under the CORE book,
+        # flattering the core and starving the gate.
+        def play(entry, mp, side, won=False):
+            return {"entry": entry, "mp": mp, "side": side, "won": won, "units": 1.0,
+                    "stake": 10.0, "pnl": -10.0, "clv": 0.0, "contracts": int(10.0 // entry),
+                    "lead": 1, "tier": "B", "mid": entry, "margin": 0.0, "edge": 0.0,
+                    "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "sub": "",
+                    "close_mid": entry, "actual": 95,
+                    "model_version": "2026-07-06.v11-audit12"}
+        state = {"predictions": {}, "resolved": [{
+            "code": "DAL", "kind": "HIGH", "target": "2026-07-01", "lead": 1, "actual": 95,
+            "mean": 95.0, "bias": 0.0, "psd": 1.5, "sd": 1.5,
+            "buckets": [{"mp": 0.4, "mid": 0.4, "hit": 1, "rep": 95.0}],
+            "plays": [play(0.60, 0.25, "Buy YES"),    # p_win arm: 0.25 <= 0.30
+                      play(0.10, 0.80, "Buy YES"),    # entry arm: 0.10 <= 0.20
+                      play(0.60, 0.60, "Buy YES", True)]}]}   # core
+        rep = kw.compute_report(state)
+        self.assertEqual(rep["book_split"]["exp"]["n"], 2)
+        self.assertEqual(rep["book_split"]["core"]["n"], 1)
 
     def test_challenger_weighting_tally(self):
         # two sharp providers plus one heavy awful one: skill weighting must

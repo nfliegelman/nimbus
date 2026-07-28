@@ -1038,6 +1038,7 @@ def resolve_pending(state):
                                  "stake":pl["stake"],"contracts":contracts,"won":won,"pnl":round(pnl,2),
                                  "margin":mv,"actual":rec["actual"],"mp":pl["mp"],"mid":pl["mid"],
                                  "edge":pl.get("edge"),"lead":p.get("plays_lead",p.get("lead")),
+                                 "p_win":pl.get("p_win"),
                                  "close_mid":cmid,"clv":clv,
                                  "model_version":p.get("plays_model_version") or p.get("model_version","")})
         if ok and rec["buckets"]:
@@ -1138,6 +1139,31 @@ def _era_label(mv):
     Legacy for three days (caught 2026-07-16): never enumerate the NEW-era
     stamps, enumerate the CLOSED legacy set."""
     return "Legacy (pre-audit)" if ((not mv) or "nimbus-calib" in mv) else "Audit build (v11+)"
+
+def play_pwin(p):
+    """Model probability that a SETTLED play's position wins. Prefer the value
+    frozen at entry; fall back to reconstructing it from the retained raw mp.
+
+    The fallback exists because resolve_pending dropped p_win when copying a
+    frozen play into its resolved record (shipped v7, caught 2026-07-28), so
+    every play settled before the fix carries mp but not p_win. That silently
+    killed the second arm of the docket 1 cheap-entry cell ("entry <= 0.20 OR
+    p_win <= 0.30"), which is a REGISTERED gate definition: the cell must be
+    read as registered, not as the narrowed entry-only version the missing
+    field left behind. Measured at the time of the fix, the dead arm had cost
+    nothing (all 83 audit-era plays with p_win <= 0.30 also had entry <= 0.20,
+    so cell membership was 14 either way), but that is luck, not a guarantee.
+
+    Reconstruction is exact at the 0.30 threshold that matters. Entry-time
+    p_win uses mp clamped into [TAIL_FLOOR, 1-TAIL_FLOOR] while the logged mp
+    is raw, so the two can differ only where the clamp binds, at raw mp below
+    0.015 or above 0.985. Backfilling the stored records instead was rejected:
+    weather_state.json is live state and is never rewritten."""
+    if p.get("p_win") is not None: return p["p_win"]
+    mp=p.get("mp")
+    if mp is None: return None
+    mp_e=min(max(mp,TAIL_FLOOR),1.0-TAIL_FLOOR)
+    return mp_e if p.get("side")=="Buy YES" else 1.0-mp_e
 
 def compute_report(state):
     resolved=[r for r in state.get("resolved",[]) if not r.get("gated")]   # quarantined records never enter any aggregate
@@ -1339,7 +1365,9 @@ def compute_report(state):
         # showing it separately keeps the core strategy readable in both
         # directions and shows the docket gate filling in public.
         audp=[p for p in pls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
-        _cell=lambda p: p["entry"]<=0.20 or ((p.get("p_win") or 1.0)<=0.30)
+        def _cell(p):
+            pw=play_pwin(p)
+            return p["entry"]<=0.20 or (pw is not None and pw<=0.30)
         rep["book_split"]={
             "core":{"n":len([p for p in audp if not _cell(p)]),
                     "w":sum(1 for p in audp if not _cell(p) and p["won"]),
