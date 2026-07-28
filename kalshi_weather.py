@@ -735,6 +735,12 @@ def size_play(net, p_win, proven, lead=0):
 # different forecast config (floor, cap, stype); ticker is the join key to the
 # settlement. Deliberately NOT in _KNOB_NAMES: this is a recording schema, not a
 # behavior knob, so CONFIG_HASH is unaffected.
+# Since 2026-07-28 the snapshot also freezes `sd`, the member sd of the DECISION
+# board. The record-level `sd` refreshes with the forecast every run, so by
+# settlement it describes the final board; the docket 6 spread-convergence
+# candidates filter on what was knowable when the decision was made, which only
+# this frozen copy preserves. Snapshots written before that date have no `sd`
+# and the replay tool falls back to the record's final-board sd, saying so.
 BOOK0_FIELDS=("ticker","mp","mid","yb","ya","oi","floor","cap","stype")
 
 # Board tape (FUTURE docket 7, bet-timing replay). book0 preserves the FIRST
@@ -935,6 +941,7 @@ def score(state):
                     # `lead` on the record is the LAST refresh's, not the decision
                     # board's. A replay missing either would apply the wrong filters.
                     rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
+                                  "sd":msd,
                                   "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
                 # BOARD TAPE (append-once per run stamp): every healthy board this
                 # market is seen on, so a replay can ask what freezing at board k

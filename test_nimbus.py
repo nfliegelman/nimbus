@@ -514,6 +514,68 @@ class TestPipeline(unittest.TestCase):
         base_ids = {(p["ticker"], p["side"]) for p in base}
         self.assertTrue({(p["ticker"], p["side"]) for p in floored} <= base_ids)
 
+    def test_book0_freezes_decision_time_sd(self):
+        """The docket 6 spread candidates filter on the sd of the DECISION board.
+        Record-level sd refreshes with the forecast every run, so book0 must carry
+        its own frozen copy; without it a replay would read the final board's
+        spread and call it the decision's (registered 2026-07-28)."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        key = "DAL|HIGH|" + self.day
+        rec = state["predictions"][key]
+        sd0 = rec["book0"].get("sd")
+        self.assertIsNotNone(sd0)
+        self.assertAlmostEqual(sd0, rec["sd"], places=9)   # same quantity at first log
+
+        def wider(lat, lon, tz):
+            d = self.day
+            pm = {m: {"hi": {d: [88.0 + j * 0.4 for j in range(35)]}, "lo": {d: [70.0] * 35}}
+                  for m in kw.ENSEMBLE_MODELS}
+            hi = [v for m in pm.values() for v in m["hi"][d]]
+            return {d: hi}, {d: [70.0] * 140}, -18000, pm
+        self._wire([self._lad(c) for c in healthy], fm=wider)
+        kw.score(state)
+        rec = state["predictions"][key]
+        self.assertEqual(rec["book0"]["sd"], sd0)                   # frozen with the snapshot
+        self.assertNotAlmostEqual(rec["sd"], sd0, places=3)         # live record really moved
+
+    def test_replay_sd_filter_reads_frozen_sd_then_stated_proxy(self):
+        """The registered spread-convergence candidates must drop plays from
+        wide-spread decision boards, must read book0's frozen sd when present, and
+        must fall back to the record's final-board sd only when the snapshot
+        predates the field."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "sd": p["sd"], "book0": dict(b0, buckets=gb)})
+        base = rs.replay(recs, rs.cfg("champion"))
+        self.assertTrue(base, "fixture produced no plays to filter")
+        sd0 = recs[0]["book0"]["sd"]
+        keep = rs.replay(recs, rs.cfg("keep", max_sd=sd0 + 0.01))
+        drop = rs.replay(recs, rs.cfg("drop", max_sd=sd0 - 0.01))
+        self.assertEqual(len(keep), len(base))
+        self.assertEqual(drop, [])
+        # frozen sd wins over a divergent record-level sd
+        recorded_wide = [dict(r, sd=99.0) for r in recs]
+        self.assertEqual(len(rs.replay(recorded_wide, rs.cfg("frozen", max_sd=sd0 + 0.01))), len(base))
+        # legacy snapshot without sd: the record's final-board sd is the proxy
+        legacy = [dict(r, sd=99.0, book0={k: v for k, v in r["book0"].items() if k != "sd"})
+                  for r in recs]
+        self.assertEqual(rs.replay(legacy, rs.cfg("proxy_drop", max_sd=1.0)), [])
+        legacy_tight = [dict(r, sd=0.1, book0={k: v for k, v in r["book0"].items() if k != "sd"})
+                        for r in recs]
+        self.assertEqual(len(rs.replay(legacy_tight, rs.cfg("proxy_keep", max_sd=1.0))), len(base))
+
 
 class TestSpreadDisplay(unittest.TestCase):
     """Surfacing forecast spread, earned by the spread-skill check reading

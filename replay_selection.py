@@ -72,6 +72,7 @@ def cfg(name, **over):
                 daily_cap=kw.DAILY_UNIT_CAP,
                 event_cap=kw.EVENT_UNIT_CAP,
                 min_pwin=0.0,                      # floor on stated win probability
+                max_sd=None,                       # ceiling on decision-time member sd (None = off)
                 sides="both",                      # both | yes | no
                 flat_units=None)                   # None = tiered sizing
     base.update(over)
@@ -111,6 +112,16 @@ SLATE = [
     cfg("MAX_ENTRY 0.85", max_entry=0.85),
     # -- combination, registered as its own candidate not as a rescue --
     cfg("MIN_ENTRY 0.20 + NO only", min_entry=0.20, sides="no"),
+    # -- spread convergence, REGISTERED 2026-07-28 (recorded in FUTURE docket 6).
+    #    Motivated by the 2026-07-25 spread-skill read (corr +0.250, widest sd
+    #    quartile misses 2.32 deg vs 1.52 tightest) plus an external bot's
+    #    claimed convergence trigger (REDDIT_FINDINGS 2026-07-28 addendum).
+    #    Thresholds were pinned to the ALREADY-MEASURED sd quartiles before any
+    #    replay data existed, so they cannot be shopped after the fact. Filters
+    #    read book0's frozen decision-time sd; records whose snapshot predates
+    #    that field fall back to the final-board sd, and main() prints the split.
+    cfg("sd <= 2.80 (skip widest qtl)", max_sd=2.80),
+    cfg("sd <= 1.69 (tightest qtl only)", max_sd=1.69),
 ]
 
 def _size(net, p_win, proven, lead, c):
@@ -143,6 +154,12 @@ def replay(records, c):
             if b0.get("biased"): continue          # live play gate: model vs market too far apart
             lead = b0.get("lead")
             if lead is None or lead > c["max_lead"]: continue
+            if c["max_sd"] is not None:
+                # decision-time member sd, frozen on the snapshot since 2026-07-28;
+                # older records fall back to the record's final-board sd (the
+                # stated proxy). A record with neither cannot satisfy an sd filter.
+                sdv = b0.get("sd", r.get("sd"))
+                if sdv is None or sdv > c["max_sd"]: continue
             proven = (lambda a: a["nb"] >= 20 and (a["bk"] - a["bm"]) / a["nb"] > 0)(
                 skill[(r["code"], r["kind"])])
             for e in b0["buckets"]:
@@ -226,6 +243,10 @@ def main():
         print("\n  Nothing to replay yet. book0 attaches to records that resolve from now on;\n"
               "  the first should land within about a day of the retention change going live.\n")
         return
+    nb0sd = sum(1 for r in recs if r["book0"].get("sd") is not None)
+    if nb0sd < len(recs):
+        print(f"  decision-time sd frozen on {nb0sd} of {len(recs)} events; sd-filter configs read the"
+              f"\n  record's final-board sd as a stated proxy on the other {len(recs) - nb0sd} (FUTURE docket 6)")
     print(f"  target dates {min(r['target'] for r in recs)} -> {max(r['target'] for r in recs)}\n")
 
     slate = [c for c in SLATE if not args.only or args.only.lower() in c["name"].lower()]
