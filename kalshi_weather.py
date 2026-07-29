@@ -1182,6 +1182,14 @@ def resolve_pending(state):
                                  "margin":mv,"actual":rec["actual"],"mp":pl["mp"],"mid":pl["mid"],
                                  "edge":pl.get("edge"),"lead":p.get("plays_lead",p.get("lead")),
                                  "p_win":pl.get("p_win"),
+                                 # net (the post-cost edge the play was SIZED on) plus the bucket
+                                 # identity were dropped here from v7 until 2026-07-28, the same
+                                 # loss class as p_win above. Cost was real: the stated-edge
+                                 # honesty tile divides net over contracts, so it rendered a false
+                                 # +0.0c from the day it shipped. net is NOT reconstructable for
+                                 # plays settled in that window (the half-spread died with the
+                                 # decision book), so the tile reports only net-bearing plays.
+                                 "net":pl.get("net"),"ticker":pl.get("ticker"),"bid":pl.get("bid"),
                                  "close_mid":cmid,"clv":clv,
                                  "model_version":p.get("plays_model_version") or p.get("model_version","")})
         if ok and rec["buckets"]:
@@ -1429,8 +1437,18 @@ def compute_report(state):
         # still reproduce identical output (batch 8 replay guarantee holds).
         ncon=sum(p["contracts"] for p in pls)
         if ncon:
-            rep["edge_stated"]=sum((p.get("net") or 0)*p["contracts"] for p in pls if p.get("net") is not None)/ncon
             rep["edge_real"]=pnl/ncon
+            # Stated edge averages ONLY over plays that retained net (kept at
+            # resolve since 2026-07-28). Dividing by ALL contracts, as this did
+            # until then, reported a false +0.0c while no resolved play carried
+            # the field, and would understate forever as mixed eras accumulate.
+            # No reconstruction fallback exists: net is not recoverable for
+            # plays settled without it (unlike p_win), so absence means absence.
+            netp=[p for p in pls if p.get("net") is not None]
+            ncon_net=sum(p["contracts"] for p in netp)
+            if ncon_net:
+                rep["edge_stated"]=sum(p["net"]*p["contracts"] for p in netp)/ncon_net
+                rep["edge_stated_n"]=len(netp)
         days=defaultdict(list)
         for p in pls: days[p["target"]].append(p)
         dk=sorted(days)
@@ -1856,12 +1874,15 @@ def render_results(rep,updated,health=None,alerts=None):
       f"<div class='kbox'><div class='v'>{p['avg_margin']:+.1f}\u00b0</div><div class='l'>avg margin</div></div>"
       f"<div class='kbox'><div class='v'>{rep['n_events']}</div><div class='l'>events</div></div></div>")
     honest=""
-    if rep.get("edge_stated") is not None or rep.get("roi_ci") or rep.get("clv"):
+    if rep.get("edge_real") is not None or rep.get("roi_ci") or rep.get("clv"):
         cells=""
         if rep.get("edge_stated") is not None:
             ec="up" if rep["edge_real"]>=rep["edge_stated"] else "red"
-            cells+=(f"<div class='kbox'><div class='v'>{rep['edge_stated']*100:+.1f}\u00a2</div><div class='l'>stated edge /contract</div></div>"
+            cells+=(f"<div class='kbox'><div class='v'>{rep['edge_stated']*100:+.1f}\u00a2</div><div class='l'>stated edge /contract ({rep.get('edge_stated_n',0)} plays)</div></div>"
                     f"<div class='kbox'><div class='v {ec}'>{rep['edge_real']*100:+.1f}\u00a2</div><div class='l'>realized /contract</div></div>")
+        elif rep.get("edge_real") is not None:
+            cells+=(f"<div class='kbox'><div class='v dim'>pending</div><div class='l'>stated edge /contract (plays before 2026-07-28 lack it)</div></div>"
+                    f"<div class='kbox'><div class='v'>{rep['edge_real']*100:+.1f}\u00a2</div><div class='l'>realized /contract</div></div>")
         if rep.get("roi_ci"):
             lo,hi,nd=rep["roi_ci"]
             cells+=f"<div class='kbox'><div class='v'>{lo*100:+.0f}% .. {hi*100:+.0f}%</div><div class='l'>ROI 90% CI (block by day, {nd}d)</div></div>"
