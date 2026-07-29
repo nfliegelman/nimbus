@@ -793,6 +793,31 @@ class TestPipeline(unittest.TestCase):
         dull = [rec(d, False) for d in (10, 11, 12, 13)]
         self.assertEqual(rs.replay(dull, rs.cfg("proven2", proven_only=True)), [])
 
+    def test_book0_source_mp_per_provider_probabilities(self):
+        """source_mp (FUTURE docket 8): each core provider's dressed bucket
+        probabilities under the shared calibration, frozen with book0. The July
+        audit proved provider mean/sd summaries cannot reconstruct these, so
+        this logging is the sole honest basis for any consensus test."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        rec = state["predictions"]["DAL|HIGH|" + self.day]
+        b0 = rec["book0"]
+        smp = b0.get("source_mp")
+        self.assertTrue(smp and b0.get("smp_v") == 1)
+        for m in kw.ENSEMBLE_MODELS:
+            self.assertIn(m, smp)
+            self.assertEqual(len(smp[m]), len(b0["buckets"]))      # positional
+            self.assertAlmostEqual(sum(smp[m]), 1.0, places=1)     # ladder mass
+        for m in kw.AI_ENSEMBLE_MODELS:
+            self.assertNotIn(m, smp)                               # evidence never enters
+        # write-once: a refreshed board must not move the frozen probabilities
+        frozen = {m: list(v) for m, v in smp.items()}
+        self._wire([self._lad(c) for c in healthy])
+        kw.score(state)
+        self.assertEqual(state["predictions"]["DAL|HIGH|" + self.day]["book0"]["source_mp"], frozen)
+
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
         in members_by_model and change NOTHING else. The AI fixture is wildly off

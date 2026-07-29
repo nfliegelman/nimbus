@@ -1157,6 +1157,28 @@ def score(state):
                     rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
                                   "sd":msd,
                                   "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
+                    # SOURCE_MP (registered 2026-07-29, FUTURE docket 8): each
+                    # core provider's own dressed bucket probabilities under the
+                    # SHARED city/kind calibration (same corr, same sigma, no
+                    # cross-provider weighting), positional against book0's
+                    # buckets. This is the minimum logging an honest source-
+                    # consensus test needs: provider summaries (mean/sd) cannot
+                    # reconstruct bucket probabilities, proven in the July
+                    # audit. Write-once with book0; pure recording, read by
+                    # nothing in the pricing path; AI providers excluded like
+                    # everywhere else; a provider under 5 members logs nothing.
+                    # The nowcast floor is deliberately NOT applied here (it is
+                    # a pooled-cloud operation; the point is each provider's
+                    # independent opinion), noted in 7b.
+                    _kk="hi" if kind=="HIGH" else "lo"
+                    _smp={}
+                    for _m in ENSEMBLE_MODELS:
+                        _vals=(((pms.get(code) or {}).get(_m) or {}).get(_kk) or {}).get(tdate.isoformat())
+                        if _vals and len(_vals)>=5:
+                            _sh=[v+corr for v in _vals]
+                            _smp[_m]=[round(dressed_prob(_sh,b,sigma),4) for b in L["buckets"]]
+                    if _smp:
+                        rec["book0"]["source_mp"]=_smp; rec["book0"]["smp_v"]=1
                 # BOARD TAPE (append-once per run stamp): every healthy board this
                 # market is seen on, so a replay can ask what freezing at board k
                 # would have done. Gated boards are skipped.
