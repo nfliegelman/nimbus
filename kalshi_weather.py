@@ -1431,6 +1431,23 @@ def compute_report(state):
         rep["pnl"]={"n":tot,"wins":wins,"winrate":wins/tot,"net":pnl,"staked":staked,
                     "roi":(pnl/staked if staked else 0),"net_units":pnl/BASE_UNIT_USD,
                     "avg_margin":sum(p["margin"] for p in pls if p["margin"] is not None)/max(1,sum(1 for p in pls if p["margin"] is not None))}
+        # Current-engine headline (display only): the same aggregates over plays
+        # frozen under the audit build (v11+), so the owner can read the live
+        # strategy without the retired pre-audit engine's frozen mistakes
+        # blended in. The all-time row stays computed and one tap away: this is
+        # a VIEW split, not a record split, and every gate, kill criterion, and
+        # chart keeps reading the whole book exactly as before. Absent when the
+        # book has no era mix (all-legacy or all-current needs no toggle).
+        curp=[p for p in pls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
+        if curp and len(curp)<tot:
+            w2=sum(1 for p in curp if p["won"]); pnl2=sum(p["pnl"] for p in curp)
+            st2=sum(p["contracts"]*p["entry"] for p in curp)
+            nm2=sum(1 for p in curp if p["margin"] is not None)
+            rep["pnl_cur"]={"n":len(curp),"wins":w2,"winrate":w2/len(curp),"net":pnl2,"staked":st2,
+                            "roi":(pnl2/st2 if st2 else 0),"net_units":pnl2/BASE_UNIT_USD,
+                            "avg_margin":sum(p["margin"] for p in curp if p["margin"] is not None)/max(1,nm2),
+                            "n_events":sum(1 for r in resolved
+                                           if _era_label(r.get("model_version") or "")!="Legacy (pre-audit)")}
         # Honesty tiles (audit batch 10): stated edge vs realized cents/contract,
         # and a block-bootstrap-by-target-date ROI interval (batch 9 verdict).
         # random is DETERMINISTICALLY seeded from the data so identical inputs
@@ -1596,6 +1613,8 @@ tr.play td{background:rgba(70,192,138,.05)}
 .rating .big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;line-height:1;padding:8px 14px;border-radius:10px}.rating .txt{color:var(--mut);font-size:13px}.rating .txt b{color:var(--tx)}
 .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.kbox{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 16px;min-width:120px}
 .kbox .v{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600}.kbox .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.eratog{display:flex;gap:6px;margin:10px 0 2px}.eratog button{font:600 12px 'IBM Plex Mono',monospace;color:var(--mut);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+.eratog button.on{color:var(--tx);border-color:var(--teal)}.eranote{font-size:11.5px;color:var(--mut);margin:2px 0 6px}
 .tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}.c-hi{background:rgba(70,192,138,.14);color:var(--up)}
 .c-wide{background:rgba(227,162,60,.14);color:var(--dn)}
 .gloss{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
@@ -1866,13 +1885,34 @@ def render_results(rep,updated,health=None,alerts=None):
         html=(head("results",updated,_health_strip(health,alerts))+"<h2 class='sec'>Results tracker</h2>"
               +body+GLOSSARY+"</div></body></html>")
         with open(os.path.join(OUT_DIR,"results.html"),"w",encoding="utf-8") as fp: fp.write(html); return
-    p=rep["pnl"]; cls="up" if p["net"]>=0 else "red"
-    kpis=("<div class='kpi'>"
-      f"<div class='kbox'><div class='v {cls}'>{p['net_units']:+.1f}u</div><div class='l'>net units</div></div>"
-      f"<div class='kbox'><div class='v'>{p['winrate']*100:.0f}%</div><div class='l'>win rate ({p['wins']}/{p['n']})</div></div>"
-      f"<div class='kbox'><div class='v {cls}'>{p['roi']*100:+.1f}%</div><div class='l'>ROI</div></div>"
-      f"<div class='kbox'><div class='v'>{p['avg_margin']:+.1f}\u00b0</div><div class='l'>avg margin</div></div>"
-      f"<div class='kbox'><div class='v'>{rep['n_events']}</div><div class='l'>events</div></div></div>")
+    def _kpi_row(q,ev,div_id="",hidden=False):
+        c="up" if q["net"]>=0 else "red"
+        attrs=(f" id='{div_id}'" if div_id else "")+(" style='display:none'" if hidden else "")
+        return (f"<div class='kpi'{attrs}>"
+          f"<div class='kbox'><div class='v {c}'>{q['net_units']:+.1f}u</div><div class='l'>net units</div></div>"
+          f"<div class='kbox'><div class='v'>{q['winrate']*100:.0f}%</div><div class='l'>win rate ({q['wins']}/{q['n']})</div></div>"
+          f"<div class='kbox'><div class='v {c}'>{q['roi']*100:+.1f}%</div><div class='l'>ROI</div></div>"
+          f"<div class='kbox'><div class='v'>{q['avg_margin']:+.1f}\u00b0</div><div class='l'>avg margin</div></div>"
+          f"<div class='kbox'><div class='v'>{ev}</div><div class='l'>events</div></div></div>")
+    p=rep["pnl"]
+    if rep.get("pnl_cur"):
+        # Era view toggle (display only): current engine first, because that is
+        # the strategy actually running; the all-time row, which includes the
+        # retired pre-audit engine's frozen plays, is one tap away and every
+        # chart, table, and gate below the toggle stays all-time as before.
+        kpis=("<div class='eratog'><button id='eb-cur' class='on' type='button'>Current engine</button>"
+              "<button id='eb-all' type='button'>All time</button></div>"
+              "<div class='eranote'>Current engine = plays frozen under the audit build (Jul 6 on). "
+              "All time adds the retired pre-audit engine. Charts and gates below always count everything.</div>"
+              +_kpi_row(rep["pnl_cur"],rep["pnl_cur"]["n_events"],"kpi-cur")
+              +_kpi_row(p,rep["n_events"],"kpi-all",hidden=True)
+              +"<script>(function(){var c=document.getElementById('eb-cur'),a=document.getElementById('eb-all'),"
+               "kc=document.getElementById('kpi-cur'),ka=document.getElementById('kpi-all');"
+               "function sw(cur){kc.style.display=cur?'':'none';ka.style.display=cur?'none':'';"
+               "c.className=cur?'on':'';a.className=cur?'':'on';}"
+               "c.onclick=function(){sw(true)};a.onclick=function(){sw(false)};})();</script>")
+    else:
+        kpis=_kpi_row(p,rep["n_events"])
     honest=""
     if rep.get("edge_real") is not None or rep.get("roi_ci") or rep.get("clv"):
         cells=""

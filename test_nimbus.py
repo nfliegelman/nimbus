@@ -108,6 +108,37 @@ class TestReport(unittest.TestCase):
         self.assertEqual(rep1["clv"]["n"], 4)
         self.assertTrue(any("NBM" in k for k, _, _ in rep1["sources"]))
 
+    def test_current_engine_headline_splits_by_era(self):
+        """pnl_cur must aggregate ONLY plays frozen under the audit build, and
+        must be absent when the book has no era mix (a toggle with one option
+        is noise). The all-time row is untouched either way: this is a view
+        split, and every gate keeps counting the whole record."""
+        st = self._state()
+        for r in st["resolved"][:2]:            # 2 of 4 plays become legacy
+            for pl in r["plays"]: pl["model_version"] = "2026-07-02.v3-nimbus-calib"
+        rep = kw.compute_report(st)
+        cur = rep.get("pnl_cur")
+        self.assertTrue(cur and cur["n"] == 2)
+        self.assertEqual(rep["pnl"]["n"], 4)     # all-time unchanged
+        self.assertEqual(cur["net"], sum(p["pnl"] for r in st["resolved"][2:] for p in r["plays"]))
+        # no era mix -> no toggle
+        self.assertIsNone(kw.compute_report(self._state()).get("pnl_cur"))
+        # rendered page: toggle present, current engine is the visible default,
+        # all-time row rendered but hidden, and the note keeps it honest
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("Current engine", html)
+        self.assertIn("id='kpi-cur'", html)
+        self.assertIn("id='kpi-all' style='display:none'", html)
+        self.assertIn("Charts and gates below always count everything", html)
+
     def test_stated_edge_averages_only_net_bearing_plays(self):
         """Plays settled before 2026-07-28 carry no net (resolve dropped it).
         The stated-edge tile must average over the plays that HAVE the field,
