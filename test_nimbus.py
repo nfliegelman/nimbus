@@ -137,7 +137,19 @@ class TestReport(unittest.TestCase):
         self.assertIn("Current engine", html)
         self.assertIn("id='kpi-cur'", html)
         self.assertIn("id='kpi-all' style='display:none'", html)
-        self.assertIn("Charts and gates below always count everything", html)
+        self.assertIn("every gate and table below always counts everything", html)
+        # the P&L chart follows the toggle (owner request 2026-07-29): both
+        # series render, current engine visible, all-time hidden, dates labeled
+        self.assertEqual(len(rep["cum_cur"]), rep["pnl_cur"]["n"])
+        self.assertEqual(rep["cum_dates"][0], "2026-07-01")
+        self.assertIn("id='ch-cur'", html)
+        self.assertIn("id='ch-all' style='display:none'", html)
+        self.assertIn("all time (incl. retired engine)", html)
+        self.assertIn(f">{rep['cum_cur_dates'][0]}</text>", html)
+        # no era mix -> single chart, still date-labeled
+        rep_all = kw.compute_report(self._state())
+        self.assertNotIn("cum_cur", rep_all)
+        self.assertIn("cum_dates", rep_all)
 
     def test_stated_edge_averages_only_net_bearing_plays(self):
         """Plays settled before 2026-07-28 carry no net (resolve dropped it).
