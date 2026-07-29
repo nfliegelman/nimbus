@@ -77,6 +77,8 @@ def cfg(name, **over):
                 kinds="both",                      # both | HIGH | LOW
                 skip_pwin_band=None,               # (lo, hi): skip plays with lo <= p_win < hi
                 skip_modal_no=False,               # skip Buy NO on the market's modal bucket
+                shrink=0.0,                        # selection-shrink toward market: p_sel = (1-s)*mp + s*mid
+                max_disagree=None,                 # skip when abs(mp_e - mid) exceeds this (None = off)
                 flat_units=None)                   # None = tiered sizing
     base.update(over)
     return base
@@ -140,7 +142,31 @@ SLATE = [
     cfg("p_win >= 0.90 only", min_pwin=0.90),
     cfg("HIGH markets only", kinds="HIGH"),
     cfg("no NO fade of modal bucket", skip_modal_no=True),
+    # -- two candidates REGISTERED 2026-07-29 (second batch; owner approval and
+    #    the motivating winner's-curse diagnostic quoted in FUTURE docket 6).
+    #    Mechanism: across ALL buckets stated 10-20 percent the model realizes
+    #    15.6 percent (n=1249, calibrated), but the 51 such buckets the engine
+    #    FADED realized 45.1 percent: the market is usually right when it
+    #    disagrees enough to clear the gate. Both candidates discount exactly
+    #    that disagreement. Honesty notes fixed at registration: full-sample
+    #    rows are contaminated by the diagnostic that motivated them, so ONLY
+    #    the prospective leg (--since 2026-07-29) can promote either; and on
+    #    the edge axis shrink-0.25 scales raw edge by 0.75, so it overlaps the
+    #    PLAY_NET_EDGE rows there, differing through p_win, the sizing tiers,
+    #    and the suspect cap. Parameters were fixed before registration and
+    #    may never be tuned on the full history.
+    cfg("selection-shrink 0.25", shrink=0.25),
+    cfg("skip |mp-mid| > 0.25", max_disagree=0.25),
 ]
+# SENSITIVITY ROWS (demoted 2026-07-29, owner-approved, recorded in FUTURE
+# docket 6): still computed and printed every run so the record stays whole,
+# but no longer promotable candidates. p_win >= 0.30 has been co-extensive
+# with MIN_ENTRY 0.20 across the entire history; MIN_ENTRY 0.10/0.15 are
+# sensitivity shadows of the docket 1 remedy; YES-only is dominated in all
+# evidence; sd <= 1.69 rejects ~75 percent of trades and cannot reach a
+# readable sample at ~4 plays/day. Re-promotion requires a fresh registration.
+SENSITIVITY = {"p_win >= 0.30", "MIN_ENTRY 0.10", "MIN_ENTRY 0.15",
+               "YES side only", "sd <= 1.69 (tightest qtl only)"}
 
 def _size(net, p_win, proven, lead, c):
     """size_play with config knobs. Mirrors kalshi_weather.size_play exactly."""
@@ -188,6 +214,12 @@ def replay(records, c):
                 mid, oi = e["mid"], e["oi"]
                 if not (0.02 < mid < 0.98) or oi < c["min_oi"]: continue
                 mp_e = min(max(e["mp"], c["tail_floor"]), 1.0 - c["tail_floor"])
+                if c["max_disagree"] is not None and abs(mp_e - mid) > c["max_disagree"]: continue
+                # selection-shrink (registered 2026-07-29): discount the model
+                # toward the market for SELECTION quantities only. Everything
+                # downstream (edge, p_win, sizing tiers, suspect cap) sees the
+                # shrunk probability; nothing recorded changes.
+                if c["shrink"]: mp_e = (1.0 - c["shrink"]) * mp_e + c["shrink"] * mid
                 cost = (e["ya"] - e["yb"]) / 2 + kw.fee(mid) + 0.01
                 edge = mp_e - mid
                 if edge > 0: side, entry, net = "Buy YES", e["ya"], edge - cost
@@ -285,9 +317,11 @@ def main():
     print("  " + "-" * 100)
     for nm, a in rows:
         ci = f"[{a['lo']*100:+.1f}%, {a['hi']*100:+.1f}%]" if a["lo"] is not None else "n<25"
-        tag = " *" if nm == "champion" else "  "
+        tag = " *" if nm == "champion" else " s" if nm in SENSITIVITY else "  "
         print(f"{tag}{nm:<32}{a['n']:>5}{a['wr']*100:>6.1f}%{a['staked']:>10.2f}"
               f"{a['pnl']:>+10.2f}{a['roi']*100:>+7.1f}%   {ci}")
+    if any(nm in SENSITIVITY for nm, _ in rows):
+        print("\n  s = sensitivity row (demoted 2026-07-29): computed for the record, not promotable")
     if champ:
         print(f"\n  champion reference: {champ['n']} plays, {champ['roi']*100:+.1f}% ROI")
     print("\n  A config beating the champion here has NOT proven anything yet: with this many")

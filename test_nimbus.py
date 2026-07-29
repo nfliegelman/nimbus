@@ -704,6 +704,43 @@ class TestPipeline(unittest.TestCase):
         for tk, sd in removed:
             self.assertEqual(sd, "Buy NO")
 
+    def test_replay_shrink_and_disagreement_knobs(self):
+        """The 2026-07-29 second-batch candidates. shrink=0 must reproduce the
+        champion exactly (the nested-null property that makes the candidate
+        readable); a near-total shrink must kill every edge; a tiny
+        disagreement cap must reject everything and a huge one must change
+        nothing. Wiring tests: the race itself prices the economics."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "sd": p["sd"], "book0": dict(b0, buckets=gb)})
+        base = rs.replay(recs, rs.cfg("champion"))
+        self.assertTrue(base, "fixture produced no plays to filter")
+        key = lambda plays: sorted((x["ticker"], x["side"], x["units"]) for x in plays)
+        self.assertEqual(key(rs.replay(recs, rs.cfg("s0", shrink=0.0))), key(base))
+        self.assertEqual(rs.replay(recs, rs.cfg("s95", shrink=0.95)), [])
+        self.assertEqual(rs.replay(recs, rs.cfg("d0", max_disagree=0.001)), [])
+        self.assertEqual(key(rs.replay(recs, rs.cfg("dbig", max_disagree=1.0))), key(base))
+        # shrink can only weaken an edge toward the market, never strengthen it:
+        # every play the shrunk config takes must also be a champion play
+        shrunk = rs.replay(recs, rs.cfg("s25", shrink=0.25))
+        champ_keys = {(x["ticker"], x["side"]) for x in base}
+        capped_ok = {(x["ticker"], x["side"]) for x in shrunk} - champ_keys
+        # (exposure-cap refill can admit a previously trimmed play; any such
+        # play must still clear the champion's own gate, so re-run the champion
+        # WITHOUT caps to enumerate every gate-clearing play)
+        uncapped = rs.replay(recs, rs.cfg("uncap", daily_cap=999, event_cap=999))
+        uncapped_keys = {(x["ticker"], x["side"]) for x in uncapped}
+        self.assertTrue(capped_ok <= uncapped_keys)
+
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
         in members_by_model and change NOTHING else. The AI fixture is wildly off
