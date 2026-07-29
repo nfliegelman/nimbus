@@ -1524,12 +1524,18 @@ def compute_report(state):
     # Rain shadow tally (FUTURE 5b, evidence only): pooled wet-fraction Brier vs
     # the market's mid over graded city-days. rain passes through reporting_view
     # untouched (dict(state, resolved=...) keeps top-level keys).
-    rn=(state.get("rain") or {}).get("resolved") or []
-    if rn:
-        rep["rain"]={"n":len(rn),
-            "brier_pool":sum((r["pool_wet"]-r["hit"])**2 for r in rn)/len(rn),
-            "brier_mkt":sum((r["mid"]-r["hit"])**2 for r in rn)/len(rn),
-            "wet_rate":sum(r["hit"] for r in rn)/len(rn)}
+    rsh=state.get("rain") or {}
+    rres=rsh.get("resolved") or []; rpend=rsh.get("pending") or {}
+    if rres or rpend:
+        # Render even before the first grading: a shadow that shows nothing for
+        # its first day reads as broken to the owner (the CLV tile solved the
+        # same problem with an explicit pending state, batch 5).
+        rep["rain"]={"n":len(rres),"pend":len(rpend)}
+        if rres:
+            rep["rain"].update(
+                brier_pool=sum((r["pool_wet"]-r["hit"])**2 for r in rres)/len(rres),
+                brier_mkt=sum((r["mid"]-r["hit"])**2 for r in rres)/len(rres),
+                wet_rate=sum(r["hit"] for r in rres)/len(rres))
     # Calibration engine series (owner request 2026-07-06): rolling MAE of the
     # UNCORRECTED forecast, the CORRECTED forecast, and the market-implied mean,
     # in resolution order. Raw-vs-corrected divergence IS the learning engine
@@ -2098,12 +2104,18 @@ def render_results(rep,updated,health=None,alerts=None):
         srct+=("<h2 class='sec'>Rain shadow (evidence only)</h2>"
           "<div class='note'>KXRAIN daily measurable-rain markets, logged and graded beside the temperature book "
           "on the same CLI settlement reports and stations. No rain play is ever generated; the FUTURE 5b gate "
-          "decides whether this ever becomes more than evidence. Lower Brier is better.</div>"
-          "<div class='kpi'>"
-          f"<div class='kbox'><div class='v'>{rn['n']}</div><div class='l'>graded city-days</div></div>"
-          f"<div class='kbox'><div class='v'>{rn['brier_pool']:.4f}</div><div class='l'>model Brier (pooled wet fraction)</div></div>"
-          f"<div class='kbox'><div class='v'>{rn['brier_mkt']:.4f}</div><div class='l'>market Brier (mid)</div></div>"
-          f"<div class='kbox'><div class='v'>{rn['wet_rate']*100:.0f}%</div><div class='l'>settled wet</div></div></div>")
+          "decides whether this ever becomes more than evidence. Lower Brier is better.</div>")
+        if rn["n"]:
+            srct+=("<div class='kpi'>"
+              f"<div class='kbox'><div class='v'>{rn['n']}</div><div class='l'>graded city-days</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['brier_pool']:.4f}</div><div class='l'>model Brier (pooled wet fraction)</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['brier_mkt']:.4f}</div><div class='l'>market Brier (mid)</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['wet_rate']*100:.0f}%</div><div class='l'>settled wet</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['pend']}</div><div class='l'>awaiting settlement</div></div></div>")
+        else:
+            srct+=("<div class='kpi'>"
+              f"<div class='kbox'><div class='v dim'>{rn['pend']} logged</div>"
+              "<div class='l'>city-days collected, first grades land after the next settlements</div></div></div>")
     chart=f"<div class='card'>{svg_line(rep.get('cum',[]))}</div>"
     calsec=""
     if rep.get("calib_series"):

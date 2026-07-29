@@ -1573,6 +1573,28 @@ class TestRainShadow(unittest.TestCase):
         # and a state with no rain key renders no rain section
         rep3 = kw.compute_report({"predictions": {}, "resolved": []})
         self.assertNotIn("rain", rep3)
+        # PENDING-ONLY state (day one, nothing settled yet) must still show the
+        # shadow is alive: a silent first day reads as broken to the owner
+        pend_state = {"predictions": {}, "resolved": [],
+                      "rain": {"pending": {"DEN|2026-07-30": {"code": "DEN"},
+                                           "SEA|2026-07-30": {"code": "SEA"}},
+                               "resolved": []}}
+        rep4 = kw.compute_report(pend_state)
+        self.assertEqual(rep4["rain"]["n"], 0)
+        self.assertEqual(rep4["rain"]["pend"], 2)
+        rep4 = dict(rep4, plays=rep2["plays"], pnl=rep2["pnl"])
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep4, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html4 = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("Rain shadow (evidence only)", html4)
+        self.assertIn("2 logged", html4)
+        self.assertIn("first grades land after the next settlements", html4)
 
 
 if __name__ == "__main__":
