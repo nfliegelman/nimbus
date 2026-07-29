@@ -108,6 +108,77 @@ class TestReport(unittest.TestCase):
         self.assertEqual(rep1["clv"]["n"], 4)
         self.assertTrue(any("NBM" in k for k, _, _ in rep1["sources"]))
 
+    def test_current_engine_headline_splits_by_era(self):
+        """pnl_cur must aggregate ONLY plays frozen under the audit build, and
+        must be absent when the book has no era mix (a toggle with one option
+        is noise). The all-time row is untouched either way: this is a view
+        split, and every gate keeps counting the whole record."""
+        st = self._state()
+        for r in st["resolved"][:2]:            # 2 of 4 plays become legacy
+            for pl in r["plays"]: pl["model_version"] = "2026-07-02.v3-nimbus-calib"
+        rep = kw.compute_report(st)
+        cur = rep.get("pnl_cur")
+        self.assertTrue(cur and cur["n"] == 2)
+        self.assertEqual(rep["pnl"]["n"], 4)     # all-time unchanged
+        self.assertEqual(cur["net"], sum(p["pnl"] for r in st["resolved"][2:] for p in r["plays"]))
+        # no era mix -> no toggle
+        self.assertIsNone(kw.compute_report(self._state()).get("pnl_cur"))
+        # rendered page: toggle present, current engine is the visible default,
+        # all-time row rendered but hidden, and the note keeps it honest
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("Current engine", html)
+        self.assertIn("id='kpi-cur'", html)
+        self.assertIn("id='kpi-all' style='display:none'", html)
+        self.assertIn("Charts and gates below always count everything", html)
+
+    def test_stated_edge_averages_only_net_bearing_plays(self):
+        """Plays settled before 2026-07-28 carry no net (resolve dropped it).
+        The stated-edge tile must average over the plays that HAVE the field,
+        not divide by every contract: the old denominator reported a false
+        +0.0c across the whole pre-fix record and would understate forever as
+        mixed eras accumulate. net has no reconstruction fallback (unlike
+        p_win), so a missing value means the play simply does not count."""
+        st = self._state()
+        for r in st["resolved"][:3]:            # 3 legacy plays lose the field
+            for pl in r["plays"]: del pl["net"]
+        rep = kw.compute_report(st)
+        self.assertEqual(rep["edge_stated"], 0.05)   # the one net-bearing play, undiluted
+        self.assertEqual(rep["edge_stated_n"], 1)
+        self.assertIn("edge_real", rep)
+
+    def test_stated_edge_absent_not_zero_when_no_play_carries_net(self):
+        """A record where NO resolved play carries net (the entire pre-fix
+        history) must omit edge_stated rather than assert a 0.0c claim the
+        model never made, and the tile must render as pending, not +0.0c.
+        This is the regression test for the defect itself: the old code
+        passed its unit test on a fixture that hand-wrote net onto a resolved
+        play, while the live page showed +0.0c for three weeks."""
+        st = self._state()
+        for r in st["resolved"]:
+            for pl in r["plays"]: del pl["net"]
+        rep = kw.compute_report(st)
+        self.assertNotIn("edge_stated", rep)
+        self.assertIn("edge_real", rep)
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("pending", html)
+        self.assertNotIn("+0.0\u00a2</div><div class='l'>stated edge", html)
+
     def test_calibration_series_and_eras(self):
         st = self._state()
         st["resolved"] = st["resolved"] * 3   # 12 rows clears the 8-row gate
@@ -279,6 +350,12 @@ class TestPipeline(unittest.TestCase):
         # registered as "entry <= 0.20 OR p_win <= 0.30", and dropping the
         # field here silently reduced that gate to its entry arm alone
         self.assertEqual(pl["p_win"], 0.42)
+        # net and the bucket identity must survive too: dropping net zeroed
+        # the stated-edge honesty tile from v5.11 until 2026-07-28, and losing
+        # ticker forced every later join back to fuzzy sub/price matching
+        self.assertEqual(pl["net"], 0.05)
+        self.assertEqual(pl["ticker"], "A")
+        self.assertEqual(pl["bid"], "94-95")
         # entry board of the frozen plays: without it, bet-timing analysis can
         # only proxy the entry time from the record's first log
         self.assertEqual(r.get("plays_logged_at"), "2026-07-02T21:38Z")
