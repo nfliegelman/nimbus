@@ -1,6 +1,6 @@
 # Nimbus
 
-*Fully audited 2026-07-04 to 07-06 (12 batches): every finding, fix, and design decision is in `audit/AUDIT_TODO.md` and the `HANDOFF.md` changelog. A 60-test suite runs before every scheduled board and blocks publishing on failure, and runs again on every pull request alongside a read-only rehearsal of the whole pipeline.*
+*Fully audited 2026-07-04 to 07-06 (12 batches): every finding, fix, and design decision is in `audit/AUDIT_TODO.md` and the `HANDOFF.md` changelog. A 74-test suite runs before every scheduled board and blocks publishing on failure, and runs again on every pull request alongside a read-only rehearsal of the whole pipeline.*
 
 Runs itself on GitHub (three trading runs a day, plus one observation-only run),
 so your office network never touches Kalshi. You just open two web pages on your phone.

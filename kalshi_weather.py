@@ -1157,6 +1157,28 @@ def score(state):
                     rec["book0"]={"at":run_stamp,"mean":mean,"biased":biased,"lead":lead,
                                   "sd":msd,
                                   "buckets":[{k:b[k] for k in BOOK0_FIELDS} for b in pbk]}
+                    # SOURCE_MP (registered 2026-07-29, FUTURE docket 8): each
+                    # core provider's own dressed bucket probabilities under the
+                    # SHARED city/kind calibration (same corr, same sigma, no
+                    # cross-provider weighting), positional against book0's
+                    # buckets. This is the minimum logging an honest source-
+                    # consensus test needs: provider summaries (mean/sd) cannot
+                    # reconstruct bucket probabilities, proven in the July
+                    # audit. Write-once with book0; pure recording, read by
+                    # nothing in the pricing path; AI providers excluded like
+                    # everywhere else; a provider under 5 members logs nothing.
+                    # The nowcast floor is deliberately NOT applied here (it is
+                    # a pooled-cloud operation; the point is each provider's
+                    # independent opinion), noted in 7b.
+                    _kk="hi" if kind=="HIGH" else "lo"
+                    _smp={}
+                    for _m in ENSEMBLE_MODELS:
+                        _vals=(((pms.get(code) or {}).get(_m) or {}).get(_kk) or {}).get(tdate.isoformat())
+                        if _vals and len(_vals)>=5:
+                            _sh=[v+corr for v in _vals]
+                            _smp[_m]=[round(dressed_prob(_sh,b,sigma),4) for b in L["buckets"]]
+                    if _smp:
+                        rec["book0"]["source_mp"]=_smp; rec["book0"]["smp_v"]=1
                 # BOARD TAPE (append-once per run stamp): every healthy board this
                 # market is seen on, so a replay can ask what freezing at board k
                 # would have done. Gated boards are skipped.
@@ -1524,12 +1546,18 @@ def compute_report(state):
     # Rain shadow tally (FUTURE 5b, evidence only): pooled wet-fraction Brier vs
     # the market's mid over graded city-days. rain passes through reporting_view
     # untouched (dict(state, resolved=...) keeps top-level keys).
-    rn=(state.get("rain") or {}).get("resolved") or []
-    if rn:
-        rep["rain"]={"n":len(rn),
-            "brier_pool":sum((r["pool_wet"]-r["hit"])**2 for r in rn)/len(rn),
-            "brier_mkt":sum((r["mid"]-r["hit"])**2 for r in rn)/len(rn),
-            "wet_rate":sum(r["hit"] for r in rn)/len(rn)}
+    rsh=state.get("rain") or {}
+    rres=rsh.get("resolved") or []; rpend=rsh.get("pending") or {}
+    if rres or rpend:
+        # Render even before the first grading: a shadow that shows nothing for
+        # its first day reads as broken to the owner (the CLV tile solved the
+        # same problem with an explicit pending state, batch 5).
+        rep["rain"]={"n":len(rres),"pend":len(rpend)}
+        if rres:
+            rep["rain"].update(
+                brier_pool=sum((r["pool_wet"]-r["hit"])**2 for r in rres)/len(rres),
+                brier_mkt=sum((r["mid"]-r["hit"])**2 for r in rres)/len(rres),
+                wet_rate=sum(r["hit"] for r in rres)/len(rres))
     # Calibration engine series (owner request 2026-07-06): rolling MAE of the
     # UNCORRECTED forecast, the CORRECTED forecast, and the market-implied mean,
     # in resolution order. Raw-vs-corrected divergence IS the learning engine
@@ -1677,10 +1705,22 @@ def compute_report(state):
         rep["by_pwin"]=byp
         # cumulative series (in UNITS: owner directive 2026-07-06, the display is
         # bankroll-agnostic until a real unit is chosen), ordered by target date
+        spls=sorted(pls,key=lambda x:x["target"])
         ser=[]; run=0.0
-        for p in sorted(pls,key=lambda x:x["target"]):
+        for p in spls:
             run+=p["pnl"]/BASE_UNIT_USD; ser.append(round(run,2))
         rep["cum"]=ser
+        rep["cum_dates"]=(spls[0]["target"],spls[-1]["target"])
+        # current-engine cumulative (display only, mirrors pnl_cur): the chart
+        # was the one all-time element left under the era toggle, and without
+        # dates its legacy-era swings read as the live strategy's
+        curs=[p for p in spls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
+        if curs and len(curs)<len(spls):
+            c2=[]; run2=0.0
+            for p in curs:
+                run2+=p["pnl"]/BASE_UNIT_USD; c2.append(round(run2,2))
+            rep["cum_cur"]=c2
+            rep["cum_cur_dates"]=(curs[0]["target"],curs[-1]["target"])
         rep["recent"]=sorted(pls,key=lambda x:x["target"],reverse=True)
         # Era split in units: the honest instrument for "is the audit build
         # better", once its plays settle. Version stamps make this a query.
@@ -1828,17 +1868,23 @@ def head(active,updated,extra=""):
       f"<div class='nav'><a class='{a('bets')}' href='index.html'>Today's bets</a>"
       f"<a class='{a('results')}' href='results.html'>Results tracker</a></div>{extra}</div></header><div class='wrap'>")
 
-def svg_line(vals,w=680,h=170,pad=26):
+def svg_line(vals,w=680,h=170,pad=26,title="cumulative units P&L",dates=None):
     if not vals: return ""
     lo=min(0,min(vals)); hi=max(0,max(vals)); rng=(hi-lo) or 1
     def X(i): return pad+(w-2*pad)*(i/max(1,len(vals)-1))
     def Y(v): return h-pad-(h-2*pad)*((v-lo)/rng)
     pts=" ".join(f"{X(i):.1f},{Y(v):.1f}" for i,v in enumerate(vals))
     zero=Y(0)
-    aria=esc(f"Cumulative units profit and loss across {len(vals)} resolved plays, ending at {vals[-1]:+.1f} units")
+    aria=esc(f"{title}: {len(vals)} resolved plays, ending at {vals[-1]:+.1f} units")
+    # x-axis date labels (owner request 2026-07-29): without them the chart's
+    # early-history swings read as recent
+    dl=""
+    if dates:
+        dl=(f"<text x='{pad}' y='{h-6}' fill='#8b97a6' font-size='10' font-family=monospace>{esc(dates[0])}</text>"
+            f"<text x='{w-pad}' y='{h-6}' fill='#8b97a6' font-size='10' font-family=monospace text-anchor='end'>{esc(dates[1])}</text>")
     return (f"<svg viewBox='0 0 {w} {h}' role='img' aria-label='{aria}'><line x1='{pad}' y1='{zero:.1f}' x2='{w-pad}' y2='{zero:.1f}' "
             f"stroke='#232a33'/><polyline points='{pts}' fill='none' stroke='#5ad1c8' stroke-width='2'/>"
-            f"<text x='{pad}' y='14' fill='#8b97a6' font-size='11' font-family=monospace>cumulative units P&amp;L</text></svg>")
+            f"<text x='{pad}' y='14' fill='#8b97a6' font-size='11' font-family=monospace>{esc(title).replace('P&L','P&amp;L')}</text>{dl}</svg>")
 
 def svg_multi(series,labels,colors,w=680,h=190,pad=26,ref=None):
     """Multi-line chart; None values break the line (data-gated segments)."""
@@ -2051,12 +2097,15 @@ def render_results(rep,updated,health=None,alerts=None):
         kpis=("<div class='eratog'><button id='eb-cur' class='on' type='button'>Current engine</button>"
               "<button id='eb-all' type='button'>All time</button></div>"
               "<div class='eranote'>Current engine = plays frozen under the audit build (Jul 6 on). "
-              "All time adds the retired pre-audit engine. Charts and gates below always count everything.</div>"
+              "All time adds the retired pre-audit engine. The P&amp;L chart follows this toggle; "
+              "every gate and table below always counts everything.</div>"
               +_kpi_row(rep["pnl_cur"],rep["pnl_cur"]["n_events"],"kpi-cur")
               +_kpi_row(p,rep["n_events"],"kpi-all",hidden=True)
-              +"<script>(function(){var c=document.getElementById('eb-cur'),a=document.getElementById('eb-all'),"
-               "kc=document.getElementById('kpi-cur'),ka=document.getElementById('kpi-all');"
-               "function sw(cur){kc.style.display=cur?'':'none';ka.style.display=cur?'none':'';"
+              +"<script>(function(){var c=document.getElementById('eb-cur'),a=document.getElementById('eb-all');"
+               "function sw(cur){var g=function(i){return document.getElementById(i)};"
+               "var kc=g('kpi-cur'),ka=g('kpi-all'),cc=g('ch-cur'),ca=g('ch-all');"
+               "kc.style.display=cur?'':'none';ka.style.display=cur?'none':'';"
+               "if(cc){cc.style.display=cur?'':'none';ca.style.display=cur?'none':'';}"
                "c.className=cur?'on':'';a.className=cur?'':'on';}"
                "c.onclick=function(){sw(true)};a.onclick=function(){sw(false)};})();</script>")
     else:
@@ -2098,13 +2147,26 @@ def render_results(rep,updated,health=None,alerts=None):
         srct+=("<h2 class='sec'>Rain shadow (evidence only)</h2>"
           "<div class='note'>KXRAIN daily measurable-rain markets, logged and graded beside the temperature book "
           "on the same CLI settlement reports and stations. No rain play is ever generated; the FUTURE 5b gate "
-          "decides whether this ever becomes more than evidence. Lower Brier is better.</div>"
-          "<div class='kpi'>"
-          f"<div class='kbox'><div class='v'>{rn['n']}</div><div class='l'>graded city-days</div></div>"
-          f"<div class='kbox'><div class='v'>{rn['brier_pool']:.4f}</div><div class='l'>model Brier (pooled wet fraction)</div></div>"
-          f"<div class='kbox'><div class='v'>{rn['brier_mkt']:.4f}</div><div class='l'>market Brier (mid)</div></div>"
-          f"<div class='kbox'><div class='v'>{rn['wet_rate']*100:.0f}%</div><div class='l'>settled wet</div></div></div>")
-    chart=f"<div class='card'>{svg_line(rep.get('cum',[]))}</div>"
+          "decides whether this ever becomes more than evidence. Lower Brier is better.</div>")
+        if rn["n"]:
+            srct+=("<div class='kpi'>"
+              f"<div class='kbox'><div class='v'>{rn['n']}</div><div class='l'>graded city-days</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['brier_pool']:.4f}</div><div class='l'>model Brier (pooled wet fraction)</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['brier_mkt']:.4f}</div><div class='l'>market Brier (mid)</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['wet_rate']*100:.0f}%</div><div class='l'>settled wet</div></div>"
+              f"<div class='kbox'><div class='v'>{rn['pend']}</div><div class='l'>awaiting settlement</div></div></div>")
+        else:
+            srct+=("<div class='kpi'>"
+              f"<div class='kbox'><div class='v dim'>{rn['pend']} logged</div>"
+              "<div class='l'>city-days collected, first grades land after the next settlements</div></div></div>")
+    if rep.get("cum_cur"):
+        chart=("<div class='card' id='ch-cur'>"
+               +svg_line(rep["cum_cur"],title="cumulative units P&L, current engine",dates=rep.get("cum_cur_dates"))
+               +"</div><div class='card' id='ch-all' style='display:none'>"
+               +svg_line(rep.get("cum",[]),title="cumulative units P&L, all time (incl. retired engine)",dates=rep.get("cum_dates"))
+               +"</div>")
+    else:
+        chart=f"<div class='card'>{svg_line(rep.get('cum',[]),dates=rep.get('cum_dates'))}</div>"
     calsec=""
     if rep.get("calib_series"):
         cs=rep["calib_series"]

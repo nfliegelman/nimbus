@@ -137,7 +137,19 @@ class TestReport(unittest.TestCase):
         self.assertIn("Current engine", html)
         self.assertIn("id='kpi-cur'", html)
         self.assertIn("id='kpi-all' style='display:none'", html)
-        self.assertIn("Charts and gates below always count everything", html)
+        self.assertIn("every gate and table below always counts everything", html)
+        # the P&L chart follows the toggle (owner request 2026-07-29): both
+        # series render, current engine visible, all-time hidden, dates labeled
+        self.assertEqual(len(rep["cum_cur"]), rep["pnl_cur"]["n"])
+        self.assertEqual(rep["cum_dates"][0], "2026-07-01")
+        self.assertIn("id='ch-cur'", html)
+        self.assertIn("id='ch-all' style='display:none'", html)
+        self.assertIn("all time (incl. retired engine)", html)
+        self.assertIn(f">{rep['cum_cur_dates'][0]}</text>", html)
+        # no era mix -> single chart, still date-labeled
+        rep_all = kw.compute_report(self._state())
+        self.assertNotIn("cum_cur", rep_all)
+        self.assertIn("cum_dates", rep_all)
 
     def test_stated_edge_averages_only_net_bearing_plays(self):
         """Plays settled before 2026-07-28 carry no net (resolve dropped it).
@@ -740,6 +752,71 @@ class TestPipeline(unittest.TestCase):
         uncapped = rs.replay(recs, rs.cfg("uncap", daily_cap=999, event_cap=999))
         uncapped_keys = {(x["ticker"], x["side"]) for x in uncapped}
         self.assertTrue(capped_ok <= uncapped_keys)
+        # fourth-batch knobs (2026-07-29): one play per ladder, overround cap
+        one = rs.replay(recs, rs.cfg("one", max_plays_event=1, daily_cap=999, event_cap=999))
+        evc = {}
+        for x in one: evc[(x["code"], x["kind"], x["target"])] = evc.get((x["code"], x["kind"], x["target"]), 0) + 1
+        self.assertTrue(one and max(evc.values()) == 1)
+        ovs = [sum(e["ya"] for e in r["book0"]["buckets"]) - 1.0 for r in recs]
+        self.assertEqual(rs.replay(recs, rs.cfg("ov0", max_over=min(ovs) - 0.01)), [])
+        self.assertEqual(key(rs.replay(recs, rs.cfg("ovbig", max_over=max(ovs) + 0.01))), key(base))
+
+    def test_replay_proven_only_is_walk_forward(self):
+        """The proven-cities candidate (registered 2026-07-29) may trade a
+        city/kind only AFTER 20+ prior replayed buckets show the model beating
+        the market there. It must trade nothing while skill is unproven, unlock
+        exactly when the prior record justifies it, and never peek ahead: the
+        deciding buckets must all lie on earlier target dates."""
+        import replay_selection as rs
+        def rec(day, mp_close):
+            # 8 buckets; the winning bucket is index 1. mp_close=True makes the
+            # model sharper than the market (mp 0.9 vs mid 0.5 on the winner,
+            # mp ~0.014 vs mid ~0.07 elsewhere), accruing positive skill.
+            bks = []
+            for i in range(8):
+                hit = 1 if i == 1 else 0
+                mp = (0.9 if hit else 0.014) if mp_close else (0.5 if hit else 0.07)
+                bks.append({"ticker": f"T{i}", "mid": 0.5 if hit else 0.07,
+                            "yb": 0.48 if hit else 0.05, "ya": 0.52 if hit else 0.09,
+                            "oi": 900, "mp": mp, "hit": hit})
+            return {"code": "DAL", "kind": "HIGH", "target": f"2026-07-{day:02d}", "sd": 1.0,
+                    "book0": {"biased": False, "lead": 1, "sd": 1.0, "buckets": bks}}
+        # three sharp prior days = 24 buckets of positive skill, then a fourth day
+        recs = [rec(d, True) for d in (10, 11, 12, 13)]
+        champ = rs.replay(recs, rs.cfg("champion"))
+        proven = rs.replay(recs, rs.cfg("proven", proven_only=True))
+        self.assertTrue(any(x["target"] == "2026-07-10" for x in champ))
+        # the proven config trades ONLY the fourth day: days 1-3 built the record
+        self.assertTrue(proven, "day-4 plays should unlock once skill is proven")
+        self.assertTrue(all(x["target"] == "2026-07-13" for x in proven))
+        # and with the model NOT beating the market, nothing ever unlocks
+        dull = [rec(d, False) for d in (10, 11, 12, 13)]
+        self.assertEqual(rs.replay(dull, rs.cfg("proven2", proven_only=True)), [])
+
+    def test_book0_source_mp_per_provider_probabilities(self):
+        """source_mp (FUTURE docket 8): each core provider's dressed bucket
+        probabilities under the shared calibration, frozen with book0. The July
+        audit proved provider mean/sd summaries cannot reconstruct these, so
+        this logging is the sole honest basis for any consensus test."""
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        rec = state["predictions"]["DAL|HIGH|" + self.day]
+        b0 = rec["book0"]
+        smp = b0.get("source_mp")
+        self.assertTrue(smp and b0.get("smp_v") == 1)
+        for m in kw.ENSEMBLE_MODELS:
+            self.assertIn(m, smp)
+            self.assertEqual(len(smp[m]), len(b0["buckets"]))      # positional
+            self.assertAlmostEqual(sum(smp[m]), 1.0, places=1)     # ladder mass
+        for m in kw.AI_ENSEMBLE_MODELS:
+            self.assertNotIn(m, smp)                               # evidence never enters
+        # write-once: a refreshed board must not move the frozen probabilities
+        frozen = {m: list(v) for m, v in smp.items()}
+        self._wire([self._lad(c) for c in healthy])
+        kw.score(state)
+        self.assertEqual(state["predictions"]["DAL|HIGH|" + self.day]["book0"]["source_mp"], frozen)
 
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
@@ -1573,6 +1650,28 @@ class TestRainShadow(unittest.TestCase):
         # and a state with no rain key renders no rain section
         rep3 = kw.compute_report({"predictions": {}, "resolved": []})
         self.assertNotIn("rain", rep3)
+        # PENDING-ONLY state (day one, nothing settled yet) must still show the
+        # shadow is alive: a silent first day reads as broken to the owner
+        pend_state = {"predictions": {}, "resolved": [],
+                      "rain": {"pending": {"DEN|2026-07-30": {"code": "DEN"},
+                                           "SEA|2026-07-30": {"code": "SEA"}},
+                               "resolved": []}}
+        rep4 = kw.compute_report(pend_state)
+        self.assertEqual(rep4["rain"]["n"], 0)
+        self.assertEqual(rep4["rain"]["pend"], 2)
+        rep4 = dict(rep4, plays=rep2["plays"], pnl=rep2["pnl"])
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep4, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html4 = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("Rain shadow (evidence only)", html4)
+        self.assertIn("2 logged", html4)
+        self.assertIn("first grades land after the next settlements", html4)
 
 
 if __name__ == "__main__":
