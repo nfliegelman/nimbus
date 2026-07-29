@@ -741,6 +741,38 @@ class TestPipeline(unittest.TestCase):
         uncapped_keys = {(x["ticker"], x["side"]) for x in uncapped}
         self.assertTrue(capped_ok <= uncapped_keys)
 
+    def test_replay_proven_only_is_walk_forward(self):
+        """The proven-cities candidate (registered 2026-07-29) may trade a
+        city/kind only AFTER 20+ prior replayed buckets show the model beating
+        the market there. It must trade nothing while skill is unproven, unlock
+        exactly when the prior record justifies it, and never peek ahead: the
+        deciding buckets must all lie on earlier target dates."""
+        import replay_selection as rs
+        def rec(day, mp_close):
+            # 8 buckets; the winning bucket is index 1. mp_close=True makes the
+            # model sharper than the market (mp 0.9 vs mid 0.5 on the winner,
+            # mp ~0.014 vs mid ~0.07 elsewhere), accruing positive skill.
+            bks = []
+            for i in range(8):
+                hit = 1 if i == 1 else 0
+                mp = (0.9 if hit else 0.014) if mp_close else (0.5 if hit else 0.07)
+                bks.append({"ticker": f"T{i}", "mid": 0.5 if hit else 0.07,
+                            "yb": 0.48 if hit else 0.05, "ya": 0.52 if hit else 0.09,
+                            "oi": 900, "mp": mp, "hit": hit})
+            return {"code": "DAL", "kind": "HIGH", "target": f"2026-07-{day:02d}", "sd": 1.0,
+                    "book0": {"biased": False, "lead": 1, "sd": 1.0, "buckets": bks}}
+        # three sharp prior days = 24 buckets of positive skill, then a fourth day
+        recs = [rec(d, True) for d in (10, 11, 12, 13)]
+        champ = rs.replay(recs, rs.cfg("champion"))
+        proven = rs.replay(recs, rs.cfg("proven", proven_only=True))
+        self.assertTrue(any(x["target"] == "2026-07-10" for x in champ))
+        # the proven config trades ONLY the fourth day: days 1-3 built the record
+        self.assertTrue(proven, "day-4 plays should unlock once skill is proven")
+        self.assertTrue(all(x["target"] == "2026-07-13" for x in proven))
+        # and with the model NOT beating the market, nothing ever unlocks
+        dull = [rec(d, False) for d in (10, 11, 12, 13)]
+        self.assertEqual(rs.replay(dull, rs.cfg("proven2", proven_only=True)), [])
+
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
         in members_by_model and change NOTHING else. The AI fixture is wildly off

@@ -79,6 +79,7 @@ def cfg(name, **over):
                 skip_modal_no=False,               # skip Buy NO on the market's modal bucket
                 shrink=0.0,                        # selection-shrink toward market: p_sel = (1-s)*mp + s*mid
                 max_disagree=None,                 # skip when abs(mp_e - mid) exceeds this (None = off)
+                proven_only=False,                 # trade only city/kind pairs with positive PRIOR skill
                 flat_units=None)                   # None = tiered sizing
     base.update(over)
     return base
@@ -157,6 +158,16 @@ SLATE = [
     #    may never be tuned on the full history.
     cfg("selection-shrink 0.25", shrink=0.25),
     cfg("skip |mp-mid| > 0.25", max_disagree=0.25),
+    # -- REGISTERED 2026-07-29 (third batch; owner request quoted in FUTURE
+    #    docket 6): the honest form of "only bet the green cities". Trades only
+    #    city/kind pairs whose PRIOR replayed settlements show positive skill
+    #    (the same walk-forward proven flag the sizing gate uses: 20+ prior
+    #    buckets with model Brier beating the market's), so it can never peek
+    #    at a city's future results, unlike the by-city ROI leaderboard, whose
+    #    green rows at n=6-26 are mostly payoff-asymmetry luck. Expect a tiny
+    #    early sample: skill accumulates within the replayable window, so this
+    #    row will trade nothing for the first days of coverage by design.
+    cfg("proven city/kind only", proven_only=True),
 ]
 # SENSITIVITY ROWS (demoted 2026-07-29, owner-approved, recorded in FUTURE
 # docket 6): still computed and printed every run so the record stays whole,
@@ -210,6 +221,7 @@ def replay(records, c):
                 if sdv is None or sdv > c["max_sd"]: continue
             proven = (lambda a: a["nb"] >= 20 and (a["bk"] - a["bm"]) / a["nb"] > 0)(
                 skill[(r["code"], r["kind"])])
+            if c["proven_only"] and not proven: continue
             for e in b0["buckets"]:
                 mid, oi = e["mid"], e["oi"]
                 if not (0.02 < mid < 0.98) or oi < c["min_oi"]: continue
