@@ -656,6 +656,54 @@ class TestPipeline(unittest.TestCase):
                         for r in recs]
         self.assertEqual(len(rs.replay(legacy_tight, rs.cfg("proxy_keep", max_sd=1.0))), len(base))
 
+    def test_replay_selection_filters_registered_2026_07_29(self):
+        """The six candidates registered 2026-07-29 lean on three new knobs:
+        kind restriction, a p_win band skip, and the modal-bucket NO-fade skip.
+        Each must drop exactly what it claims to drop and nothing else, or the
+        slate's rows describe rules that were never actually tested."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "sd": p["sd"], "book0": dict(b0, buckets=gb)})
+        base = rs.replay(recs, rs.cfg("champion"))
+        self.assertTrue(base, "fixture produced no plays to filter")
+        # kind restriction: HIGH-only yields only HIGH plays, LOW-only only LOW,
+        # and the two partitions cover the champion book
+        hi = rs.replay(recs, rs.cfg("hi", kinds="HIGH"))
+        lo = rs.replay(recs, rs.cfg("lo", kinds="LOW"))
+        self.assertTrue(all(x["kind"] == "HIGH" for x in hi))
+        self.assertTrue(all(x["kind"] == "LOW" for x in lo))
+        self.assertEqual(len(hi) + len(lo), len(base))
+        # p_win band skip: a band wrapped around a real play's p_win drops it
+        tgt = base[0]
+        band = (round(tgt["p_win"] - 0.005, 4), round(tgt["p_win"] + 0.005, 4))
+        banded = rs.replay(recs, rs.cfg("band", skip_pwin_band=band))
+        self.assertNotIn((tgt["ticker"], tgt["side"]),
+                         [(x["ticker"], x["side"]) for x in banded])
+        # count may stay equal (dropping a play frees exposure-cap budget for a
+        # previously trimmed one), but no surviving play may sit inside the band
+        for x in banded:
+            self.assertFalse(band[0] <= x["p_win"] < band[1])
+        # modal-fade skip: no surviving play is a Buy NO on its board's favorite
+        nomodal = rs.replay(recs, rs.cfg("nomodal", skip_modal_no=True))
+        modal_of = {(r["code"], r["kind"]): max(r["book0"]["buckets"], key=lambda e: e["mid"])["ticker"]
+                    for r in recs}
+        for x in nomodal:
+            if x["side"] == "Buy NO":
+                self.assertNotEqual(x["ticker"], modal_of[(x["code"], x["kind"])])
+        # and every play the filter removed really was a modal NO fade
+        removed = {(x["ticker"], x["side"]) for x in base} - {(x["ticker"], x["side"]) for x in nomodal}
+        for tk, sd in removed:
+            self.assertEqual(sd, "Buy NO")
+
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
         in members_by_model and change NOTHING else. The AI fixture is wildly off

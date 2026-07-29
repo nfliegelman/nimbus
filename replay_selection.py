@@ -74,6 +74,9 @@ def cfg(name, **over):
                 min_pwin=0.0,                      # floor on stated win probability
                 max_sd=None,                       # ceiling on decision-time member sd (None = off)
                 sides="both",                      # both | yes | no
+                kinds="both",                      # both | HIGH | LOW
+                skip_pwin_band=None,               # (lo, hi): skip plays with lo <= p_win < hi
+                skip_modal_no=False,               # skip Buy NO on the market's modal bucket
                 flat_units=None)                   # None = tiered sizing
     base.update(over)
     return base
@@ -122,6 +125,21 @@ SLATE = [
     #    that field fall back to the final-board sd, and main() prints the split.
     cfg("sd <= 2.80 (skip widest qtl)", max_sd=2.80),
     cfg("sd <= 1.69 (tightest qtl only)", max_sd=1.69),
+    # -- six candidates REGISTERED 2026-07-29 (owner-requested; quotes and full
+    #    motivation notes recorded in FUTURE docket 6). Their prospective leg
+    #    reads `--since 2026-07-29`. Honesty note fixed at registration: the
+    #    belly-skip, 0.90 floor, HIGH-only, and modal-fade candidates were
+    #    partly motivated by INSPECTED retrospective cells (the 2026-07-29
+    #    p_win-band and era tables in audit/JULY_REDDIT_AUDIT_FINDINGS.md), so
+    #    their full-sample rows are contaminated by construction and ONLY the
+    #    prospective leg can promote them. The two favorite-fade candidates are
+    #    structural (favorite-longshot direction, HANDOFF section 4). --
+    cfg("NO only + entry >= 0.35", sides="no", min_entry=0.35),
+    cfg("NO only + entry >= 0.50", sides="no", min_entry=0.50),
+    cfg("skip p_win 0.80-0.90 band", skip_pwin_band=(0.80, 0.90)),
+    cfg("p_win >= 0.90 only", min_pwin=0.90),
+    cfg("HIGH markets only", kinds="HIGH"),
+    cfg("no NO fade of modal bucket", skip_modal_no=True),
 ]
 
 def _size(net, p_win, proven, lead, c):
@@ -152,8 +170,12 @@ def replay(records, c):
         for r in day:
             b0 = r["book0"]
             if b0.get("biased"): continue          # live play gate: model vs market too far apart
+            if c["kinds"] != "both" and r["kind"] != c["kinds"]: continue
             lead = b0.get("lead")
             if lead is None or lead > c["max_lead"]: continue
+            # modal bucket = the market's favorite (highest mid on the decision board)
+            modal = (max(b0["buckets"], key=lambda e: e["mid"])["ticker"]
+                     if c["skip_modal_no"] and b0["buckets"] else None)
             if c["max_sd"] is not None:
                 # decision-time member sd, frozen on the snapshot since 2026-07-28;
                 # older records fall back to the record's final-board sd (the
@@ -173,8 +195,10 @@ def replay(records, c):
                 if c["sides"] == "yes" and side != "Buy YES": continue
                 if c["sides"] == "no" and side != "Buy NO": continue
                 if entry < c["min_entry"] or entry > c["max_entry"]: continue
+                if modal is not None and side == "Buy NO" and e["ticker"] == modal: continue
                 p_win = mp_e if side == "Buy YES" else 1 - mp_e
                 if p_win < c["min_pwin"]: continue
+                if c["skip_pwin_band"] and c["skip_pwin_band"][0] <= p_win < c["skip_pwin_band"][1]: continue
                 units = _size(net, p_win, proven, lead, c)
                 if units <= 0: continue
                 cands.append({"code": r["code"], "kind": r["kind"], "target": d,
