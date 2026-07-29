@@ -1381,5 +1381,150 @@ class TestNowcastShadow(unittest.TestCase):
         self.assertTrue(gate2[4][1])
 
 
+class TestRainShadow(unittest.TestCase):
+    """KXRAIN evidence shadow (FUTURE 5b): logging and grading only. These tests
+    pin the market parser, the LST wet-fraction math, the write-once invariant,
+    settlement grading, and the report/render path, all network-free."""
+
+    def _mkts_payload(self, yb=0.10, ya=0.16):
+        return {"events": [{"event_ticker": "KXRAIN-26JUL30", "markets": [
+            {"ticker": "KXRAIN-26JUL30-DEN", "yes_bid_dollars": str(yb),
+             "yes_ask_dollars": str(ya), "volume_fp": "1010.86", "open_interest_fp": "4929.94"},
+            {"ticker": "KXRAIN-26JUL30-ZZZ", "yes_bid_dollars": "0.5",
+             "yes_ask_dollars": "0.6", "volume_fp": "1", "open_interest_fp": "1"},
+        ]}]}
+
+    def test_rain_market_parser(self):
+        saved = kw.fget
+        try:
+            kw.fget = lambda url, tries=3: self._mkts_payload()
+            out = kw.fetch_rain_markets()
+        finally:
+            kw.fget = saved
+        self.assertIn("2026-07-30", out)
+        self.assertIn("DEN", out["2026-07-30"])
+        self.assertNotIn("ZZZ", out["2026-07-30"])   # unknown suffix skipped, never guessed
+        q = out["2026-07-30"]["DEN"]
+        self.assertEqual(q["mid"], 0.13)
+        self.assertEqual(q["vol"], 1010.86)
+        self.assertEqual(q["event_ticker"], "KXRAIN-26JUL30")
+        # a dead fetch is an empty dict, not an exception
+        try:
+            kw.fget = lambda url, tries=3: None
+            self.assertEqual(kw.fetch_rain_markets(), {})
+        finally:
+            kw.fget = saved
+
+    def test_rain_wet_fractions_hand_computed(self):
+        # CST (utc_offset_seconds == std offset): no LST shift. Three members
+        # over one day: totals 0.5 mm (wet), 0.10 mm (wet0 only), 0.0 (dry).
+        times = [f"2026-07-30T{h:02d}:00" for h in range(24)]
+        def mem(total_first_two_hours):
+            return [total_first_two_hours / 2.0] * 2 + [0.0] * 22
+        payload = {"utc_offset_seconds": -21600, "hourly": {
+            "time": times,
+            "precipitation_member01": mem(0.5),
+            "precipitation_member02": mem(0.10),
+            "precipitation_member03": mem(0.0)}}
+        saved = kw.fget
+        try:
+            kw.fget = lambda url, tries=3: payload
+            out = kw.fetch_rain_members(39.85, -104.66, "America/Chicago")
+        finally:
+            kw.fget = saved
+        for m in kw.ENSEMBLE_MODELS:
+            d = out[m]["2026-07-30"]
+            self.assertEqual(d["n"], 3)
+            self.assertAlmostEqual(d["wet"], 1 / 3, places=3)    # only the 0.5 mm member clears 0.254 mm
+            self.assertAlmostEqual(d["wet0"], 2 / 3, places=3)
+
+    def test_rain_pass_write_once_and_requires_forecast(self):
+        saved_m, saved_f = kw.fetch_rain_markets, kw.fetch_rain_members
+        prov = {m: {"2026-07-30": {"n": 30, "wet": 0.40, "wet0": 0.60}} for m in kw.ENSEMBLE_MODELS}
+        try:
+            kw.fetch_rain_markets = lambda: {"2026-07-30": {"DEN": {
+                "ticker": "KXRAIN-26JUL30-DEN", "event_ticker": "KXRAIN-26JUL30",
+                "yb": 0.10, "ya": 0.16, "mid": 0.13, "vol": 100.0, "oi": 200.0}}}
+            kw.fetch_rain_members = lambda lat, lon, tz: prov
+            state = {"predictions": {}, "resolved": []}
+            self.assertEqual(kw.rain_pass(state, "2026-07-30T12:19Z"), 1)
+            rec = state["rain"]["pending"]["DEN|2026-07-30"]
+            self.assertEqual(rec["mid"], 0.13)
+            self.assertAlmostEqual(rec["pool_wet"], 0.40, places=6)
+            # second sighting with moved prices must NOT rewrite the record
+            kw.fetch_rain_markets = lambda: {"2026-07-30": {"DEN": {
+                "ticker": "KXRAIN-26JUL30-DEN", "event_ticker": "KXRAIN-26JUL30",
+                "yb": 0.50, "ya": 0.56, "mid": 0.53, "vol": 999.0, "oi": 999.0}}}
+            self.assertEqual(kw.rain_pass(state, "2026-07-30T21:40Z"), 0)
+            self.assertEqual(state["rain"]["pending"]["DEN|2026-07-30"]["mid"], 0.13)
+            # no forecast, no record: prices alone are never logged
+            kw.fetch_rain_markets = lambda: {"2026-07-31": {"DEN": {
+                "ticker": "KXRAIN-26JUL31-DEN", "event_ticker": "KXRAIN-26JUL31",
+                "yb": 0.2, "ya": 0.3, "mid": 0.25, "vol": 1.0, "oi": 1.0}}}
+            kw.fetch_rain_members = lambda lat, lon, tz: {}
+            self.assertEqual(kw.rain_pass(state, "2026-07-31T12:19Z"), 0)
+            self.assertNotIn("DEN|2026-07-31", state["rain"]["pending"])
+        finally:
+            kw.fetch_rain_markets, kw.fetch_rain_members = saved_m, saved_f
+
+    def test_rain_resolve_grades_and_waits(self):
+        saved_f, saved_today = kw.fetch_settled_event, kw.TODAY
+        rec = {"code": "DEN", "target": "2026-07-30", "ticker": "KXRAIN-26JUL30-DEN",
+               "event_ticker": "KXRAIN-26JUL30", "logged_at": "x", "yb": 0.10, "ya": 0.16,
+               "mid": 0.13, "vol": 1.0, "oi": 2.0, "p": {}, "pool_wet": 0.40, "pool_wet0": 0.6, "rv": 1}
+        wait = dict(rec, code="SEA", ticker="KXRAIN-26JUL30-SEA")
+        state = {"rain": {"pending": {"DEN|2026-07-30": dict(rec),
+                                      "SEA|2026-07-30": wait}, "resolved": []}}
+        try:
+            kw.TODAY = dtm.date(2026, 8, 2)
+            kw.fetch_settled_event = lambda et: {"KXRAIN-26JUL30-DEN": ("yes", None)}
+            self.assertEqual(kw.rain_resolve(state), 1)
+        finally:
+            kw.fetch_settled_event, kw.TODAY = saved_f, saved_today
+        rv = state["rain"]["resolved"]
+        self.assertEqual(len(rv), 1)
+        self.assertEqual(rv[0]["hit"], 1)
+        self.assertEqual(rv[0]["code"], "DEN")
+        self.assertNotIn("DEN|2026-07-30", state["rain"]["pending"])
+        self.assertIn("SEA|2026-07-30", state["rain"]["pending"])   # unsettled waits
+
+    def test_rain_report_and_render(self):
+        state = {"predictions": {}, "resolved": [],
+                 "rain": {"pending": {}, "resolved": [
+                     {"code": "DEN", "target": "2026-07-30", "mid": 0.20, "pool_wet": 0.10,
+                      "pool_wet0": 0.2, "hit": 0, "rv": 1},
+                     {"code": "SEA", "target": "2026-07-30", "mid": 0.60, "pool_wet": 0.90,
+                      "pool_wet0": 0.95, "hit": 1, "rv": 1}]}}
+        rep = kw.compute_report(state)
+        rn = rep["rain"]
+        self.assertEqual(rn["n"], 2)
+        self.assertAlmostEqual(rn["brier_pool"], ((0.10 - 0) ** 2 + (0.90 - 1) ** 2) / 2, places=9)
+        self.assertAlmostEqual(rn["brier_mkt"], ((0.20 - 0) ** 2 + (0.60 - 1) ** 2) / 2, places=9)
+        self.assertAlmostEqual(rn["wet_rate"], 0.5, places=9)
+        # renders only via the results page, never as a play anywhere
+        rep2 = dict(rep, plays=[{"code": "DEN", "kind": "HIGH", "target": "2026-07-30",
+                                 "sub": "x", "side": "Buy YES", "entry": 0.5, "tier": "B",
+                                 "units": 1.0, "stake": 10.0, "contracts": 20, "won": True,
+                                 "pnl": 1.0, "margin": 1.0, "actual": 91, "mp": 0.55,
+                                 "mid": 0.5, "edge": 0.06, "net": 0.05, "lead": 1,
+                                 "close_mid": 0.5, "clv": 0.0, "model_version": "t"}],
+                    pnl={"n": 1, "wins": 1, "winrate": 1.0, "net": 1.0, "staked": 10.0,
+                         "roi": 0.1, "net_units": 0.1, "avg_margin": 1.0})
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep2, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("Rain shadow (evidence only)", html)
+        self.assertIn("graded city-days", html)
+        # and a state with no rain key renders no rain section
+        rep3 = kw.compute_report({"predictions": {}, "resolved": []})
+        self.assertNotIn("rain", rep3)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

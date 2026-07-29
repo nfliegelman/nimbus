@@ -93,6 +93,18 @@ REF_MODELS = ["ncep_nbm_conus", "ncep_hrrr_conus"]
 # Deliberately NOT in _KNOB_NAMES: evidence logging, not a behavior knob, so
 # CONFIG_HASH is unaffected.
 AI_ENSEMBLE_MODELS = ["ncep_aigefs025", "ecmwf_aifs025"]
+# KXRAIN evidence shadow (FUTURE 5b, registered 2026-07-29, owner-approved).
+# Kalshi's daily "measurable rain" binaries settle on the SAME CLI climate
+# reports and stations as the temperature ladders (rules cite CLINYC etc;
+# trace counts as 0, so YES means >= 0.01 inch), and their city suffixes are
+# exactly the 20 codes in CITIES (verified live 2026-07-29). Evidence-only:
+# forecasts and prices are logged write-once and graded at settlement, no rain
+# play is ever generated, every fetch is isolated so a rain outage can never
+# touch temperature pricing, and main() wraps the whole pass non-fatally.
+# Deliberately NOT in _KNOB_NAMES: evidence, not behavior.
+RAIN_SERIES = "KXRAIN"
+RAIN_WET_IN = 0.01                    # CLI measurable-precip threshold, inches
+RAIN_WET_MM = round(RAIN_WET_IN*25.4, 3)   # 0.254 mm, Open-Meteo units
 # Open-Meteo publishes per-model run metadata at
 # api.open-meteo.com/data/{id}/static/meta.json; forecast responses themselves
 # carry no run id. Ensemble-API model names map to different metadata ids.
@@ -483,6 +495,120 @@ def fetch_settled_event(event_ticker):
         for m in d.get("markets",[]):
             out[m.get("ticker")]=(m.get("result"), fnum(m.get("expiration_value")))
     return out
+
+# ----------------------- rain evidence shadow ----------------------
+def fetch_rain_markets():
+    """Open KXRAIN events -> {target_iso: {code: quote}}. Isolated: a failure
+    returns {} and the temperature pipeline never notices. Quote fields use the
+    same fixed-point names pull_weather_markets already consumes."""
+    d=fget(f"{KBASE}/events?series_ticker={RAIN_SERIES}&status=open&limit=20&with_nested_markets=true",tries=2)
+    out={}
+    if not d: return out
+    for e in d.get("events",[]):
+        et=e.get("event_ticker","") or ""; parts=et.split("-")
+        tdate=parse_date_code(parts[1]) if len(parts)>1 else None
+        if not tdate: continue
+        for m in e.get("markets",[]):
+            tk=m.get("ticker","") or ""; code=tk.split("-")[-1]
+            if code not in CITIES: continue        # unknown suffixes are skipped, never guessed
+            yb,ya=fnum(m.get("yes_bid_dollars")),fnum(m.get("yes_ask_dollars"))
+            if yb is None or ya is None: continue
+            out.setdefault(tdate.isoformat(),{})[code]={
+                "ticker":tk,"event_ticker":et,"yb":yb,"ya":ya,
+                "mid":round((yb+ya)/2,4),
+                "vol":round(fnum(m.get("volume_fp"),0) or 0,2),
+                "oi":round(fnum(m.get("open_interest_fp"),0) or 0,2)}
+    return out
+
+def fetch_rain_members(lat,lon,tz):
+    """Per-provider ensemble precipitation over the CLI day (same LST windowing
+    as fetch_members): {model: {date: {n, wet, wet0}}} where wet is the member
+    fraction with total precip >= RAIN_WET_MM (the CLI measurable threshold)
+    and wet0 the fraction with any precip at all. Each model is its own request
+    (the fetch_ai_members isolation pattern)."""
+    out={}
+    std_off=STD_OFFSET_H.get(tz,0)*3600
+    for model in ENSEMBLE_MODELS:
+        u=(f"https://ensemble-api.open-meteo.com/v1/ensemble?latitude={lat}&longitude={lon}"
+           f"&hourly=precipitation&models={model}"
+           f"&timezone={urllib.parse.quote(tz)}&forecast_days=3")
+        d=fget(u,tries=2)
+        if not d: continue
+        dst_shift=dt.timedelta(seconds=(d.get("utc_offset_seconds",0)-std_off))
+        h=d.get("hourly",{}); times=h.get("time",[])
+        lst_days=[]
+        for t in times:
+            try: lst_days.append((dt.datetime.fromisoformat(t)-dst_shift).date().isoformat())
+            except ValueError: lst_days.append(t[:10])
+        tot={}
+        for k in [k for k in h if k.startswith("precipitation")]:
+            dv={}
+            for day,v in zip(lst_days,h[k]):
+                if v is not None: dv[day]=dv.get(day,0.0)+v
+            for day,s in dv.items(): tot.setdefault(day,[]).append(s)
+        md={}
+        for day,sums in tot.items():
+            n=len(sums)
+            if n: md[day]={"n":n,"wet":round(sum(1 for s in sums if s>=RAIN_WET_MM)/n,4),
+                           "wet0":round(sum(1 for s in sums if s>0)/n,4)}
+        if md: out[model]=md
+        time.sleep(0.2)
+    return out
+
+def rain_pass(state,run_stamp):
+    """Write-once per (city, target date): per-provider wet fractions beside the
+    market's quote at first sighting. No plays, no pricing, no touch on any
+    temperature path. Records freeze at the FIRST board that shows the market
+    (typically lead 1, since Kalshi lists tomorrow's rain event a day ahead),
+    which is the same decision-time honesty the temperature book uses."""
+    mkts=fetch_rain_markets()
+    if not mkts: return 0
+    rain=state.setdefault("rain",{"pending":{},"resolved":[]})
+    pend=rain.setdefault("pending",{})
+    fx={}; logged=0
+    for tdate in sorted(mkts):
+        for code in sorted(mkts[tdate]):
+            key=f"{code}|{tdate}"
+            if key in pend: continue                   # write-once
+            if code not in fx:
+                lat,lon,tz=CITIES[code][0],CITIES[code][1],CITIES[code][2]
+                fx[code]=fetch_rain_members(lat,lon,tz)
+            provs={m:fx[code][m][tdate] for m in fx[code] if tdate in fx[code][m]}
+            if not provs: continue                     # no forecast, no record: never log prices alone
+            q=mkts[tdate][code]
+            nT=sum(v["n"] for v in provs.values())
+            pend[key]={"code":code,"target":tdate,"ticker":q["ticker"],
+                       "event_ticker":q["event_ticker"],"logged_at":run_stamp,
+                       "yb":q["yb"],"ya":q["ya"],"mid":q["mid"],"vol":q["vol"],"oi":q["oi"],
+                       "p":provs,
+                       "pool_wet":round(sum(v["wet"]*v["n"] for v in provs.values())/nT,4),
+                       "pool_wet0":round(sum(v["wet0"]*v["n"] for v in provs.values())/nT,4),
+                       "rv":1}
+            logged+=1
+    if logged: print(f"Rain shadow: logged {logged} city-days.")
+    return logged
+
+def rain_resolve(state):
+    """Grade pending rain records against Kalshi's settled results. hit=1 iff
+    the market settled YES (measurable rain). Unsettled records simply wait."""
+    rain=state.get("rain") or {}
+    pend=rain.get("pending") or {}
+    if not pend: return 0
+    resv=rain.setdefault("resolved",[])
+    byev={}
+    for key,r in pend.items(): byev.setdefault(r["event_ticker"],[]).append(key)
+    n=0
+    for et,keys in byev.items():
+        if dt.date.fromisoformat(pend[keys[0]]["target"])>TODAY-dt.timedelta(days=1): continue
+        settled=fetch_settled_event(et); time.sleep(0.1)
+        if not settled: continue
+        for key in keys:
+            r=pend[key]; res=settled.get(r["ticker"])
+            if not res or res[0] not in ("yes","no"): continue
+            resv.append(dict(r,hit=1 if res[0]=="yes" else 0))
+            del pend[key]; n+=1
+    if n: print(f"Rain shadow: graded {n} city-days.")
+    return n
 
 # --------------------------- calibration ---------------------------
 SQRT2=math.sqrt(2.0)
@@ -1382,6 +1508,15 @@ def compute_report(state):
             nm="NBM (station-calibrated)" if k=="nbm" else "HRRR (short-lead)"
             src[nm][0]+=abs(v-a); src[nm][1]+=1
     rep["sources"]=sorted(((k,s/n,n) for k,(s,n) in src.items() if n),key=lambda x:x[1])
+    # Rain shadow tally (FUTURE 5b, evidence only): pooled wet-fraction Brier vs
+    # the market's mid over graded city-days. rain passes through reporting_view
+    # untouched (dict(state, resolved=...) keeps top-level keys).
+    rn=(state.get("rain") or {}).get("resolved") or []
+    if rn:
+        rep["rain"]={"n":len(rn),
+            "brier_pool":sum((r["pool_wet"]-r["hit"])**2 for r in rn)/len(rn),
+            "brier_mkt":sum((r["mid"]-r["hit"])**2 for r in rn)/len(rn),
+            "wet_rate":sum(r["hit"] for r in rn)/len(rn)}
     # Calibration engine series (owner request 2026-07-06): rolling MAE of the
     # UNCORRECTED forecast, the CORRECTED forecast, and the market-implied mean,
     # in resolution order. Raw-vs-corrected divergence IS the learning engine
@@ -1945,6 +2080,17 @@ def render_results(rep,updated,health=None,alerts=None):
           "evidence (50+ rows per source), never on reputation. Raw model rows accrue only on records logged "
           "after the audit build deployed.</div>"
           "<table><thead><tr><th>Source</th><th class='n'>MAE</th><th class='n'>Settled</th></tr></thead><tbody>"+rowsS+"</tbody></table>")
+    if rep.get("rain"):
+        rn=rep["rain"]
+        srct+=("<h2 class='sec'>Rain shadow (evidence only)</h2>"
+          "<div class='note'>KXRAIN daily measurable-rain markets, logged and graded beside the temperature book "
+          "on the same CLI settlement reports and stations. No rain play is ever generated; the FUTURE 5b gate "
+          "decides whether this ever becomes more than evidence. Lower Brier is better.</div>"
+          "<div class='kpi'>"
+          f"<div class='kbox'><div class='v'>{rn['n']}</div><div class='l'>graded city-days</div></div>"
+          f"<div class='kbox'><div class='v'>{rn['brier_pool']:.4f}</div><div class='l'>model Brier (pooled wet fraction)</div></div>"
+          f"<div class='kbox'><div class='v'>{rn['brier_mkt']:.4f}</div><div class='l'>market Brier (mid)</div></div>"
+          f"<div class='kbox'><div class='v'>{rn['wet_rate']*100:.0f}%</div><div class='l'>settled wet</div></div></div>")
     chart=f"<div class='card'>{svg_line(rep.get('cum',[]))}</div>"
     calsec=""
     if rep.get("calib_series"):
@@ -2301,6 +2447,14 @@ def main():
         print("\nShadow run complete."); return
     resolve_pending(state)
     shadow_pass(state)   # normal runs also collect when a city sits in the window (eastern cities hit it on the morning cron)
+    # Rain evidence shadow (FUTURE 5b): fully isolated and non-fatal. A rain
+    # failure of any kind must never cost a temperature board. Skipped on the
+    # shadow-only run above to keep that run's semantics byte-clean.
+    try:
+        rain_resolve(state)
+        rain_pass(state,dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"))
+    except Exception as e:
+        print("Rain shadow skipped:",str(e)[:90])
     rows,plays,health=score(state)
     # drift_alerts deliberately stays on the LIVE state: its four alarms are all
     # recent-window instruments, it writes calib_snapshot back into the state it
