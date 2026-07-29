@@ -105,6 +105,11 @@ AI_ENSEMBLE_MODELS = ["ncep_aigefs025", "ecmwf_aifs025"]
 RAIN_SERIES = "KXRAIN"
 RAIN_WET_IN = 0.01                    # CLI measurable-precip threshold, inches
 RAIN_WET_MM = round(RAIN_WET_IN*25.4, 3)   # 0.254 mm, Open-Meteo units
+# A grid-cell ensemble drizzling 0.3 mm is not the same claim as a station
+# gauge recording 0.01 inch: grid precip is smoother and wetter than a point.
+# The 1.0 mm variant is logged from day one so the threshold-mapping question
+# is answerable from the record instead of argued from priors.
+RAIN_WET1_MM = 1.0
 # Open-Meteo publishes per-model run metadata at
 # api.open-meteo.com/data/{id}/static/meta.json; forecast responses themselves
 # carry no run id. Ensemble-API model names map to different metadata ids.
@@ -524,11 +529,14 @@ def fetch_rain_members(lat,lon,tz):
     """Per-provider ensemble precipitation over the CLI day (same LST windowing
     as fetch_members): {model: {date: {n, wet, wet0}}} where wet is the member
     fraction with total precip >= RAIN_WET_MM (the CLI measurable threshold)
-    and wet0 the fraction with any precip at all. Each model is its own request
-    (the fetch_ai_members isolation pattern)."""
+    and wet0 the fraction with any precip at all; wet1 uses the 1.0 mm variant
+    threshold. Each model is its own request (the fetch_ai_members isolation
+    pattern), and the AI evidence providers ride along the same way: their
+    failure can never cost the core rows, and they never enter the pooled
+    fractions (rain_pass pools core providers only, mirroring temperature)."""
     out={}
     std_off=STD_OFFSET_H.get(tz,0)*3600
-    for model in ENSEMBLE_MODELS:
+    for model in ENSEMBLE_MODELS+AI_ENSEMBLE_MODELS:
         u=(f"https://ensemble-api.open-meteo.com/v1/ensemble?latitude={lat}&longitude={lon}"
            f"&hourly=precipitation&models={model}"
            f"&timezone={urllib.parse.quote(tz)}&forecast_days=3")
@@ -550,7 +558,8 @@ def fetch_rain_members(lat,lon,tz):
         for day,sums in tot.items():
             n=len(sums)
             if n: md[day]={"n":n,"wet":round(sum(1 for s in sums if s>=RAIN_WET_MM)/n,4),
-                           "wet0":round(sum(1 for s in sums if s>0)/n,4)}
+                           "wet0":round(sum(1 for s in sums if s>0)/n,4),
+                           "wet1":round(sum(1 for s in sums if s>=RAIN_WET1_MM)/n,4)}
         if md: out[model]=md
         time.sleep(0.2)
     return out
@@ -574,15 +583,19 @@ def rain_pass(state,run_stamp):
                 lat,lon,tz=CITIES[code][0],CITIES[code][1],CITIES[code][2]
                 fx[code]=fetch_rain_members(lat,lon,tz)
             provs={m:fx[code][m][tdate] for m in fx[code] if tdate in fx[code][m]}
-            if not provs: continue                     # no forecast, no record: never log prices alone
+            core={m:v for m,v in provs.items() if m in ENSEMBLE_MODELS}
+            if not core: continue                      # no core forecast, no record: never log prices alone
             q=mkts[tdate][code]
-            nT=sum(v["n"] for v in provs.values())
+            nT=sum(v["n"] for v in core.values())
+            # pooled fractions are CORE providers only, mirroring temperature:
+            # AI providers are logged in p as evidence and race solo offline.
             pend[key]={"code":code,"target":tdate,"ticker":q["ticker"],
                        "event_ticker":q["event_ticker"],"logged_at":run_stamp,
                        "yb":q["yb"],"ya":q["ya"],"mid":q["mid"],"vol":q["vol"],"oi":q["oi"],
                        "p":provs,
-                       "pool_wet":round(sum(v["wet"]*v["n"] for v in provs.values())/nT,4),
-                       "pool_wet0":round(sum(v["wet0"]*v["n"] for v in provs.values())/nT,4),
+                       "pool_wet":round(sum(v["wet"]*v["n"] for v in core.values())/nT,4),
+                       "pool_wet0":round(sum(v["wet0"]*v["n"] for v in core.values())/nT,4),
+                       "pool_wet1":round(sum(v.get("wet1",0.0)*v["n"] for v in core.values())/nT,4),
                        "rv":1}
             logged+=1
     if logged: print(f"Rain shadow: logged {logged} city-days.")

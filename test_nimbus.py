@@ -1416,31 +1416,39 @@ class TestRainShadow(unittest.TestCase):
             kw.fget = saved
 
     def test_rain_wet_fractions_hand_computed(self):
-        # CST (utc_offset_seconds == std offset): no LST shift. Three members
-        # over one day: totals 0.5 mm (wet), 0.10 mm (wet0 only), 0.0 (dry).
+        # CST (utc_offset_seconds == std offset): no LST shift. Four members
+        # over one day: totals 2.0 mm (clears every threshold), 0.5 mm (wet but
+        # under 1.0 mm), 0.10 mm (any-precip only), 0.0 (dry).
         times = [f"2026-07-30T{h:02d}:00" for h in range(24)]
         def mem(total_first_two_hours):
             return [total_first_two_hours / 2.0] * 2 + [0.0] * 22
         payload = {"utc_offset_seconds": -21600, "hourly": {
             "time": times,
-            "precipitation_member01": mem(0.5),
-            "precipitation_member02": mem(0.10),
-            "precipitation_member03": mem(0.0)}}
+            "precipitation_member01": mem(2.0),
+            "precipitation_member02": mem(0.5),
+            "precipitation_member03": mem(0.10),
+            "precipitation_member04": mem(0.0)}}
         saved = kw.fget
         try:
             kw.fget = lambda url, tries=3: payload
             out = kw.fetch_rain_members(39.85, -104.66, "America/Chicago")
         finally:
             kw.fget = saved
-        for m in kw.ENSEMBLE_MODELS:
+        # AI evidence providers are fetched the same way and land beside the core
+        for m in kw.ENSEMBLE_MODELS + kw.AI_ENSEMBLE_MODELS:
             d = out[m]["2026-07-30"]
-            self.assertEqual(d["n"], 3)
-            self.assertAlmostEqual(d["wet"], 1 / 3, places=3)    # only the 0.5 mm member clears 0.254 mm
-            self.assertAlmostEqual(d["wet0"], 2 / 3, places=3)
+            self.assertEqual(d["n"], 4)
+            self.assertAlmostEqual(d["wet"], 2 / 4, places=3)    # 2.0 and 0.5 clear 0.254 mm
+            self.assertAlmostEqual(d["wet0"], 3 / 4, places=3)
+            self.assertAlmostEqual(d["wet1"], 1 / 4, places=3)   # only 2.0 clears 1.0 mm
 
     def test_rain_pass_write_once_and_requires_forecast(self):
         saved_m, saved_f = kw.fetch_rain_markets, kw.fetch_rain_members
-        prov = {m: {"2026-07-30": {"n": 30, "wet": 0.40, "wet0": 0.60}} for m in kw.ENSEMBLE_MODELS}
+        prov = {m: {"2026-07-30": {"n": 30, "wet": 0.40, "wet0": 0.60, "wet1": 0.20}}
+                for m in kw.ENSEMBLE_MODELS}
+        # a wildly wet AI provider must be LOGGED but never pooled (core-only
+        # pooling mirrors temperature: AI is evidence, racing solo offline)
+        prov["ncep_aigefs025"] = {"2026-07-30": {"n": 31, "wet": 1.0, "wet0": 1.0, "wet1": 1.0}}
         try:
             kw.fetch_rain_markets = lambda: {"2026-07-30": {"DEN": {
                 "ticker": "KXRAIN-26JUL30-DEN", "event_ticker": "KXRAIN-26JUL30",
@@ -1450,18 +1458,22 @@ class TestRainShadow(unittest.TestCase):
             self.assertEqual(kw.rain_pass(state, "2026-07-30T12:19Z"), 1)
             rec = state["rain"]["pending"]["DEN|2026-07-30"]
             self.assertEqual(rec["mid"], 0.13)
-            self.assertAlmostEqual(rec["pool_wet"], 0.40, places=6)
+            self.assertAlmostEqual(rec["pool_wet"], 0.40, places=6)   # core only: the 1.0 AI fraction is excluded
+            self.assertAlmostEqual(rec["pool_wet1"], 0.20, places=6)
+            self.assertIn("ncep_aigefs025", rec["p"])                 # but it IS logged as evidence
             # second sighting with moved prices must NOT rewrite the record
             kw.fetch_rain_markets = lambda: {"2026-07-30": {"DEN": {
                 "ticker": "KXRAIN-26JUL30-DEN", "event_ticker": "KXRAIN-26JUL30",
                 "yb": 0.50, "ya": 0.56, "mid": 0.53, "vol": 999.0, "oi": 999.0}}}
             self.assertEqual(kw.rain_pass(state, "2026-07-30T21:40Z"), 0)
             self.assertEqual(state["rain"]["pending"]["DEN|2026-07-30"]["mid"], 0.13)
-            # no forecast, no record: prices alone are never logged
+            # no CORE forecast, no record: prices alone are never logged, and an
+            # AI-only response must not create a record either
             kw.fetch_rain_markets = lambda: {"2026-07-31": {"DEN": {
                 "ticker": "KXRAIN-26JUL31-DEN", "event_ticker": "KXRAIN-26JUL31",
                 "yb": 0.2, "ya": 0.3, "mid": 0.25, "vol": 1.0, "oi": 1.0}}}
-            kw.fetch_rain_members = lambda lat, lon, tz: {}
+            kw.fetch_rain_members = lambda lat, lon, tz: {
+                "ncep_aigefs025": {"2026-07-31": {"n": 31, "wet": 0.5, "wet0": 0.5, "wet1": 0.5}}}
             self.assertEqual(kw.rain_pass(state, "2026-07-31T12:19Z"), 0)
             self.assertNotIn("DEN|2026-07-31", state["rain"]["pending"])
         finally:
