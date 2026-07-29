@@ -752,6 +752,14 @@ class TestPipeline(unittest.TestCase):
         uncapped = rs.replay(recs, rs.cfg("uncap", daily_cap=999, event_cap=999))
         uncapped_keys = {(x["ticker"], x["side"]) for x in uncapped}
         self.assertTrue(capped_ok <= uncapped_keys)
+        # fourth-batch knobs (2026-07-29): one play per ladder, overround cap
+        one = rs.replay(recs, rs.cfg("one", max_plays_event=1, daily_cap=999, event_cap=999))
+        evc = {}
+        for x in one: evc[(x["code"], x["kind"], x["target"])] = evc.get((x["code"], x["kind"], x["target"]), 0) + 1
+        self.assertTrue(one and max(evc.values()) == 1)
+        ovs = [sum(e["ya"] for e in r["book0"]["buckets"]) - 1.0 for r in recs]
+        self.assertEqual(rs.replay(recs, rs.cfg("ov0", max_over=min(ovs) - 0.01)), [])
+        self.assertEqual(key(rs.replay(recs, rs.cfg("ovbig", max_over=max(ovs) + 0.01))), key(base))
 
     def test_replay_proven_only_is_walk_forward(self):
         """The proven-cities candidate (registered 2026-07-29) may trade a

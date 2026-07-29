@@ -80,6 +80,8 @@ def cfg(name, **over):
                 shrink=0.0,                        # selection-shrink toward market: p_sel = (1-s)*mp + s*mid
                 max_disagree=None,                 # skip when abs(mp_e - mid) exceeds this (None = off)
                 proven_only=False,                 # trade only city/kind pairs with positive PRIOR skill
+                max_plays_event=None,              # cap PLAYS (not units) per ladder (None = off)
+                max_over=None,                     # skip ladders with overround above this (None = off)
                 flat_units=None)                   # None = tiered sizing
     base.update(over)
     return base
@@ -168,6 +170,17 @@ SLATE = [
     #    early sample: skill accumulates within the replayable window, so this
     #    row will trade nothing for the first days of coverage by design.
     cfg("proven city/kind only", proven_only=True),
+    # -- REGISTERED 2026-07-29 (fourth batch; owner go-ahead quoted in FUTURE
+    #    docket 6). One play per ladder: the audit measured WITHIN-ladder
+    #    stacking as the real correlation risk, and the 2u event cap still
+    #    allows two plays on one settlement number. Overround cap: the ladder's
+    #    built-in vig (sum of asks minus 1) from book0, a market-quality score
+    #    from data already held; threshold pinned OUTCOME-BLIND to the measured
+    #    p75 (0.19 over 160 book0 ladders, quartiles p25 0.07 / p50 0.12 /
+    #    p75 0.19) before any replay result was read. Prospective leg
+    #    --since 2026-07-29. --
+    cfg("one play per ladder", max_plays_event=1),
+    cfg("overround <= 0.19 (skip worst qtl)", max_over=0.19),
 ]
 # SENSITIVITY ROWS (demoted 2026-07-29, owner-approved, recorded in FUTURE
 # docket 6): still computed and printed every run so the record stays whole,
@@ -222,6 +235,7 @@ def replay(records, c):
             proven = (lambda a: a["nb"] >= 20 and (a["bk"] - a["bm"]) / a["nb"] > 0)(
                 skill[(r["code"], r["kind"])])
             if c["proven_only"] and not proven: continue
+            if c["max_over"] is not None and (sum(e["ya"] for e in b0["buckets"]) - 1.0) > c["max_over"]: continue
             for e in b0["buckets"]:
                 mid, oi = e["mid"], e["oi"]
                 if not (0.02 < mid < 0.98) or oi < c["min_oi"]: continue
@@ -250,12 +264,13 @@ def replay(records, c):
                               "p_win": p_win, "units": units, "hit": e["hit"]})
         # exposure caps, best plays first (same ordering as the live cap loop)
         cands.sort(key=lambda x: (-x["units"], -(x["p_win"] or 0), -x["net"], x["ticker"]))
-        per_day = 0.0; per_ev = defaultdict(float)
+        per_day = 0.0; per_ev = defaultdict(float); per_evn = defaultdict(int)
         for x in cands:
             ev = (x["code"], x["kind"])
             if per_day + x["units"] > c["daily_cap"] + 1e-9: continue
             if per_ev[ev] + x["units"] > c["event_cap"] + 1e-9: continue
-            per_day += x["units"]; per_ev[ev] += x["units"]
+            if c["max_plays_event"] is not None and per_evn[ev] >= c["max_plays_event"]: continue
+            per_day += x["units"]; per_ev[ev] += x["units"]; per_evn[ev] += 1
             stake = round(x["units"] * kw.BASE_UNIT_USD, 2)
             entry = x["entry"]
             contracts = int(stake // entry) if entry > 0 else 0
