@@ -656,6 +656,91 @@ class TestPipeline(unittest.TestCase):
                         for r in recs]
         self.assertEqual(len(rs.replay(legacy_tight, rs.cfg("proxy_keep", max_sd=1.0))), len(base))
 
+    def test_replay_selection_filters_registered_2026_07_29(self):
+        """The six candidates registered 2026-07-29 lean on three new knobs:
+        kind restriction, a p_win band skip, and the modal-bucket NO-fade skip.
+        Each must drop exactly what it claims to drop and nothing else, or the
+        slate's rows describe rules that were never actually tested."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "sd": p["sd"], "book0": dict(b0, buckets=gb)})
+        base = rs.replay(recs, rs.cfg("champion"))
+        self.assertTrue(base, "fixture produced no plays to filter")
+        # kind restriction: HIGH-only yields only HIGH plays, LOW-only only LOW,
+        # and the two partitions cover the champion book
+        hi = rs.replay(recs, rs.cfg("hi", kinds="HIGH"))
+        lo = rs.replay(recs, rs.cfg("lo", kinds="LOW"))
+        self.assertTrue(all(x["kind"] == "HIGH" for x in hi))
+        self.assertTrue(all(x["kind"] == "LOW" for x in lo))
+        self.assertEqual(len(hi) + len(lo), len(base))
+        # p_win band skip: a band wrapped around a real play's p_win drops it
+        tgt = base[0]
+        band = (round(tgt["p_win"] - 0.005, 4), round(tgt["p_win"] + 0.005, 4))
+        banded = rs.replay(recs, rs.cfg("band", skip_pwin_band=band))
+        self.assertNotIn((tgt["ticker"], tgt["side"]),
+                         [(x["ticker"], x["side"]) for x in banded])
+        # count may stay equal (dropping a play frees exposure-cap budget for a
+        # previously trimmed one), but no surviving play may sit inside the band
+        for x in banded:
+            self.assertFalse(band[0] <= x["p_win"] < band[1])
+        # modal-fade skip: no surviving play is a Buy NO on its board's favorite
+        nomodal = rs.replay(recs, rs.cfg("nomodal", skip_modal_no=True))
+        modal_of = {(r["code"], r["kind"]): max(r["book0"]["buckets"], key=lambda e: e["mid"])["ticker"]
+                    for r in recs}
+        for x in nomodal:
+            if x["side"] == "Buy NO":
+                self.assertNotEqual(x["ticker"], modal_of[(x["code"], x["kind"])])
+        # and every play the filter removed really was a modal NO fade
+        removed = {(x["ticker"], x["side"]) for x in base} - {(x["ticker"], x["side"]) for x in nomodal}
+        for tk, sd in removed:
+            self.assertEqual(sd, "Buy NO")
+
+    def test_replay_shrink_and_disagreement_knobs(self):
+        """The 2026-07-29 second-batch candidates. shrink=0 must reproduce the
+        champion exactly (the nested-null property that makes the candidate
+        readable); a near-total shrink must kill every edge; a tiny
+        disagreement cap must reject everything and a huge one must change
+        nothing. Wiring tests: the race itself prices the economics."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "sd": p["sd"], "book0": dict(b0, buckets=gb)})
+        base = rs.replay(recs, rs.cfg("champion"))
+        self.assertTrue(base, "fixture produced no plays to filter")
+        key = lambda plays: sorted((x["ticker"], x["side"], x["units"]) for x in plays)
+        self.assertEqual(key(rs.replay(recs, rs.cfg("s0", shrink=0.0))), key(base))
+        self.assertEqual(rs.replay(recs, rs.cfg("s95", shrink=0.95)), [])
+        self.assertEqual(rs.replay(recs, rs.cfg("d0", max_disagree=0.001)), [])
+        self.assertEqual(key(rs.replay(recs, rs.cfg("dbig", max_disagree=1.0))), key(base))
+        # shrink can only weaken an edge toward the market, never strengthen it:
+        # every play the shrunk config takes must also be a champion play
+        shrunk = rs.replay(recs, rs.cfg("s25", shrink=0.25))
+        champ_keys = {(x["ticker"], x["side"]) for x in base}
+        capped_ok = {(x["ticker"], x["side"]) for x in shrunk} - champ_keys
+        # (exposure-cap refill can admit a previously trimmed play; any such
+        # play must still clear the champion's own gate, so re-run the champion
+        # WITHOUT caps to enumerate every gate-clearing play)
+        uncapped = rs.replay(recs, rs.cfg("uncap", daily_cap=999, event_cap=999))
+        uncapped_keys = {(x["ticker"], x["side"]) for x in uncapped}
+        self.assertTrue(capped_ok <= uncapped_keys)
+
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
         in members_by_model and change NOTHING else. The AI fixture is wildly off
@@ -1331,6 +1416,163 @@ class TestNowcastShadow(unittest.TestCase):
         gate2=kw._prod_gate([{"stake":10.0,"pnl":-5.0,"clv":None,"won":False}]*5, [0.1]*5, 5)
         self.assertEqual(sum(1 for _,m,_ in gate2 if m), 1)   # only "kill not fired" holds
         self.assertTrue(gate2[4][1])
+
+
+class TestRainShadow(unittest.TestCase):
+    """KXRAIN evidence shadow (FUTURE 5b): logging and grading only. These tests
+    pin the market parser, the LST wet-fraction math, the write-once invariant,
+    settlement grading, and the report/render path, all network-free."""
+
+    def _mkts_payload(self, yb=0.10, ya=0.16):
+        return {"events": [{"event_ticker": "KXRAIN-26JUL30", "markets": [
+            {"ticker": "KXRAIN-26JUL30-DEN", "yes_bid_dollars": str(yb),
+             "yes_ask_dollars": str(ya), "volume_fp": "1010.86", "open_interest_fp": "4929.94"},
+            {"ticker": "KXRAIN-26JUL30-ZZZ", "yes_bid_dollars": "0.5",
+             "yes_ask_dollars": "0.6", "volume_fp": "1", "open_interest_fp": "1"},
+        ]}]}
+
+    def test_rain_market_parser(self):
+        saved = kw.fget
+        try:
+            kw.fget = lambda url, tries=3: self._mkts_payload()
+            out = kw.fetch_rain_markets()
+        finally:
+            kw.fget = saved
+        self.assertIn("2026-07-30", out)
+        self.assertIn("DEN", out["2026-07-30"])
+        self.assertNotIn("ZZZ", out["2026-07-30"])   # unknown suffix skipped, never guessed
+        q = out["2026-07-30"]["DEN"]
+        self.assertEqual(q["mid"], 0.13)
+        self.assertEqual(q["vol"], 1010.86)
+        self.assertEqual(q["event_ticker"], "KXRAIN-26JUL30")
+        # a dead fetch is an empty dict, not an exception
+        try:
+            kw.fget = lambda url, tries=3: None
+            self.assertEqual(kw.fetch_rain_markets(), {})
+        finally:
+            kw.fget = saved
+
+    def test_rain_wet_fractions_hand_computed(self):
+        # CST (utc_offset_seconds == std offset): no LST shift. Four members
+        # over one day: totals 2.0 mm (clears every threshold), 0.5 mm (wet but
+        # under 1.0 mm), 0.10 mm (any-precip only), 0.0 (dry).
+        times = [f"2026-07-30T{h:02d}:00" for h in range(24)]
+        def mem(total_first_two_hours):
+            return [total_first_two_hours / 2.0] * 2 + [0.0] * 22
+        payload = {"utc_offset_seconds": -21600, "hourly": {
+            "time": times,
+            "precipitation_member01": mem(2.0),
+            "precipitation_member02": mem(0.5),
+            "precipitation_member03": mem(0.10),
+            "precipitation_member04": mem(0.0)}}
+        saved = kw.fget
+        try:
+            kw.fget = lambda url, tries=3: payload
+            out = kw.fetch_rain_members(39.85, -104.66, "America/Chicago")
+        finally:
+            kw.fget = saved
+        # AI evidence providers are fetched the same way and land beside the core
+        for m in kw.ENSEMBLE_MODELS + kw.AI_ENSEMBLE_MODELS:
+            d = out[m]["2026-07-30"]
+            self.assertEqual(d["n"], 4)
+            self.assertAlmostEqual(d["wet"], 2 / 4, places=3)    # 2.0 and 0.5 clear 0.254 mm
+            self.assertAlmostEqual(d["wet0"], 3 / 4, places=3)
+            self.assertAlmostEqual(d["wet1"], 1 / 4, places=3)   # only 2.0 clears 1.0 mm
+
+    def test_rain_pass_write_once_and_requires_forecast(self):
+        saved_m, saved_f = kw.fetch_rain_markets, kw.fetch_rain_members
+        prov = {m: {"2026-07-30": {"n": 30, "wet": 0.40, "wet0": 0.60, "wet1": 0.20}}
+                for m in kw.ENSEMBLE_MODELS}
+        # a wildly wet AI provider must be LOGGED but never pooled (core-only
+        # pooling mirrors temperature: AI is evidence, racing solo offline)
+        prov["ncep_aigefs025"] = {"2026-07-30": {"n": 31, "wet": 1.0, "wet0": 1.0, "wet1": 1.0}}
+        try:
+            kw.fetch_rain_markets = lambda: {"2026-07-30": {"DEN": {
+                "ticker": "KXRAIN-26JUL30-DEN", "event_ticker": "KXRAIN-26JUL30",
+                "yb": 0.10, "ya": 0.16, "mid": 0.13, "vol": 100.0, "oi": 200.0}}}
+            kw.fetch_rain_members = lambda lat, lon, tz: prov
+            state = {"predictions": {}, "resolved": []}
+            self.assertEqual(kw.rain_pass(state, "2026-07-30T12:19Z"), 1)
+            rec = state["rain"]["pending"]["DEN|2026-07-30"]
+            self.assertEqual(rec["mid"], 0.13)
+            self.assertAlmostEqual(rec["pool_wet"], 0.40, places=6)   # core only: the 1.0 AI fraction is excluded
+            self.assertAlmostEqual(rec["pool_wet1"], 0.20, places=6)
+            self.assertIn("ncep_aigefs025", rec["p"])                 # but it IS logged as evidence
+            # second sighting with moved prices must NOT rewrite the record
+            kw.fetch_rain_markets = lambda: {"2026-07-30": {"DEN": {
+                "ticker": "KXRAIN-26JUL30-DEN", "event_ticker": "KXRAIN-26JUL30",
+                "yb": 0.50, "ya": 0.56, "mid": 0.53, "vol": 999.0, "oi": 999.0}}}
+            self.assertEqual(kw.rain_pass(state, "2026-07-30T21:40Z"), 0)
+            self.assertEqual(state["rain"]["pending"]["DEN|2026-07-30"]["mid"], 0.13)
+            # no CORE forecast, no record: prices alone are never logged, and an
+            # AI-only response must not create a record either
+            kw.fetch_rain_markets = lambda: {"2026-07-31": {"DEN": {
+                "ticker": "KXRAIN-26JUL31-DEN", "event_ticker": "KXRAIN-26JUL31",
+                "yb": 0.2, "ya": 0.3, "mid": 0.25, "vol": 1.0, "oi": 1.0}}}
+            kw.fetch_rain_members = lambda lat, lon, tz: {
+                "ncep_aigefs025": {"2026-07-31": {"n": 31, "wet": 0.5, "wet0": 0.5, "wet1": 0.5}}}
+            self.assertEqual(kw.rain_pass(state, "2026-07-31T12:19Z"), 0)
+            self.assertNotIn("DEN|2026-07-31", state["rain"]["pending"])
+        finally:
+            kw.fetch_rain_markets, kw.fetch_rain_members = saved_m, saved_f
+
+    def test_rain_resolve_grades_and_waits(self):
+        saved_f, saved_today = kw.fetch_settled_event, kw.TODAY
+        rec = {"code": "DEN", "target": "2026-07-30", "ticker": "KXRAIN-26JUL30-DEN",
+               "event_ticker": "KXRAIN-26JUL30", "logged_at": "x", "yb": 0.10, "ya": 0.16,
+               "mid": 0.13, "vol": 1.0, "oi": 2.0, "p": {}, "pool_wet": 0.40, "pool_wet0": 0.6, "rv": 1}
+        wait = dict(rec, code="SEA", ticker="KXRAIN-26JUL30-SEA")
+        state = {"rain": {"pending": {"DEN|2026-07-30": dict(rec),
+                                      "SEA|2026-07-30": wait}, "resolved": []}}
+        try:
+            kw.TODAY = dtm.date(2026, 8, 2)
+            kw.fetch_settled_event = lambda et: {"KXRAIN-26JUL30-DEN": ("yes", None)}
+            self.assertEqual(kw.rain_resolve(state), 1)
+        finally:
+            kw.fetch_settled_event, kw.TODAY = saved_f, saved_today
+        rv = state["rain"]["resolved"]
+        self.assertEqual(len(rv), 1)
+        self.assertEqual(rv[0]["hit"], 1)
+        self.assertEqual(rv[0]["code"], "DEN")
+        self.assertNotIn("DEN|2026-07-30", state["rain"]["pending"])
+        self.assertIn("SEA|2026-07-30", state["rain"]["pending"])   # unsettled waits
+
+    def test_rain_report_and_render(self):
+        state = {"predictions": {}, "resolved": [],
+                 "rain": {"pending": {}, "resolved": [
+                     {"code": "DEN", "target": "2026-07-30", "mid": 0.20, "pool_wet": 0.10,
+                      "pool_wet0": 0.2, "hit": 0, "rv": 1},
+                     {"code": "SEA", "target": "2026-07-30", "mid": 0.60, "pool_wet": 0.90,
+                      "pool_wet0": 0.95, "hit": 1, "rv": 1}]}}
+        rep = kw.compute_report(state)
+        rn = rep["rain"]
+        self.assertEqual(rn["n"], 2)
+        self.assertAlmostEqual(rn["brier_pool"], ((0.10 - 0) ** 2 + (0.90 - 1) ** 2) / 2, places=9)
+        self.assertAlmostEqual(rn["brier_mkt"], ((0.20 - 0) ** 2 + (0.60 - 1) ** 2) / 2, places=9)
+        self.assertAlmostEqual(rn["wet_rate"], 0.5, places=9)
+        # renders only via the results page, never as a play anywhere
+        rep2 = dict(rep, plays=[{"code": "DEN", "kind": "HIGH", "target": "2026-07-30",
+                                 "sub": "x", "side": "Buy YES", "entry": 0.5, "tier": "B",
+                                 "units": 1.0, "stake": 10.0, "contracts": 20, "won": True,
+                                 "pnl": 1.0, "margin": 1.0, "actual": 91, "mp": 0.55,
+                                 "mid": 0.5, "edge": 0.06, "net": 0.05, "lead": 1,
+                                 "close_mid": 0.5, "clv": 0.0, "model_version": "t"}],
+                    pnl={"n": 1, "wins": 1, "winrate": 1.0, "net": 1.0, "staked": 10.0,
+                         "roi": 0.1, "net_units": 0.1, "avg_margin": 1.0})
+        saved = kw.OUT_DIR
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                kw.OUT_DIR = d
+                kw.render_results(rep2, "now", None, [])
+                with open(os.path.join(d, "results.html"), encoding="utf-8") as fp:
+                    html = fp.read()
+        finally:
+            kw.OUT_DIR = saved
+        self.assertIn("Rain shadow (evidence only)", html)
+        self.assertIn("graded city-days", html)
+        # and a state with no rain key renders no rain section
+        rep3 = kw.compute_report({"predictions": {}, "resolved": []})
+        self.assertNotIn("rain", rep3)
 
 
 if __name__ == "__main__":
