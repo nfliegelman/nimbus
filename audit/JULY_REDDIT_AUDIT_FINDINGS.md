@@ -11,6 +11,20 @@ CONFIG_HASH `5a84b45a`. All repository numbers below were recomputed read-only
 in this session; all external observations were made live on 2026-07-28.
 `weather_state.json` was not modified. `kalshi_weather.py` was not run.
 
+**Revisions 2026-07-29 (language tightened, no finding changed):** four
+statements below are narrowed so the record does not overstate the evidence.
+(1) "The forecast layer is near-optimal / the leak is selection" is the
+narrower claim that no tested challenger among the 8 pre-stated configs
+(n=859, strict walk-forward) shows a meaningful improvement; an untested
+forecast improvement could still exist. (2) The audit-era core book is -0.8
+percent ON A 69-PLAY SAMPLE with a 90 percent block-bootstrap CI of [-19.8
+percent, +19.2 percent]: consistent with breakeven, and also with meaningfully
+negative or positive. (3) The registered gates are a path to EVIDENCE, not a
+guaranteed path to profitability; "do not adopt" and "stop" are among their
+honest outcomes. (4) Experiment ETAs must use each gate's own
+binding-observation accrual rate, not total settlement volume; the computed
+rates live in `audit/EXECUTION_REALISM_DESIGN.md` section 13.
+
 **Companion documents:** `audit/REDDIT_FINDINGS.md` (2026-07-28 addendum
 reviewed first, per its instruction), HANDOFF.md v6.19 through v6.24, FUTURE.md
 dockets 1, 6, 7 and section 5. Several of the brief's "suspected gaps" were
@@ -589,8 +603,9 @@ belong in the section 12 patch (different family).
 
 Expected value, stated honestly: `backtest_models.py` on 859 events shows the
 pricing pool at 1.708 MAE with the adopted skill-pool at 1.693 and every
-single-provider config at 1.798 or worse; the forecast layer is near-optimal
-and the measured leak is selection. The AI providers' plausible contribution
+single-provider config at 1.798 or worse; no tested challenger improves on
+the pricing pool meaningfully, so remaining upside is being pursued in
+selection (revision note, top of file). The AI providers' plausible contribution
 is diversity (a genuinely different model core), not raw skill, and the
 diminishing-returns classification in the post-audit priority list stands
 until the gate says otherwise.
@@ -841,9 +856,9 @@ the AI replacement-stack row (section 11.4).
 9. How much paper P&L assumes top-of-book fills? 100% by construction; plausible at 11-333 contracts, unproven.
 10. Is open interest adding selection value? Unknown; decision-time OI is joinable for 3 plays; historically untestable, replayable via book0 going forward (MIN_OI 1000 is already a docket 6 candidate).
 11. Would volume/depth add information beyond spread+OI? Plausibly at larger size; log-only first.
-12. Losses from forecasting vs selection? Selection: forecast layer near-optimal (859-event race), leak concentrated in cheap-tail adverse selection (already registered as docket 1).
+12. Losses from forecasting vs selection? No tested forecast challenger (8 configs, n=859) improves on the champion meaningfully, while the measured dollar losses concentrate in cheap-tail adverse selection at the play filter (registered as docket 1); an untested forecast improvement remains possible in principle.
 13. Legacy vs current losses? Legacy engine -$183 of the -$278; audit-era core book -$8.73 (69 plays); audit cheap cell -$85.83 (14 plays).
-14. HIGH Buy NO near break-even prospectively? Yes: -0.2% lifetime, and the audit-era core book overall is -0.8%.
+14. HIGH Buy NO near break-even prospectively? Yes: -0.2% lifetime, and the audit-era core book overall is -0.8% on 69 plays (90% block-bootstrap CI [-19.8%, +19.2%]: a small sample consistent with breakeven, not proof of it).
 15. LOW Buy NO still poor after controls? Direction persists in the audit era (-34.6%, n=25); too thin to act; covered by registered slate.
 16. Lead-0 mostly pre-nowcast? Entirely: 33 of 33 plays are legacy-era.
 17. Is decision-time field loss impairing diagnosis? Yes, measurably: the stated-edge tile has read a false +0.0c since 2026-07-06; net-edge bands are uncomputable.
