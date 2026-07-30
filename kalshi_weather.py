@@ -1482,6 +1482,97 @@ def play_pwin(p):
     mp_e=min(max(mp,TAIL_FLOOR),1.0-TAIL_FLOOR)
     return mp_e if p.get("side")=="Buy YES" else 1.0-mp_e
 
+def _play_view(pls,resolved):
+    """Every display aggregate derived from PLAYS, computed over whatever play
+    list is handed in. Called once for the whole book and once for
+    current-engine plays alone, so the era toggle governs the entire
+    play-derived view rather than only the headline.
+
+    Deliberately NOT in here: calibration bins, learned corrections, source
+    MAE, spread skill, the era table, and the gates. Those describe the
+    FORECASTER, or are already era-scoped by their own registration, and must
+    keep counting the whole record. `resolved` is the matching record scope and
+    is used only for the events count."""
+    out={}
+    if not pls: return out
+    wins=sum(1 for p in pls if p["won"]); tot=len(pls); pnl=sum(p["pnl"] for p in pls)
+    staked=sum(p["contracts"]*p["entry"] for p in pls)
+    nmar=sum(1 for p in pls if p["margin"] is not None)
+    out["pnl"]={"n":tot,"wins":wins,"winrate":wins/tot,"net":pnl,"staked":staked,
+                "roi":(pnl/staked if staked else 0),"net_units":pnl/BASE_UNIT_USD,
+                "avg_margin":sum(p["margin"] for p in pls if p["margin"] is not None)/max(1,nmar)}
+    out["n_events"]=len(resolved)
+    ncon=sum(p["contracts"] for p in pls)
+    if ncon:
+        out["edge_real"]=pnl/ncon
+        netp=[p for p in pls if p.get("net") is not None]
+        ncon_net=sum(p["contracts"] for p in netp)
+        if ncon_net:
+            out["edge_stated"]=sum(p["net"]*p["contracts"] for p in netp)/ncon_net
+            out["edge_stated_n"]=len(netp)
+    days=defaultdict(list)
+    for p in pls: days[p["target"]].append(p)
+    dk=sorted(days)
+    if len(dk)>=3:
+        rng=random.Random(len(pls)*100003+len(dk))
+        rois=[]
+        for _ in range(800):
+            sample=[p for _x in range(len(dk)) for p in days[rng.choice(dk)]]
+            st=sum(p["contracts"]*p["entry"] for p in sample)
+            if st: rois.append(sum(p["pnl"] for p in sample)/st)
+        rois.sort()
+        if rois: out["roi_ci"]=(rois[int(0.05*len(rois))],rois[int(0.95*len(rois))],len(dk))
+    cl=[p for p in pls if p.get("clv") is not None]
+    live=[p for p in cl if abs(p["clv"])>1e-9 or p.get("close_mid")!=p.get("mid")]
+    if cl:
+        out["clv"]={"n":len(cl),"beat":sum(1 for p in cl if p["clv"]>0),
+                    "avg":sum(p["clv"] for p in cl)/len(cl),"live":len(live)}
+    byc=defaultdict(lambda:{"n":0,"w":0,"pnl":0.0})
+    for p in pls:
+        a=byc[p["code"]]; a["n"]+=1; a["w"]+=1 if p["won"] else 0; a["pnl"]+=p["pnl"]
+    out["by_city"]=sorted(((CITIES[c][3],v["n"],v["w"],v["pnl"]) for c,v in byc.items()),key=lambda x:-x[3])
+    byu=defaultdict(lambda:{"n":0,"w":0,"pnl":0.0})
+    for p in pls:
+        a=byu[p["units"]]; a["n"]+=1; a["w"]+=1 if p["won"] else 0; a["pnl"]+=p["pnl"]
+    out["by_unit"]=sorted(((u,v["n"],v["w"],v["pnl"]) for u,v in byu.items()),key=lambda x:-x[0])
+    def _win(dcount):
+        cut=(TODAY-dt.timedelta(days=dcount)).isoformat()
+        sel=[x for x in pls if x["target"]>=cut]
+        if not sel: return None
+        w=sum(1 for x in sel if x["won"])
+        return {"n":len(sel),"w":w,"wr":w/len(sel),"u":sum(x["pnl"] for x in sel)/BASE_UNIT_USD}
+    out["windows"]={"day":_win(1),"week":_win(7),"all":_win(100000)}
+    EB=[(0.0,0.08,"under 8%"),(0.08,0.15,"8-15%"),(0.15,0.25,"15-25%"),(0.25,9.0,"25%+")]
+    bye=[]
+    for lo,hi,lab in EB:
+        sel=[x for x in pls if x.get("edge") is not None and lo<=abs(x["edge"])<hi]
+        if sel:
+            w=sum(1 for x in sel if x["won"]); bye.append((lab,len(sel),w,sum(x["pnl"] for x in sel)))
+    out["by_edge"]=bye
+    PB=[(0.0,0.50,"under 50%"),(0.50,0.65,"50-65%"),(0.65,0.80,"65-80%"),(0.80,1.01,"80%+")]
+    byp=[]
+    for lo,hi,lab in PB:
+        sel=[]
+        for x in pls:
+            if x.get("mp") is None: continue
+            pw=x["mp"] if x.get("side")=="Buy YES" else 1-x["mp"]
+            if lo<=pw<hi: sel.append((x,pw))
+        if sel:
+            w=sum(1 for x,_ in sel if x["won"])
+            stk=sum(x["contracts"]*x["entry"] for x,_ in sel)
+            pn=sum(x["pnl"] for x,_ in sel)
+            avgp=sum(pw for _,pw in sel)/len(sel)
+            byp.append((lab,len(sel),w,avgp,pn,(pn/stk if stk else 0.0)))
+    out["by_pwin"]=byp
+    spls=sorted(pls,key=lambda x:x["target"])
+    ser=[]; run=0.0
+    for p in spls:
+        run+=p["pnl"]/BASE_UNIT_USD; ser.append(round(run,2))
+    out["cum"]=ser
+    out["cum_dates"]=(spls[0]["target"],spls[-1]["target"])
+    out["recent"]=sorted(pls,key=lambda x:x["target"],reverse=True)
+    return out
+
 def compute_report(state):
     resolved=[r for r in state.get("resolved",[]) if not r.get("gated")]   # quarantined records never enter any aggregate
     bk=[b for r in resolved for b in r["buckets"]]
@@ -1602,126 +1693,18 @@ def compute_report(state):
     rep["city_bias"]=sorted(((CITIES[c][3],k,sum(v)/len(v),len(v)) for (c,k),v in cb.items()),key=lambda x:-abs(x[2]))
     # play performance
     if pls:
-        wins=sum(1 for p in pls if p["won"]); tot=len(pls); pnl=sum(p["pnl"] for p in pls)
-        staked=sum(p["contracts"]*p["entry"] for p in pls)
-        rep["pnl"]={"n":tot,"wins":wins,"winrate":wins/tot,"net":pnl,"staked":staked,
-                    "roi":(pnl/staked if staked else 0),"net_units":pnl/BASE_UNIT_USD,
-                    "avg_margin":sum(p["margin"] for p in pls if p["margin"] is not None)/max(1,sum(1 for p in pls if p["margin"] is not None))}
-        # Current-engine headline (display only): the same aggregates over plays
-        # frozen under the audit build (v11+), so the owner can read the live
-        # strategy without the retired pre-audit engine's frozen mistakes
-        # blended in. The all-time row stays computed and one tap away: this is
-        # a VIEW split, not a record split, and every gate, kill criterion, and
-        # chart keeps reading the whole book exactly as before. Absent when the
-        # book has no era mix (all-legacy or all-current needs no toggle).
+        rep.update(_play_view(pls,resolved))
+        # ERA VIEW (display only): the identical play-derived tables over
+        # current-engine plays alone. Before this, only the headline and the
+        # chart followed the toggle while every table stayed all-time, which
+        # was actively misleading: San Antonio reads +31.8u all-time and +0.1u
+        # on the current engine, because two retired-engine longshot hits carry
+        # the entire number. Gates, kill criteria, and the forecast-record
+        # tables are untouched and still count the whole book.
         curp=[p for p in pls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
-        if curp and len(curp)<tot:
-            w2=sum(1 for p in curp if p["won"]); pnl2=sum(p["pnl"] for p in curp)
-            st2=sum(p["contracts"]*p["entry"] for p in curp)
-            nm2=sum(1 for p in curp if p["margin"] is not None)
-            rep["pnl_cur"]={"n":len(curp),"wins":w2,"winrate":w2/len(curp),"net":pnl2,"staked":st2,
-                            "roi":(pnl2/st2 if st2 else 0),"net_units":pnl2/BASE_UNIT_USD,
-                            "avg_margin":sum(p["margin"] for p in curp if p["margin"] is not None)/max(1,nm2),
-                            "n_events":sum(1 for r in resolved
-                                           if _era_label(r.get("model_version") or "")!="Legacy (pre-audit)")}
-        # Honesty tiles (audit batch 10): stated edge vs realized cents/contract,
-        # and a block-bootstrap-by-target-date ROI interval (batch 9 verdict).
-        # random is DETERMINISTICALLY seeded from the data so identical inputs
-        # still reproduce identical output (batch 8 replay guarantee holds).
-        ncon=sum(p["contracts"] for p in pls)
-        if ncon:
-            rep["edge_real"]=pnl/ncon
-            # Stated edge averages ONLY over plays that retained net (kept at
-            # resolve since 2026-07-28). Dividing by ALL contracts, as this did
-            # until then, reported a false +0.0c while no resolved play carried
-            # the field, and would understate forever as mixed eras accumulate.
-            # No reconstruction fallback exists: net is not recoverable for
-            # plays settled without it (unlike p_win), so absence means absence.
-            netp=[p for p in pls if p.get("net") is not None]
-            ncon_net=sum(p["contracts"] for p in netp)
-            if ncon_net:
-                rep["edge_stated"]=sum(p["net"]*p["contracts"] for p in netp)/ncon_net
-                rep["edge_stated_n"]=len(netp)
-        days=defaultdict(list)
-        for p in pls: days[p["target"]].append(p)
-        dk=sorted(days)
-        if len(dk)>=3:
-            rng=random.Random(len(pls)*100003+len(dk))
-            rois=[]
-            for _ in range(800):
-                sample=[p for _x in range(len(dk)) for p in days[rng.choice(dk)]]
-                st=sum(p["contracts"]*p["entry"] for p in sample)
-                if st: rois.append(sum(p["pnl"] for p in sample)/st)
-            rois.sort()
-            if rois: rep["roi_ci"]=(rois[int(0.05*len(rois))],rois[int(0.95*len(rois))],len(dk))
-        cl=[p for p in pls if p.get("clv") is not None]
-        live=[p for p in cl if abs(p["clv"])>1e-9 or p.get("close_mid")!=p.get("mid")]
-        if cl:
-            rep["clv"]={"n":len(cl),"beat":sum(1 for p in cl if p["clv"]>0),
-                        "avg":sum(p["clv"] for p in cl)/len(cl),"live":len(live)}
-        # by city
-        byc=defaultdict(lambda:{"n":0,"w":0,"pnl":0.0})
-        for p in pls:
-            a=byc[p["code"]]; a["n"]+=1; a["w"]+=1 if p["won"] else 0; a["pnl"]+=p["pnl"]
-        rep["by_city"]=sorted(((CITIES[c][3],v["n"],v["w"],v["pnl"]) for c,v in byc.items()),key=lambda x:-x[3])
-        # by unit
-        byu=defaultdict(lambda:{"n":0,"w":0,"pnl":0.0})
-        for p in pls:
-            a=byu[p["units"]]; a["n"]+=1; a["w"]+=1 if p["won"] else 0; a["pnl"]+=p["pnl"]
-        rep["by_unit"]=sorted(((u,v["n"],v["w"],v["pnl"]) for u,v in byu.items()),key=lambda x:-x[0])
-        # time-windowed win rate, by target date
-        def _win(days):
-            cut=(TODAY-dt.timedelta(days=days)).isoformat()
-            sel=[x for x in pls if x["target"]>=cut]
-            if not sel: return None
-            w=sum(1 for x in sel if x["won"])
-            return {"n":len(sel),"w":w,"wr":w/len(sel),"u":sum(x["pnl"] for x in sel)/BASE_UNIT_USD}
-        rep["windows"]={"day":_win(1),"week":_win(7),"all":_win(100000)}
-        # win rate by edge magnitude (does a bigger edge actually win more?)
-        EB=[(0.0,0.08,"under 8%"),(0.08,0.15,"8-15%"),(0.15,0.25,"15-25%"),(0.25,9.0,"25%+")]
-        bye=[]
-        for lo,hi,lab in EB:
-            sel=[x for x in pls if x.get("edge") is not None and lo<=abs(x["edge"])<hi]
-            if sel:
-                w=sum(1 for x in sel if x["won"]); bye.append((lab,len(sel),w,sum(x["pnl"] for x in sel)))
-        rep["by_edge"]=bye
-        # win rate and P&L by the model's stated win probability at bet time.
-        # This is the go/no-go table for a "bet only the high-confidence cards"
-        # strategy: it shows whether 80%+ plays actually deliver ROI or just wins.
-        PB=[(0.0,0.50,"under 50%"),(0.50,0.65,"50-65%"),(0.65,0.80,"65-80%"),(0.80,1.01,"80%+")]
-        byp=[]
-        for lo,hi,lab in PB:
-            sel=[]
-            for x in pls:
-                if x.get("mp") is None: continue
-                pw=x["mp"] if x.get("side")=="Buy YES" else 1-x["mp"]
-                if lo<=pw<hi: sel.append((x,pw))
-            if sel:
-                w=sum(1 for x,_ in sel if x["won"])
-                stk=sum(x["contracts"]*x["entry"] for x,_ in sel)
-                pn=sum(x["pnl"] for x,_ in sel)
-                avgp=sum(pw for _,pw in sel)/len(sel)
-                byp.append((lab,len(sel),w,avgp,pn,(pn/stk if stk else 0.0)))
-        rep["by_pwin"]=byp
-        # cumulative series (in UNITS: owner directive 2026-07-06, the display is
-        # bankroll-agnostic until a real unit is chosen), ordered by target date
-        spls=sorted(pls,key=lambda x:x["target"])
-        ser=[]; run=0.0
-        for p in spls:
-            run+=p["pnl"]/BASE_UNIT_USD; ser.append(round(run,2))
-        rep["cum"]=ser
-        rep["cum_dates"]=(spls[0]["target"],spls[-1]["target"])
-        # current-engine cumulative (display only, mirrors pnl_cur): the chart
-        # was the one all-time element left under the era toggle, and without
-        # dates its legacy-era swings read as the live strategy's
-        curs=[p for p in spls if _era_label(p.get("model_version") or "")!="Legacy (pre-audit)"]
-        if curs and len(curs)<len(spls):
-            c2=[]; run2=0.0
-            for p in curs:
-                run2+=p["pnl"]/BASE_UNIT_USD; c2.append(round(run2,2))
-            rep["cum_cur"]=c2
-            rep["cum_cur_dates"]=(curs[0]["target"],curs[-1]["target"])
-        rep["recent"]=sorted(pls,key=lambda x:x["target"],reverse=True)
+        if curp and len(curp)<len(pls):
+            rep["cur"]=_play_view(curp,[r for r in resolved
+                                        if _era_label(r.get("model_version") or "")!="Legacy (pre-audit)"])
         # Era split in units: the honest instrument for "is the audit build
         # better", once its plays settle. Version stamps make this a query.
         eras=defaultdict(lambda:[0,0,0.0,0.0])
@@ -2079,59 +2062,64 @@ def render_results(rep,updated,health=None,alerts=None):
         html=(head("results",updated,_health_strip(health,alerts))+"<h2 class='sec'>Results tracker</h2>"
               +body+GLOSSARY+"</div></body></html>")
         with open(os.path.join(OUT_DIR,"results.html"),"w",encoding="utf-8") as fp: fp.write(html); return
-    def _kpi_row(q,ev,div_id="",hidden=False):
+    def _kpi_row(q,ev):
         c="up" if q["net"]>=0 else "red"
-        attrs=(f" id='{div_id}'" if div_id else "")+(" style='display:none'" if hidden else "")
-        return (f"<div class='kpi'{attrs}>"
+        return (f"<div class='kpi'>"
           f"<div class='kbox'><div class='v {c}'>{q['net_units']:+.1f}u</div><div class='l'>net units</div></div>"
           f"<div class='kbox'><div class='v'>{q['winrate']*100:.0f}%</div><div class='l'>win rate ({q['wins']}/{q['n']})</div></div>"
           f"<div class='kbox'><div class='v {c}'>{q['roi']*100:+.1f}%</div><div class='l'>ROI</div></div>"
           f"<div class='kbox'><div class='v'>{q['avg_margin']:+.1f}\u00b0</div><div class='l'>avg margin</div></div>"
           f"<div class='kbox'><div class='v'>{ev}</div><div class='l'>events</div></div></div>")
     p=rep["pnl"]
-    if rep.get("pnl_cur"):
-        # Era view toggle (display only): current engine first, because that is
-        # the strategy actually running; the all-time row, which includes the
-        # retired pre-audit engine's frozen plays, is one tap away and every
-        # chart, table, and gate below the toggle stays all-time as before.
-        kpis=("<div class='eratog'><button id='eb-cur' class='on' type='button'>Current engine</button>"
+    # ERA TOGGLE (display only). SCOPES drives EVERY play-derived block below:
+    # current engine first because that is the strategy actually running, all
+    # time one tap away. Class-based rather than id-based so any number of
+    # blocks can follow the toggle without new wiring.
+    CUR=rep.get("cur")
+    SCOPES=[(CUR,False),(rep,True)] if CUR else [(rep,False)]
+    def _era(html,hidden):
+        if CUR is None: return html
+        return (f"<div class='era-all' style='display:none'>{html}</div>" if hidden
+                else f"<div class='era-cur'>{html}</div>")
+    def _blocks(fn): return "".join(_era(fn(v),h) for v,h in SCOPES)
+    toggle=""
+    if CUR:
+        toggle=("<div class='eratog'><button id='eb-cur' class='on' type='button'>Current engine</button>"
               "<button id='eb-all' type='button'>All time</button></div>"
               "<div class='eranote'>Current engine = plays frozen under the audit build (Jul 6 on). "
-              "All time adds the retired pre-audit engine. The P&amp;L chart follows this toggle; "
-              "every gate and table below always counts everything.</div>"
-              +_kpi_row(rep["pnl_cur"],rep["pnl_cur"]["n_events"],"kpi-cur")
-              +_kpi_row(p,rep["n_events"],"kpi-all",hidden=True)
-              +"<script>(function(){var c=document.getElementById('eb-cur'),a=document.getElementById('eb-all');"
-               "function sw(cur){var g=function(i){return document.getElementById(i)};"
-               "var kc=g('kpi-cur'),ka=g('kpi-all'),cc=g('ch-cur'),ca=g('ch-all');"
-               "kc.style.display=cur?'':'none';ka.style.display=cur?'none':'';"
-               "if(cc){cc.style.display=cur?'':'none';ca.style.display=cur?'none':'';}"
-               "c.className=cur?'on':'';a.className=cur?'':'on';}"
-               "c.onclick=function(){sw(true)};a.onclick=function(){sw(false)};})();</script>")
-    else:
-        kpis=_kpi_row(p,rep["n_events"])
-    honest=""
-    if rep.get("edge_real") is not None or rep.get("roi_ci") or rep.get("clv"):
+              "All time adds the retired pre-audit engine. EVERY play-derived box, chart and table on this page "
+              "follows this toggle. The forecast tables further down (calibration, learned corrections, forecast "
+              "sources, spread) describe the FORECASTER rather than the betting and always count the whole "
+              "record, as do every gate and kill criterion.</div>"
+              "<script>(function(){var c=document.getElementById('eb-cur'),a=document.getElementById('eb-all');"
+              "function sw(cur){var i,A=document.querySelectorAll('.era-cur'),B=document.querySelectorAll('.era-all');"
+              "for(i=0;i<A.length;i++){A[i].style.display=cur?'':'none';}"
+              "for(i=0;i<B.length;i++){B[i].style.display=cur?'none':'';}"
+              "c.className=cur?'on':'';a.className=cur?'':'on';}"
+              "c.onclick=function(){sw(true)};a.onclick=function(){sw(false)};})();</script>")
+    kpis=toggle+_blocks(lambda v:_kpi_row(v["pnl"],v["n_events"]))
+    def _honest(v):
         cells=""
-        if rep.get("edge_stated") is not None:
-            ec="up" if rep["edge_real"]>=rep["edge_stated"] else "red"
-            cells+=(f"<div class='kbox'><div class='v'>{rep['edge_stated']*100:+.1f}\u00a2</div><div class='l'>stated edge /contract ({rep.get('edge_stated_n',0)} plays)</div></div>"
-                    f"<div class='kbox'><div class='v {ec}'>{rep['edge_real']*100:+.1f}\u00a2</div><div class='l'>realized /contract</div></div>")
-        elif rep.get("edge_real") is not None:
+        if v.get("edge_stated") is not None:
+            ec="up" if v["edge_real"]>=v["edge_stated"] else "red"
+            cells+=(f"<div class='kbox'><div class='v'>{v['edge_stated']*100:+.1f}\u00a2</div><div class='l'>stated edge /contract ({v.get('edge_stated_n',0)} plays)</div></div>"
+                    f"<div class='kbox'><div class='v {ec}'>{v['edge_real']*100:+.1f}\u00a2</div><div class='l'>realized /contract</div></div>")
+        elif v.get("edge_real") is not None:
             cells+=(f"<div class='kbox'><div class='v dim'>pending</div><div class='l'>stated edge /contract (plays before 2026-07-28 lack it)</div></div>"
-                    f"<div class='kbox'><div class='v'>{rep['edge_real']*100:+.1f}\u00a2</div><div class='l'>realized /contract</div></div>")
-        if rep.get("roi_ci"):
-            lo,hi,nd=rep["roi_ci"]
+                    f"<div class='kbox'><div class='v'>{v['edge_real']*100:+.1f}\u00a2</div><div class='l'>realized /contract</div></div>")
+        if v.get("roi_ci"):
+            lo,hi,nd=v["roi_ci"]
             cells+=f"<div class='kbox'><div class='v'>{lo*100:+.0f}% .. {hi*100:+.0f}%</div><div class='l'>ROI 90% CI (block by day, {nd}d)</div></div>"
-        if rep.get("clv"):
-            c=rep["clv"]
+        if v.get("clv"):
+            c=v["clv"]
             if c["live"]:
                 cv="up" if c["avg"]>0 else "red"
                 cells+=(f"<div class='kbox'><div class='v'>{c['beat']}/{c['n']}</div><div class='l'>beat the close</div></div>"
                         f"<div class='kbox'><div class='v {cv}'>{c['avg']*100:+.1f}\u00a2</div><div class='l'>avg CLV (edge shows here first)</div></div>")
             else:
                 cells+=f"<div class='kbox'><div class='v dim'>{c['n']} logged</div><div class='l'>CLV pending multi-board settlements</div></div>"
-        honest="<div class='kpi'>"+cells+"</div>"
+        return ("<div class='kpi'>"+cells+"</div>") if cells else ""
+    honest=_blocks(_honest)
     srct=""
     if rep.get("sources"):
         rowsS="".join(f"<tr><td>{esc(k)}</td><td class='n'>{mae:.2f}\u00b0</td><td class='n'>{n}</td></tr>"
@@ -2159,14 +2147,12 @@ def render_results(rep,updated,health=None,alerts=None):
             srct+=("<div class='kpi'>"
               f"<div class='kbox'><div class='v dim'>{rn['pend']} logged</div>"
               "<div class='l'>city-days collected, first grades land after the next settlements</div></div></div>")
-    if rep.get("cum_cur"):
-        chart=("<div class='card' id='ch-cur'>"
-               +svg_line(rep["cum_cur"],title="cumulative units P&L, current engine",dates=rep.get("cum_cur_dates"))
-               +"</div><div class='card' id='ch-all' style='display:none'>"
-               +svg_line(rep.get("cum",[]),title="cumulative units P&L, all time (incl. retired engine)",dates=rep.get("cum_dates"))
-               +"</div>")
-    else:
-        chart=f"<div class='card'>{svg_line(rep.get('cum',[]),dates=rep.get('cum_dates'))}</div>"
+    def _chart(v):
+        ttl=("cumulative units P&L, current engine" if (CUR and v is CUR)
+             else "cumulative units P&L, all time (incl. retired engine)" if CUR
+             else "cumulative units P&L")
+        return "<div class='card'>"+svg_line(v.get("cum",[]),title=ttl,dates=v.get("cum_dates"))+"</div>"
+    chart=_blocks(_chart)
     calsec=""
     if rep.get("calib_series"):
         cs=rep["calib_series"]
@@ -2233,21 +2219,31 @@ def render_results(rep,updated,health=None,alerts=None):
     def _wk(lbl,d):
         if not d: return f"<div class='kbox'><div class='v dim'>-</div><div class='l'>{lbl}</div></div>"
         return f"<div class='kbox'><div class='v'>{d['wr']*100:.0f}%</div><div class='l'>{lbl} ({d['w']}/{d['n']})</div></div>"
-    winrow=("<div class='kpi'>"+_wk("win% past day",W.get("day"))+_wk("win% past week",W.get("week"))
-            +_wk("win% overall",W.get("all"))+"</div>")
-    # by edge magnitude
-    et="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
-               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
-               for lab,n,w,pn in rep.get("by_edge",[]))
-    # by city
-    ct="".join(f'<tr><td>{esc(l)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
-               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
-               for l,n,w,pn in rep.get("by_city",[]))
-    city_bars=svg_bars([(l,pn) for l,n,w,pn in rep.get("by_city",[])])
-    # by unit
-    ut="".join(f'<tr><td>{unit_str(u)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
-               f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
-               for u,n,w,pn in rep.get("by_unit",[]))
+    def _winrow(v):
+        w=v.get("windows") or {}
+        return ("<div class='kpi'>"+_wk("win% past day",w.get("day"))+_wk("win% past week",w.get("week"))
+                +_wk("win% overall",w.get("all"))+"</div>")
+    winrow=_blocks(_winrow)
+    def _edgesec(v):
+        rows="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
+                   f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
+                   for lab,n,w,pn in v.get("by_edge",[]))
+        return ("<table><thead><tr><th>Edge</th><th class='n'>Bets</th><th class='n'>W/L</th>"
+                "<th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+rows+"</tbody></table>")
+    def _citysec(v):
+        rows="".join(f'<tr><td>{esc(l)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
+                   f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
+                   for l,n,w,pn in v.get("by_city",[]))
+        return ("<div class='card'>"+svg_bars([(l,pn) for l,n,w,pn in v.get("by_city",[])])+"</div>"
+                "<table><thead><tr><th>City</th><th class='n'>Bets</th><th class='n'>W/L</th>"
+                "<th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+rows+"</tbody></table>")
+    def _unitsec(v):
+        rows="".join(f'<tr><td>{unit_str(u)}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
+                   f'<td class="n">{(w/n*100):.0f}%</td><td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td></tr>'
+                   for u,n,w,pn in v.get("by_unit",[]))
+        return ("<table><thead><tr><th>Size</th><th class='n'>Bets</th><th class='n'>W/L</th>"
+                "<th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+rows+"</tbody></table>")
+    edgesec=_blocks(_edgesec); citysec=_blocks(_citysec); unitsec=_blocks(_unitsec)
     # brier
     brier=""
     if rep.get("brier_model") is not None:
@@ -2308,40 +2304,41 @@ def render_results(rep,updated,health=None,alerts=None):
           "<table><thead><tr><th>City</th><th>Mkt</th><th class='n'>Shift</th><th class='n'>Width</th>"
           "<th class='n'>Settled</th></tr></thead><tbody>"+rowsL+"</tbody></table>")
     # by stated win probability: the go/no-go readout for betting only high-confidence cards
-    pwt=""
-    if rep.get("by_pwin"):
+    def _pwsec(v):
         pr="".join(f'<tr><td>{lab}</td><td class="n">{n}</td><td class="n">{w}/{n}</td>'
                    f'<td class="n">{ap*100:.0f}%</td><td class="n">{(w/n*100):.0f}%</td>'
                    f'<td class="n {"up" if pn>=0 else "red"}">{pn/BASE_UNIT_USD:+.1f}u</td>'
                    f'<td class="n {"up" if roi>=0 else "red"}">{roi*100:+.1f}%</td></tr>'
-                   for lab,n,w,ap,pn,roi in rep["by_pwin"])
+                   for lab,n,w,ap,pn,roi in v.get("by_pwin",[]))
+        return ("<table><thead><tr><th>Stated</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Avg stated</th>"
+          "<th class='n'>Actual</th><th class='n'>P&amp;L</th><th class='n'>ROI</th></tr></thead><tbody>"+pr+"</tbody></table>")
+    pwt=""
+    if rep.get("by_pwin"):
         pwt=("<h2 class='sec'>By win probability</h2>"
           "<div class='note'>Each play grouped by the win probability the model stated when the bet was logged. "
           "Two things to check before betting only the high-confidence cards: does the actual column roughly match "
           "the stated column (calibration), and does the 80%+ row have positive ROI, not just a high win rate? "
           "High-probability plays win small and lose big, so a few points of overconfidence flips them negative "
-          "while still feeling like winning.</div>"
-          "<table><thead><tr><th>Stated</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Avg stated</th>"
-          "<th class='n'>Actual</th><th class='n'>P&amp;L</th><th class='n'>ROI</th></tr></thead><tbody>"+pr+"</tbody></table>")
-    raw="".join(f'<tr><td>{esc(CITIES[r["code"]][3])}</td><td>{"H" if r["kind"]=="HIGH" else "L"} {r["target"][5:]}</td>'
+          "while still feeling like winning.</div>"+_blocks(_pwsec))
+    def _rawrows(v):
+        return "".join(f'<tr><td>{esc(CITIES[r["code"]][3])}</td><td>{"H" if r["kind"]=="HIGH" else "L"} {r["target"][5:]}</td>'
                 f'<td>{esc(r["sub"])}</td><td>{unit_str(r["units"])}</td><td class="pl">{r["side"]}@{r["entry"]*100:.0f}\u00a2</td>'
                 f'<td class="n">{r["actual"]}\u00b0</td><td>{"WON" if r["won"] else "LOST"}</td>'
                 f'<td class="n">{("%+.1f"%r["margin"]) if r["margin"] is not None else DOT}\u00b0</td>'
                 f'<td class="n {"up" if r["pnl"]>=0 else "red"}">{r["pnl"]/BASE_UNIT_USD:+.1f}u</td></tr>'
-                for r in rep.get("recent",[])[:60])
+                for r in v.get("recent",[])[:60])
+    rawsec=_blocks(lambda v:("<table><thead><tr><th>City</th><th>Mkt</th><th>Bucket</th><th>Size</th><th>Bet</th>"
+                             "<th class='n'>Actual</th><th>Result</th><th class='n'>Margin</th>"
+                             "<th class='n'>P&amp;L</th></tr></thead><tbody>"+_rawrows(v)+"</tbody></table>"))
     html=(head("results",updated,_health_strip(health,alerts))+
       "<h2 class='sec'>Performance</h2>"+kpis+winrow+honest+chart+brier+calsec+GLOSSARY+
-      "<h2 class='sec'>By city</h2><div class='card'>"+city_bars+"</div>"
-      "<table><thead><tr><th>City</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+ct+"</tbody></table>"
-      "<h2 class='sec'>By unit size</h2>"
-      "<table><thead><tr><th>Size</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+ut+"</tbody></table>"
+      "<h2 class='sec'>By city</h2>"+citysec+
+      "<h2 class='sec'>By unit size</h2>"+unitsec+
       "<h2 class='sec'>By edge size</h2>"
       "<div class='note'>The calibration check that matters most: a bigger edge should win more often. "
       "If the 25%+ row wins less than the 8-15% row, those fat edges are the model being wrong, not free money.</div>"
-      "<table><thead><tr><th>Edge</th><th class='n'>Bets</th><th class='n'>W/L</th><th class='n'>Win%</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+et+"</tbody></table>"
-      +pwt+caltab+lct+srct+
-      "<h2 class='sec'>Every resolved bet</h2>"
-      "<table><thead><tr><th>City</th><th>Mkt</th><th>Bucket</th><th>Size</th><th>Bet</th><th class='n'>Actual</th><th>Result</th><th class='n'>Margin</th><th class='n'>P&amp;L</th></tr></thead><tbody>"+raw+"</tbody></table>"
+      +edgesec+pwt+caltab+lct+srct+
+      "<h2 class='sec'>Every resolved bet</h2>"+rawsec+
       "</div></body></html>")
     with open(os.path.join(OUT_DIR,"results.html"),"w",encoding="utf-8") as fp: fp.write(html)
 
