@@ -108,23 +108,36 @@ class TestReport(unittest.TestCase):
         self.assertEqual(rep1["clv"]["n"], 4)
         self.assertTrue(any("NBM" in k for k, _, _ in rep1["sources"]))
 
-    def test_current_engine_headline_splits_by_era(self):
-        """pnl_cur must aggregate ONLY plays frozen under the audit build, and
-        must be absent when the book has no era mix (a toggle with one option
-        is noise). The all-time row is untouched either way: this is a view
-        split, and every gate keeps counting the whole record."""
+    def test_era_toggle_splits_every_play_derived_view(self):
+        """The toggle must govern EVERY play-derived aggregate, not just the
+        headline. Shipping it as headline-plus-chart only was misleading: a
+        by-city row that reads +31.8u all-time and +0.1u on the current engine
+        showed the all-time number in both views. Forecast-record tables
+        (calibration bins, learned corrections, sources) and the gates stay
+        whole-record on purpose."""
         st = self._state()
         for r in st["resolved"][:2]:            # 2 of 4 plays become legacy
             for pl in r["plays"]: pl["model_version"] = "2026-07-02.v3-nimbus-calib"
         rep = kw.compute_report(st)
-        cur = rep.get("pnl_cur")
-        self.assertTrue(cur and cur["n"] == 2)
-        self.assertEqual(rep["pnl"]["n"], 4)     # all-time unchanged
-        self.assertEqual(cur["net"], sum(p["pnl"] for r in st["resolved"][2:] for p in r["plays"]))
-        # no era mix -> no toggle
-        self.assertIsNone(kw.compute_report(self._state()).get("pnl_cur"))
-        # rendered page: toggle present, current engine is the visible default,
-        # all-time row rendered but hidden, and the note keeps it honest
+        cur = rep.get("cur")
+        self.assertTrue(cur and cur["pnl"]["n"] == 2)
+        self.assertEqual(rep["pnl"]["n"], 4)     # all-time view unchanged
+        # every play-derived table must differ in scope, not just the headline
+        for k in ("by_city", "by_unit", "by_edge", "by_pwin", "recent", "cum", "windows"):
+            self.assertIn(k, cur, k)
+        self.assertEqual(len(cur["recent"]), 2)
+        self.assertEqual(len(cur["cum"]), 2)
+        self.assertEqual(sum(n for _l, n, _w, _p in cur["by_city"]), 2)
+        self.assertEqual(sum(n for _u, n, _w, _p in cur["by_unit"]), 2)
+        self.assertEqual(cur["pnl"]["net"],
+                         sum(p["pnl"] for r in st["resolved"][2:] for p in r["plays"]))
+        # bucket-level and gate aggregates are NOT era-scoped
+        self.assertNotIn("bins", cur)
+        self.assertIn("bins", rep)
+        # no era mix -> no toggle at all
+        self.assertIsNone(kw.compute_report(self._state()).get("cur"))
+        # rendered page: toggle present, current-engine blocks visible,
+        # all-time blocks rendered but hidden, and BOTH scopes' tables present
         saved = kw.OUT_DIR
         try:
             with tempfile.TemporaryDirectory() as d:
@@ -135,21 +148,14 @@ class TestReport(unittest.TestCase):
         finally:
             kw.OUT_DIR = saved
         self.assertIn("Current engine", html)
-        self.assertIn("id='kpi-cur'", html)
-        self.assertIn("id='kpi-all' style='display:none'", html)
-        self.assertIn("every gate and table below always counts everything", html)
-        # the P&L chart follows the toggle (owner request 2026-07-29): both
-        # series render, current engine visible, all-time hidden, dates labeled
-        self.assertEqual(len(rep["cum_cur"]), rep["pnl_cur"]["n"])
-        self.assertEqual(rep["cum_dates"][0], "2026-07-01")
-        self.assertIn("id='ch-cur'", html)
-        self.assertIn("id='ch-all' style='display:none'", html)
+        self.assertIn("EVERY play-derived box, chart and table on this page", html)
+        # one wrapper pair per play-derived block (kpi, winrow, honest, chart,
+        # city, unit, edge, pwin, raw = 9), each present in both scopes
+        self.assertEqual(html.count("class='era-cur'"), 9)
+        self.assertEqual(html.count("class='era-all' style='display:none'"), 9)
+        self.assertIn("current engine</text>", html)
         self.assertIn("all time (incl. retired engine)", html)
-        self.assertIn(f">{rep['cum_cur_dates'][0]}</text>", html)
-        # no era mix -> single chart, still date-labeled
-        rep_all = kw.compute_report(self._state())
-        self.assertNotIn("cum_cur", rep_all)
-        self.assertIn("cum_dates", rep_all)
+        self.assertIn(f">{cur['cum_dates'][0]}</text>", html)
 
     def test_stated_edge_averages_only_net_bearing_plays(self):
         """Plays settled before 2026-07-28 carry no net (resolve dropped it).
