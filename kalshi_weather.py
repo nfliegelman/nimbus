@@ -68,6 +68,15 @@ GATE_MIN_MODELS  = 3    # of the 4 ensemble models must have contributed
 TAIL_FLOOR = 0.015
 MIN_OI        = 300
 PLAY_NET_EDGE = 0.04
+# DORMANT (pre-staged 2026-07-31 for the docket 1 tripwire; see
+# protocols/GATE_PLAYBOOK.md gate 1). At 0.0 this floor is provably inert
+# (every entry price exceeds it; unit-tested bit-identical). It is
+# deliberately NOT in _KNOB_NAMES while dormant so CONFIG_HASH does not move
+# for a no-op. If the pre-committed remedy fires at the 40-play gate, the
+# entire behavior change is: set 0.20, add "MIN_ENTRY" to _KNOB_NAMES, bump
+# MODEL_VERSION, changelog + Decision Log in the same commit. Do not set any
+# other value without its own registration.
+MIN_ENTRY     = 0.0
 MAX_LEAD_DAYS = 4
 LEAD_CAP_DAYS = 3        # plays 3+ days out are capped at 1u; forecast skill decays fast
 BIAS_TOL      = 2.0
@@ -1082,7 +1091,7 @@ def score(state):
             if edge>0: side,entry,net="Buy YES",b["ya"],edge-cost
             else:      side,entry,net="Buy NO",round(1-b["yb"],2),(-edge)-cost
             base=((not gate) and (not biased) and (not realized) and net>=PLAY_NET_EDGE and b["oi"]>=MIN_OI
-                  and lead<=MAX_LEAD_DAYS and 0.02<mid<0.98)
+                  and lead<=MAX_LEAD_DAYS and 0.02<mid<0.98 and entry>=MIN_ENTRY)
             tier=None; eff=net; units=0.0; p_win=None; size_reason=""; hiconf=False
             if base:
                 p_win = mp_e if side=="Buy YES" else 1-mp_e
