@@ -1716,5 +1716,498 @@ class TestRainShadow(unittest.TestCase):
         self.assertIn("first grades land after the next settlements", html4)
 
 
+class TestMarketParser(unittest.TestCase):
+    """The Kalshi pull is the run's front door and has already failed silently
+    once: matching only KXHIGHT dropped 7 of 20 HIGH ladders (see the comment in
+    pull_weather_markets). These tests feed canned API pages through a
+    monkeypatched fget so both ticker generations, the NY alias, the quote
+    filter, pagination, and the ladder-count abort are pinned without a
+    network."""
+
+    def setUp(self):
+        self._saved = kw.fget
+
+    def tearDown(self):
+        kw.fget = self._saved
+
+    def _mkt(self, t, st, fl, cp, quoted=True):
+        m = {"ticker": t, "strike_type": st, "floor_strike": fl, "cap_strike": cp,
+             "yes_sub_title": "s", "open_interest_fp": 500}
+        if quoted:
+            m["yes_bid_dollars"] = 0.10
+            m["yes_ask_dollars"] = 0.12
+        return m
+
+    def _event(self, series, datecode="26AUG02", markets=None):
+        et = f"{series}-{datecode}"
+        if markets is None:
+            markets = [self._mkt(et + "-L", "less", None, 90),
+                       self._mkt(et + "-B1", "between", 90, 91),
+                       self._mkt(et + "-B2", "between", 92, 93),
+                       self._mkt(et + "-G", "greater", 93, None)]
+        return {"series_ticker": series, "event_ticker": et, "markets": markets}
+
+    def test_both_ticker_generations_alias_and_filters(self):
+        codes = list(kw.CITIES)
+        evs = [self._event("KXHIGHT" + c) for c in codes]      # new generation, all 20
+        evs += [self._event("KXLOW" + c) for c in codes[:5]]   # legacy LOWs
+        evs.append(self._event("KXHIGHNY", datecode="26AUG03"))   # legacy NYC alias
+        evs.append(self._event("KXLOWTDEN"))                      # new-generation LOW
+        # a ladder with an unquoted tail: the bucket is untradeable and drops,
+        # but the structure check reads ALL strikes and must stay green
+        unq = self._event("KXHIGHTSEA", datecode="26AUG03")
+        g = unq["markets"][3]
+        unq["markets"][3] = self._mkt(g["ticker"], "greater", 93, None, quoted=False)
+        evs.append(unq)
+        # junk that must fall out without taking the pull down
+        evs.append(self._event("KXHIGHXYZ"))                      # not a Nimbus city
+        evs.append(self._event("KXRAINDAL"))                      # different series family
+        evs.append(self._event("KXHIGHTDAL", datecode="BADDT"))   # unparseable date
+        evs.append({"series_ticker": None, "event_ticker": ""})   # degenerate event
+        kw.fget = lambda u, tries=3: {"events": evs}
+        lads = kw.pull_weather_markets()
+        self.assertEqual(len(lads), 28)
+        by = {(l["code"], l["kind"], l["date"].isoformat()) for l in lads}
+        self.assertIn(("NYC", "HIGH", "2026-08-03"), by)   # NY series lands on NYC
+        self.assertIn(("DEN", "LOW", "2026-08-02"), by)
+        self.assertIn(("ATL", "LOW", "2026-08-02"), by)
+        for c in kw.CITIES:
+            self.assertIn((c, "HIGH", "2026-08-02"), by, c)
+        self.assertFalse(any(l["code"] == "XYZ" for l in lads))
+        sea = next(l for l in lads if l["code"] == "SEA" and l["date"].isoformat() == "2026-08-03")
+        self.assertEqual(len(sea["buckets"]), 3)     # unquoted tail is not tradeable
+        self.assertTrue(sea["structure_ok"])         # but the ladder is structurally whole
+        b = lads[0]["buckets"][0]
+        self.assertEqual((b["yb"], b["ya"], b["oi"]), (0.10, 0.12, 500))
+        ny = next(l for l in lads if l["code"] == "NYC" and l["date"].isoformat() == "2026-08-03")
+        self.assertEqual(ny["event_ticker"], "KXHIGHNY-26AUG03")
+
+    def test_pagination_follows_the_cursor(self):
+        codes = list(kw.CITIES)
+        page1 = {"events": [self._event("KXHIGHT" + c) for c in codes], "cursor": "next"}
+        page2 = {"events": [self._event("KXLOW" + c) for c in codes]}
+        calls = []
+        def fake(u, tries=3):
+            calls.append(u)
+            return page2 if "cursor=next" in u else page1
+        kw.fget = fake
+        lads = kw.pull_weather_markets()
+        self.assertEqual(len(lads), 40)
+        self.assertEqual(len(calls), 2)
+        self.assertIn("cursor=next", calls[1])
+
+    def test_truncated_universe_aborts_instead_of_publishing(self):
+        # a thin or empty pull must never publish as a quiet day
+        kw.fget = lambda u, tries=3: {"events": [self._event("KXHIGHTDAL")]}
+        with self.assertRaises(SystemExit) as cm:
+            kw.pull_weather_markets()
+        self.assertEqual(cm.exception.code, 2)
+        kw.fget = lambda u, tries=3: None            # total API failure
+        with self.assertRaises(SystemExit):
+            kw.pull_weather_markets()
+
+    def test_settlement_parser_maps_results_and_values(self):
+        captured = {}
+        def fake(u, tries=3):
+            captured["url"] = u
+            return {"markets": [
+                {"ticker": "A", "result": "yes", "expiration_value": "95.0"},
+                {"ticker": "B", "result": "no", "expiration_value": None},
+                {"ticker": "C", "result": "", "expiration_value": "x"}]}
+        kw.fget = fake
+        got = kw.fetch_settled_event("EVT-26AUG02")
+        self.assertEqual(got["A"], ("yes", 95.0))
+        self.assertEqual(got["B"], ("no", None))
+        self.assertEqual(got["C"], ("", None))   # junk value degrades to None, never crashes
+        self.assertIn("event_ticker=EVT-26AUG02", captured["url"])
+        self.assertIn("status=settled", captured["url"])
+        kw.fget = lambda u, tries=3: None
+        self.assertEqual(kw.fetch_settled_event("EVT"), {})   # not settled yet reads as empty
+
+
+class TestForecastFetchParsers(unittest.TestCase):
+    """Open-Meteo response parsing. Every other test monkeypatches these
+    fetchers, so nothing checked the JSON-to-member-cloud transform itself,
+    including the LST day windowing Kalshi settlements are cut on."""
+
+    def setUp(self):
+        self._saved = kw.fget
+
+    def tearDown(self):
+        kw.fget = self._saved
+
+    def _page(self, vals):
+        return {"utc_offset_seconds": -18000,   # CDT; the standard offset is -21600
+                "hourly": {"time": ["2026-08-01T23:00", "2026-08-02T00:00", "2026-08-02T01:00"],
+                           "temperature_2m_member01": vals}}
+
+    def test_members_use_lst_days_and_survive_a_model_outage(self):
+        def fake(u, tries=3):
+            if "models=gem_global" in u:
+                return None                      # one provider down mid-run
+            return self._page([80.0, 90.0, None])
+        kw.fget = fake
+        highs, lows, offset, pm = kw.fetch_members(32.9, -97.04, "America/Chicago")
+        # the 00:00 Aug 2 clock reading belongs to the Aug 1 LST day: local
+        # midnight during DST is 23:00 standard time. Naive local-day grouping
+        # would file the 90 under Aug 2 and cut every daily extreme on the
+        # wrong window from March to November.
+        self.assertEqual(set(highs), {"2026-08-01"})
+        self.assertEqual(highs["2026-08-01"], [90.0] * 3)
+        self.assertEqual(lows["2026-08-01"], [80.0] * 3)
+        self.assertEqual(offset, -18000)
+        self.assertEqual(set(pm), set(kw.ENSEMBLE_MODELS) - {"gem_global"})
+        for m in pm:
+            self.assertEqual(pm[m]["hi"]["2026-08-01"], [90.0])
+
+    def test_ai_members_come_back_in_their_own_dict(self):
+        kw.fget = lambda u, tries=3: self._page([70.0, 75.0, None])
+        pm = kw.fetch_ai_members(32.9, -97.04, "America/Chicago")
+        self.assertEqual(set(pm), set(kw.AI_ENSEMBLE_MODELS))
+        for m in kw.AI_ENSEMBLE_MODELS:
+            self.assertEqual(pm[m]["hi"]["2026-08-01"], [75.0])
+            self.assertEqual(pm[m]["lo"]["2026-08-01"], [70.0])
+
+    def test_ref_parses_per_model_and_gates_on_hourly_coverage(self):
+        times = ["2026-08-01T%02d:00" % h for h in range(24)]
+        nbm = [60.0 + h for h in range(24)]
+        hrrr = [None] * 19 + [70.0, 71.0, 72.0, 73.0, 74.0]
+        kw.fget = lambda u, tries=3: {"utc_offset_seconds": -21600,
+                                      "hourly": {"time": times,
+                                                 "temperature_2m_ncep_nbm_conus": nbm,
+                                                 "temperature_2m_ncep_hrrr_conus": hrrr}}
+        ref = kw.fetch_ref(32.9, -97.04, "America/Chicago")
+        self.assertEqual(ref["ncep_nbm_conus"]["2026-08-01"], {"hi": 83.0, "lo": 60.0, "nh": 24})
+        self.assertEqual(ref["ncep_hrrr_conus"]["2026-08-01"]["nh"], 5)
+        # _ref_for surfaces real coverage only: 5 hourly points cannot claim a daily max
+        self.assertEqual(kw._ref_for(ref, "HIGH", "2026-08-01"), {"nbm": 83.0})
+        self.assertEqual(kw._ref_for(ref, "LOW", "2026-08-01"), {"nbm": 60.0})
+        kw.fget = lambda u, tries=3: None
+        self.assertEqual(kw.fetch_ref(32.9, -97.04, "America/Chicago"), {})
+
+    def test_run_meta_formats_the_provenance_stamp(self):
+        t = 1754020800
+        kw.fget = lambda u, tries=3: ({"last_run_initialisation_time": t}
+                                      if "/data/ncep_gefs025/" in u else None)
+        out = kw.fetch_run_meta()
+        want = dtm.datetime.fromtimestamp(t, dtm.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+        self.assertEqual(out, {"gfs025": want})
+
+
+class TestDriftAlerts(unittest.TestCase):
+    """The four display-only alarms (audit batch 7). An alarm that has never
+    fired in a test is an alarm nobody knows works: each leg gets a synthetic
+    state built to trip it and a control built not to."""
+
+    def test_brier_gap_drift_fires_on_recent_decay(self):
+        def rec(i, mp, hit):
+            return {"code": "DAL", "kind": "HIGH", "target": "t%03d" % i, "bias_corr": 0.0,
+                    "buckets": [{"mp": mp, "mid": 1.0 if hit else 0.0, "hit": hit}]}
+        good = [rec(i, 1.0, 1) for i in range(150)]        # model and market both sharp
+        bad = [rec(150 + i, 0.0, 1) for i in range(120)]   # model inverts, market stays sharp
+        al = kw.drift_alerts({"resolved": good + bad, "predictions": {}})
+        self.assertTrue(any(a.startswith("drift:") for a in al), al)
+        steady = [rec(i, 0.6, 1) for i in range(270)]
+        al2 = kw.drift_alerts({"resolved": steady, "predictions": {}})
+        self.assertFalse(any(a.startswith("drift:") for a in al2), al2)
+
+    def test_calibration_bin_alarm(self):
+        def rec(i, mp, hit):
+            return {"code": "DAL", "kind": "HIGH", "target": "t%03d" % i, "bias_corr": 0.0,
+                    "buckets": [{"mp": mp, "mid": mp, "hit": hit}]}
+        never = [rec(i, 0.55, 0) for i in range(30)]   # a 50-60% claim that never cashes
+        al = kw.drift_alerts({"resolved": never, "predictions": {}})
+        self.assertTrue(any(a.startswith("calibration: 50-60%") for a in al), al)
+        honest = [rec(i, 0.55, 1 if i % 2 else 0) for i in range(30)]
+        al2 = kw.drift_alerts({"resolved": honest, "predictions": {}})
+        self.assertFalse(any(a.startswith("calibration:") for a in al2), al2)
+
+    def test_dispersion_alarm_reads_sd_of_z(self):
+        def rec(i, bias):
+            return {"code": "DAL", "kind": "HIGH", "target": "t%03d" % i, "bias": bias,
+                    "bias_corr": 0.0, "psd": 1.0, "sd": 1.0, "sigma": 1.1,
+                    "buckets": [{"mp": None, "mid": None, "hit": 0}]}
+        tight = [rec(i, 2.0 if i % 2 else -2.0) for i in range(60)]
+        al = kw.drift_alerts({"resolved": tight, "predictions": {}})
+        self.assertTrue(any("too tight (overconfident)" in a for a in al), al)
+        wide = [rec(i, 0.5 if i % 2 else -0.5) for i in range(60)]
+        al2 = kw.drift_alerts({"resolved": wide, "predictions": {}})
+        self.assertTrue(any("too wide (underconfident)" in a for a in al2), al2)
+        ok = [rec(i, 1.0 if i % 2 else -1.0) for i in range(60)]
+        al3 = kw.drift_alerts({"resolved": ok, "predictions": {}})
+        self.assertFalse(any(a.startswith("dispersion:") for a in al3), al3)
+
+    def test_correction_jump_alarm_and_snapshot_update(self):
+        def rec(i):
+            return {"code": "DAL", "kind": "HIGH", "target": "2026-07-%02d" % (i + 1),
+                    "bias": 3.0, "bias_corr": 0.0, "sd": 1.0, "sigma": 1.1}
+        rs = [rec(i) for i in range(10)]   # corr learns toward -3 * 10/15 = -2.0
+        st = {"resolved": rs, "predictions": {}, "calib_snapshot": {"DAL|HIGH": 0.0}}
+        al = kw.drift_alerts(st)
+        self.assertTrue(any(a.startswith("correction jump: DAL|HIGH") for a in al), al)
+        self.assertAlmostEqual(st["calib_snapshot"]["DAL|HIGH"], -2.0, places=6)
+        # first run has no baseline: the snapshot seeds silently instead of alarming
+        st2 = {"resolved": rs, "predictions": {}}
+        al2 = kw.drift_alerts(st2)
+        self.assertFalse(any(a.startswith("correction jump") for a in al2), al2)
+        self.assertIn("DAL|HIGH", st2["calib_snapshot"])
+
+
+class TestGovernanceInstruments(unittest.TestCase):
+    """Kill legs and sizing caps are pre-registered governance. A kill leg that
+    cannot fire in a test is a kill switch nobody has ever flipped."""
+
+    def _play(self, pnl, clv):
+        return {"stake": 10.0, "pnl": pnl, "clv": clv, "won": pnl > 0}
+
+    def _leg(self, gate, label):
+        return next((m, d) for l, m, d in gate if l == label)
+
+    def test_roi_kill_leg_fires_on_a_deep_drawdown(self):
+        audp = [self._play(-2.0, 0.01) for _ in range(160)]   # -20% ROI, every resample
+        gate = kw._prod_gate(audp, [1.0, -1.0] * 20, 40)
+        met, detail = self._leg(gate, "neither kill leg fired")
+        self.assertFalse(met)
+        self.assertIn("ROI leg FIRED", detail)
+
+    def test_clv_kill_leg_fires_alone_when_roi_is_healthy(self):
+        audp = [self._play(1.0, -0.02) for _ in range(160)]   # profitable but behind the close
+        gate = kw._prod_gate(audp, [1.0, -1.0] * 20, 40)
+        met, detail = self._leg(gate, "neither kill leg fired")
+        self.assertFalse(met)
+        self.assertIn("CLV leg FIRED", detail)
+        self.assertNotIn("ROI leg FIRED", detail)
+
+    def test_kill_legs_clear_on_a_healthy_book_past_150(self):
+        audp = [self._play(1.0, 0.02) for _ in range(160)]
+        gate = kw._prod_gate(audp, [1.0, -1.0] * 20, 40)
+        met, detail = self._leg(gate, "neither kill leg fired")
+        self.assertTrue(met)
+        self.assertEqual(detail, "both legs clear")
+        self.assertTrue(all(m for _, m, _ in gate))   # every condition green on this book
+
+    def test_size_play_caps_each_bind_in_turn(self):
+        self.assertEqual(kw.size_play(0.03, 0.6, True), (0.0, ""))          # under the edge floor
+        u, r = kw.size_play(0.25, 0.9, True)                                # implausible edge
+        self.assertEqual(u, 1.0)
+        self.assertIn("implausibly large", r)
+        u, r = kw.size_play(0.15, 0.45, True)                               # win-prob ceiling
+        self.assertEqual(u, 1.5)
+        self.assertIn("trimmed", r)
+        u, r = kw.size_play(0.15, 0.60, True, lead=kw.LEAD_CAP_DAYS)        # lead-time cap
+        self.assertEqual(u, 1.0)
+        self.assertIn("days out, capped", r)
+        self.assertEqual(kw.size_play(0.15, 0.60, True, lead=1), (2.0, ""))  # none binding
+        u, r = kw.size_play(0.15, 0.60, False)                              # unproven city lock
+        self.assertEqual(u, 1.5)
+        self.assertIn("not yet proven", r)
+        # the lead cap trims oversized plays only: a 1u play 4 days out stays 1u
+        self.assertEqual(kw.size_play(0.05, 0.30, True, lead=4), (1.0, ""))
+
+    def test_city_skill_needs_twenty_buckets(self):
+        def recs(n):
+            return [{"code": "DAL", "kind": "HIGH",
+                     "buckets": [{"mp": 1.0, "mid": 0.5, "hit": 1}]} for _ in range(n)]
+        self.assertEqual(kw.city_skill({"resolved": recs(19)}), {})
+        sk = kw.city_skill({"resolved": recs(20)})
+        self.assertAlmostEqual(sk[("DAL", "HIGH")]["brier_edge"], 0.25, places=9)
+
+
+class TestMainOrchestration(unittest.TestCase):
+    """main() wiring. The shadow branch carries the 16:10 cron's whole promise:
+    collect snapshots, write state, touch NOTHING else. The normal branch must
+    keep state saved before any render and must survive a rain failure, because
+    rain is evidence and temperature is the product."""
+
+    PIPELINE = ("resolve_pending", "shadow_pass", "rain_resolve", "rain_pass", "score",
+                "drift_alerts", "archive_pass", "compute_report", "save_state",
+                "render_bets", "render_results", "notify_telegram")
+
+    def setUp(self):
+        self._saved = {n: getattr(kw, n) for n in self.PIPELINE}
+        self._saved_paths = (kw.STATE_PATH, kw.OUT_DIR, kw.ARCHIVE_PATH)
+        self._saved_env = {k: os.environ.get(k) for k in ("NIMBUS_SHADOW_RUN", "CI")}
+        self._saved_fget = kw.fget
+        kw.fget = _no_network
+        os.environ["CI"] = "true"    # never open a browser from the suite
+
+    def tearDown(self):
+        for n, f in self._saved.items():
+            setattr(kw, n, f)
+        kw.STATE_PATH, kw.OUT_DIR, kw.ARCHIVE_PATH = self._saved_paths
+        kw.fget = self._saved_fget
+        for k, v in self._saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def _wire(self, calls, td, forbidden=()):
+        kw.STATE_PATH = os.path.join(td, "weather_state.json")
+        kw.ARCHIVE_PATH = os.path.join(td, "weather_state_archive.json")
+        kw.OUT_DIR = os.path.join(td, "docs")
+        ret = {"resolve_pending": 0, "shadow_pass": 0, "rain_resolve": 0, "rain_pass": None,
+               "score": ([], [], {"gated": [], "capped": 0, "new_24h": 0}),
+               "drift_alerts": [], "archive_pass": 0, "compute_report": {},
+               "save_state": None, "render_bets": None, "render_results": None,
+               "notify_telegram": None}
+        for n in self.PIPELINE:
+            if n in forbidden:
+                def boom(*a, __n=n, **k):
+                    raise AssertionError(__n + " must not run on a shadow run")
+                setattr(kw, n, boom)
+            else:
+                def stub(*a, __n=n, **k):
+                    calls.append(__n)
+                    return ret[__n]
+                setattr(kw, n, stub)
+
+    def test_shadow_run_touches_nothing_but_the_snapshot_and_state(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["NIMBUS_SHADOW_RUN"] = "1"
+            forbidden = tuple(n for n in self.PIPELINE
+                              if n not in ("shadow_pass", "save_state"))
+            self._wire(calls, td, forbidden=forbidden)
+            kw.save_state = self._saved["save_state"]   # the real writer, aimed at the tempdir
+            kw.main()
+            self.assertEqual(calls, ["shadow_pass"])
+            with open(kw.STATE_PATH, encoding="utf-8") as f:
+                self.assertEqual(json.load(f), {"predictions": {}, "resolved": []})
+            self.assertFalse(os.path.exists(os.path.join(kw.OUT_DIR, "index.html")))
+            self.assertFalse(os.path.exists(os.path.join(kw.OUT_DIR, "results.html")))
+
+    def test_normal_run_saves_state_before_rendering(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as td:
+            os.environ.pop("NIMBUS_SHADOW_RUN", None)
+            self._wire(calls, td)
+            kw.main()
+        self.assertLess(calls.index("resolve_pending"), calls.index("score"))
+        self.assertLess(calls.index("save_state"), calls.index("render_bets"))
+        self.assertEqual(calls[-1], "notify_telegram")
+        for n in self.PIPELINE:
+            self.assertIn(n, calls)
+
+    def test_rain_failure_never_costs_the_temperature_run(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as td:
+            os.environ.pop("NIMBUS_SHADOW_RUN", None)
+            self._wire(calls, td)
+            def rain_boom(*a, **k):
+                raise RuntimeError("kalshi rain endpoint fell over")
+            kw.rain_resolve = rain_boom
+            kw.main()                          # must complete anyway
+        self.assertIn("score", calls)
+        self.assertIn("render_bets", calls)
+        self.assertNotIn("rain_pass", calls)   # the whole rain block aborts together
+
+
+class TestDisplayHelpers(unittest.TestCase):
+    def test_svg_multi_edges(self):
+        self.assertEqual(kw.svg_multi([[None, None]], ["a"], ["#fff"]), "")
+        flat = kw.svg_multi([[1.0, 1.0, 1.0]], ["flat"], ["#fff"])   # zero range: no div-by-zero
+        self.assertIn("<svg", flat)
+        gap = kw.svg_multi([[1.0, 2.0, None, 3.0, 4.0]], ["g"], ["#fff"])
+        self.assertEqual(gap.count("<polyline"), 2)                  # a None breaks the line
+        reffed = kw.svg_multi([[1.0, 2.0]], ["r"], ["#fff"], ref=0.5)
+        self.assertIn("stroke-dasharray", reffed)
+
+    def test_small_parsers_and_fallbacks(self):
+        self.assertEqual(kw.parse_date_code("26AUG02"), dtm.date(2026, 8, 2))
+        self.assertIsNone(kw.parse_date_code("BAD"))
+        self.assertEqual(kw.fnum("3.5"), 3.5)
+        self.assertEqual(kw.fnum(None, 7), 7)
+        self.assertIsNone(kw.fnum("x"))
+        self.assertEqual(kw.bucket_range({"stype": "weird"}), (-999, 999))
+        self.assertIsNone(kw.bucket_rep({"stype": "greater", "floor": None}))
+        b = {"stype": "between", "floor": 90, "cap": 91}
+        self.assertEqual(kw.margin_deg(90.5, b, True), 1.0)     # dead center: a degree of room
+        self.assertEqual(kw.margin_deg(93.0, b, False), -1.5)   # missed by a degree and a half
+        # a malformed strike (None where a boundary belongs) reads as broken, not a crash
+        bad = [("less", None, 90), ("between", 90, None), ("between", 92, 93), ("greater", 93, None)]
+        self.assertFalse(kw._ladder_contiguous(bad))
+
+    def test_notify_telegram_is_a_silent_noop_and_never_fatal(self):
+        import urllib.request as ur
+        saved_env = {k: os.environ.pop(k, None) for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")}
+        saved_open = ur.urlopen
+        ur.urlopen = _no_network
+        try:
+            # no secrets: returns before any request is even built
+            self.assertIsNone(kw.notify_telegram([], {}, [], {}))
+            # secrets set but the endpoint down: swallowed, never fatal to the run
+            os.environ["TELEGRAM_BOT_TOKEN"] = "t"
+            os.environ["TELEGRAM_CHAT_ID"] = "c"
+            self.assertIsNone(kw.notify_telegram([], {}, [], {}))
+        finally:
+            ur.urlopen = saved_open
+            for k, v in saved_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+
+class TestOfflineTools(unittest.TestCase):
+    """replay_selection.agg feeds every replay verdict, and backtest_models
+    promises its copied helpers stay in sync with kalshi_weather. Both promises
+    are cheap to hold in CI and expensive to discover broken."""
+
+    def test_replay_agg_totals_and_bootstrap_gate(self):
+        import replay_selection as rs
+        self.assertIsNone(rs.agg([]))
+        plays = [{"won": True, "pnl": 5.8, "contracts": 20, "entry": 0.5},
+                 {"won": False, "pnl": -5.0, "contracts": 10, "entry": 0.5}]
+        a = rs.agg(plays)
+        self.assertEqual((a["n"], a["w"]), (2, 1))
+        self.assertAlmostEqual(a["pnl"], 0.8, places=9)
+        self.assertAlmostEqual(a["staked"], 15.0, places=9)
+        self.assertIsNone(a["lo"])                    # under 25 plays: no CI is claimed
+        big = rs.agg(plays * 13)                      # 26 plays clears the gate
+        self.assertIsNotNone(big["lo"])
+        self.assertLessEqual(big["lo"], big["roi"])
+        self.assertLessEqual(big["roi"], big["hi"])
+
+    def test_backtest_helpers_match_the_live_engine(self):
+        import backtest_models as bt
+        # the file header PROMISES these copies stay in sync; hold it to that.
+        # The live version rounds to 3 places at the return (storage bytes),
+        # the offline copy keeps full precision, so sync means equal-after-round.
+        for y, mu, s in ((0.0, 0.0, 1.0), (91.0, 90.2, 1.7)):
+            self.assertEqual(round(bt._crps_gauss(y, mu, s), 3), kw._crps_gauss(y, mu, s))
+        mm = {"gfs025": {"n": 4, "mean": 80.0}, "icon_seamless": {"n": 8, "mean": 100.0}}
+        w = {"gfs025": 1.0, "icon_seamless": 1.0}
+        self.assertAlmostEqual(bt._mix_mean(mm, w), kw._mix_mean(mm, w), places=12)
+        self.assertEqual(bt._era(""), "legacy")
+        self.assertEqual(bt._era("2026-07-02.v3-nimbus-calib"), "legacy")
+        self.assertEqual(bt._era("2026-07-25.v15-nowcast-live"), "audit")
+        # roll30 shrinkage identical to the live calibration learner
+        st = {"resolved": [{"code": "DAL", "kind": "HIGH", "target": "2026-07-%02d" % (i + 1),
+                            "bias": 3.0, "bias_corr": 0.0, "sd": 1.0, "sigma": 1.1}
+                           for i in range(10)], "predictions": {}}
+        self.assertAlmostEqual(bt.roll30_corr([3.0] * 10),
+                               kw.calib_params(st)[("DAL", "HIGH")]["corr"], places=2)
+
+    def test_backtest_weighting_schemes_filter_ai_providers(self):
+        import backtest_models as bt
+        mm = {"gfs025": {"n": 4, "mean": 90.0}, "ecmwf_ifs025": {"n": 2, "mean": 90.0},
+              "icon_seamless": {"n": 8, "mean": 90.0}, "gem_global": {"n": 1, "mean": 90.0},
+              "ncep_aigefs025": {"n": 31, "mean": 80.0}, "ecmwf_aifs025": {"n": 51, "mean": 99.0}}
+        self.assertEqual(set(bt.w_member_count(mm, None)), set(bt.MODELS))
+        self.assertEqual(set(bt.w_equal(mm, None)), set(bt.MODELS))
+        # skill weights: below warmup fall back to member count, past it favor accuracy
+        hk_thin = {m: [0.5] * 10 for m in bt.MODELS}
+        self.assertEqual(bt.w_skill_invmse(mm, hk_thin), bt.w_member_count(mm, None))
+        hk = {m: [0.2] * 40 for m in bt.MODELS}
+        hk["gem_global"] = [4.0] * 40
+        w = bt.w_skill_invmse(mm, hk)
+        self.assertGreater(w["gfs025"], w["gem_global"])
+        self.assertEqual(set(w), set(bt.MODELS))               # AI never sneaks in
+        # the AI-aware row scores only records carrying both AI providers
+        self.assertEqual(set(bt.w_member_count_with_ai(mm, None)), set(bt.MODELS + bt.AI_MODELS))
+        self.assertIsNone(bt.w_member_count_with_ai({k: mm[k] for k in bt.MODELS}, None))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
