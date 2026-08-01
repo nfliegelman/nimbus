@@ -824,6 +824,42 @@ class TestPipeline(unittest.TestCase):
         kw.score(state)
         self.assertEqual(state["predictions"]["DAL|HIGH|" + self.day]["book0"]["source_mp"], frozen)
 
+    def test_min_entry_knob_is_dormant_and_wired(self):
+        """Pre-staged docket 1 remedy (protocols/GATE_PLAYBOOK.md gate 1). The
+        knob must be provably inert at 0.0, absent from _KNOB_NAMES while
+        dormant (a no-op must not move CONFIG_HASH), and genuinely wired so
+        the future flip is one constant. This test also PINS dormancy: anyone
+        flipping the value without executing the full remedy protocol
+        (registration check, _KNOB_NAMES, MODEL_VERSION, docs) breaks it."""
+        self.assertEqual(kw.MIN_ENTRY, 0.0)                # dormancy pin
+        self.assertNotIn("MIN_ENTRY", kw._KNOB_NAMES)      # hash must not move for a no-op
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        s1 = {"predictions": {}, "resolved": []}
+        kw.score(s1)
+        base = [(k, [(pl["ticker"], pl["side"]) for pl in p.get("plays", [])])
+                for k, p in sorted(s1["predictions"].items())]
+        self.assertTrue(any(pl for _k, pl in base), "fixture produced no plays")
+        # wired: an impossible floor filters every play, while records still log
+        saved = kw.MIN_ENTRY
+        try:
+            kw.MIN_ENTRY = 1.01
+            self._wire([self._lad(c) for c in healthy])
+            s2 = {"predictions": {}, "resolved": []}
+            kw.score(s2)
+            self.assertTrue(s2["predictions"])                       # logging unaffected
+            self.assertTrue(all(not p.get("plays") for p in s2["predictions"].values()))
+            # inert: back at 0.0 the selection reproduces the baseline exactly
+            kw.MIN_ENTRY = 0.0
+            self._wire([self._lad(c) for c in healthy])
+            s3 = {"predictions": {}, "resolved": []}
+            kw.score(s3)
+            again = [(k, [(pl["ticker"], pl["side"]) for pl in p.get("plays", [])])
+                     for k, p in sorted(s3["predictions"].items())]
+            self.assertEqual(base, again)
+        finally:
+            kw.MIN_ENTRY = saved
+
     def test_ai_evidence_models_log_without_touching_pricing(self):
         """AIGEFS/AIFS are evidence (FUTURE 5, added 2026-07-28): they must land
         in members_by_model and change NOTHING else. The AI fixture is wildly off

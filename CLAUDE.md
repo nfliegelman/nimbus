@@ -102,7 +102,7 @@ whether or not anything looks broken afterward.
 ## Validation required before any commit touching code
 
 1. `python3 -m py_compile kalshi_weather.py`
-2. `python3 test_nimbus.py` (currently 72 tests; all must pass, and new
+2. `python3 test_nimbus.py` (currently 73 tests; all must pass, and new
    behavior needs a new test)
 3. Sandbox double-run per the procedure above: run the script twice, confirm it
    completes, confirm no unintended plays freeze, and confirm any new display
