@@ -181,6 +181,19 @@ SLATE = [
     #    --since 2026-07-29. --
     cfg("one play per ladder", max_plays_event=1),
     cfg("overround <= 0.19 (skip worst qtl)", max_over=0.19),
+    # -- FIFTH-BATCH REGISTRATION 2026-08-03 (owner approval quoted in FUTURE
+    #    docket 6): the first deliberate HYBRID row, closing the two
+    #    independently diagnosed selection leaks with one rule. MIN_ENTRY 0.20
+    #    is the docket 1 pre-committed remedy (cheap entries are adversely
+    #    selected); the 0.80-0.90 p_win band skip answers the winner's-curse
+    #    diagnostic (faded 10-20 pct buckets realized 45.1 pct). Both parents'
+    #    full-sample rows are contaminated by inspected cells, so this combo's
+    #    is too, by construction: ONLY the prospective leg (--since 2026-08-03)
+    #    can promote it. Parameters are the parents', pinned at registration,
+    #    never tunable on the full history. If the docket 1 tripwire ships
+    #    MIN_ENTRY 0.20 into production first, this row stays distinct (it
+    #    additionally skips the band) and keeps racing unchanged. --
+    cfg("MIN_ENTRY 0.20 + skip 80-90", min_entry=0.20, skip_pwin_band=(0.80, 0.90)),
 ]
 # SENSITIVITY ROWS (demoted 2026-07-29, owner-approved, recorded in FUTURE
 # docket 6): still computed and printed every run so the record stays whole,
