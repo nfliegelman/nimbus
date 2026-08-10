@@ -799,6 +799,48 @@ class TestPipeline(unittest.TestCase):
         dull = [rec(d, False) for d in (10, 11, 12, 13)]
         self.assertEqual(rs.replay(dull, rs.cfg("proven2", proven_only=True)), [])
 
+    def test_replay_hybrid_min_entry_plus_band_skip(self):
+        """The 2026-08-03 combo candidate (MIN_ENTRY 0.20 + p_win band skip)
+        must enforce BOTH parent constraints at once, reduce to each parent
+        exactly when the other knob is disabled (the nested-null property that
+        makes a combo readable), and sit in the slate with its parameters
+        pinned so the racing row is provably the registered rule."""
+        import replay_selection as rs
+        healthy = ["DAL", "ATL", "SEA", "BOS", "LV"]
+        self._wire([self._lad(c) for c in healthy])
+        state = {"predictions": {}, "resolved": []}
+        kw.score(state)
+        recs = []
+        for p in state["predictions"].values():
+            b0 = p.get("book0")
+            if not b0: continue
+            gb = [dict(e, hit=1 if i == 1 else 0) for i, e in enumerate(b0["buckets"])]
+            recs.append({"code": p["code"], "kind": p["kind"], "target": p["target"],
+                         "sd": p["sd"], "book0": dict(b0, buckets=gb)})
+        floor_only = rs.replay(recs, rs.cfg("f", min_entry=0.20))
+        self.assertTrue(floor_only, "fixture produced no plays above the floor")
+        # wrap a band around a play the floor KEPT, so the band arm provably bites
+        tgt = floor_only[0]
+        band = (round(tgt["p_win"] - 0.005, 4), round(tgt["p_win"] + 0.005, 4))
+        combo = rs.replay(recs, rs.cfg("combo", min_entry=0.20, skip_pwin_band=band))
+        self.assertNotIn((tgt["ticker"], tgt["side"]),
+                         [(x["ticker"], x["side"]) for x in combo])
+        for x in combo:
+            self.assertGreaterEqual(x["entry"], 0.20)
+            self.assertFalse(band[0] <= x["p_win"] < band[1])
+        # nested null on each axis: disabling one knob reproduces the other parent
+        key = lambda plays: sorted((x["ticker"], x["side"], x["units"]) for x in plays)
+        self.assertEqual(key(rs.replay(recs, rs.cfg("c2", min_entry=0.20, skip_pwin_band=None))),
+                         key(floor_only))
+        band_only = rs.replay(recs, rs.cfg("b", skip_pwin_band=band))
+        self.assertEqual(key(rs.replay(recs, rs.cfg("c3", min_entry=0.0, skip_pwin_band=band))),
+                         key(band_only))
+        # the registered slate row exists, promotable, with the pinned parameters
+        row = next(c for c in rs.SLATE if c["name"] == "MIN_ENTRY 0.20 + skip 80-90")
+        self.assertEqual(row["min_entry"], 0.20)
+        self.assertEqual(row["skip_pwin_band"], (0.80, 0.90))
+        self.assertNotIn(row["name"], rs.SENSITIVITY)
+
     def test_book0_source_mp_per_provider_probabilities(self):
         """source_mp (FUTURE docket 8): each core provider's dressed bucket
         probabilities under the shared calibration, frozen with book0. The July
