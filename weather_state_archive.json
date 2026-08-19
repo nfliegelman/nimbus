@@ -5142,5 +5142,1180 @@
    }
   ],
   "plays": []
+ },
+ {
+  "code": "SATX",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 94,
+  "mean": 96.2132867132867,
+  "bias": 2.2132867132867062,
+  "sd": 1.5513692468826088,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.0764995239680241,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.17725698392499947,
+    "mid": 0.08499999999999999,
+    "hit": 1
+   },
+   {
+    "mp": 0.28883975724943683,
+    "mid": 0.55,
+    "hit": 0
+   },
+   {
+    "mp": 0.2685118101595849,
+    "mid": 0.365,
+    "hit": 0
+   },
+   {
+    "mp": 0.14066337696550432,
+    "mid": 0.015,
+    "hit": 0
+   },
+   {
+    "mp": 0.04822854773245068,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "SATX",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy YES",
+    "entry": 0.09,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 111,
+    "won": true,
+    "pnl": 99.9,
+    "margin": 0.5,
+    "actual": 94,
+    "mp": 0.17725698392499947,
+    "mid": 0.08499999999999999,
+    "edge": 0.09225698392499948,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SATX",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "95\u00b0 to 96\u00b0",
+    "side": "Buy NO",
+    "entry": 0.46,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 21,
+    "won": true,
+    "pnl": 10.92,
+    "margin": 0.5,
+    "actual": 94,
+    "mp": 0.28883975724943683,
+    "mid": 0.55,
+    "edge": -0.2611602427505632,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SATX",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "97\u00b0 to 98\u00b0",
+    "side": "Buy NO",
+    "entry": 0.64,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 15,
+    "won": true,
+    "pnl": 5.1,
+    "margin": 2.5,
+    "actual": 94,
+    "mp": 0.2685118101595849,
+    "mid": 0.365,
+    "edge": -0.09648818984041507,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "OKC",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 100,
+  "mean": 100.11328671328671,
+  "bias": 0.11328671328671192,
+  "sd": 2.4163556261860717,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.20212690697852065,
+    "mid": 0.265,
+    "hit": 0
+   },
+   {
+    "mp": 0.2584239001222873,
+    "mid": 0.455,
+    "hit": 0
+   },
+   {
+    "mp": 0.24529979064317628,
+    "mid": 0.265,
+    "hit": 1
+   },
+   {
+    "mp": 0.14733318765137726,
+    "mid": 0.035,
+    "hit": 0
+   },
+   {
+    "mp": 0.081156216357766,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.06565999824687227,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "OKC",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "98\u00b0 to 99\u00b0",
+    "side": "Buy NO",
+    "entry": 0.55,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 27,
+    "won": true,
+    "pnl": 11.61,
+    "margin": 0.5,
+    "actual": 100,
+    "mp": 0.2584239001222873,
+    "mid": 0.455,
+    "edge": -0.19657609987771274,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "NOLA",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 96,
+  "mean": 92.42587412587412,
+  "bias": -3.5741258741258832,
+  "sd": 2.5048125227979625,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.2868701516076364,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.2299965972202129,
+    "mid": 0.095,
+    "hit": 0
+   },
+   {
+    "mp": 0.21454164017759808,
+    "mid": 0.575,
+    "hit": 0
+   },
+   {
+    "mp": 0.15544454561463739,
+    "mid": 0.345,
+    "hit": 1
+   },
+   {
+    "mp": 0.08253995725120636,
+    "mid": 0.015,
+    "hit": 0
+   },
+   {
+    "mp": 0.030607108128708822,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "NOLA",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "91\u00b0 to 92\u00b0",
+    "side": "Buy YES",
+    "entry": 0.1,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 99,
+    "won": false,
+    "pnl": -10.89,
+    "margin": -3.5,
+    "actual": 96,
+    "mp": 0.2299965972202129,
+    "mid": 0.095,
+    "edge": 0.1349965972202129,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "NOLA",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy NO",
+    "entry": 0.44,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 22,
+    "won": true,
+    "pnl": 11.88,
+    "margin": 1.5,
+    "actual": 96,
+    "mp": 0.21454164017759808,
+    "mid": 0.575,
+    "edge": -0.3604583598224019,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "NOLA",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "95\u00b0 to 96\u00b0",
+    "side": "Buy NO",
+    "entry": 0.66,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 22,
+    "won": false,
+    "pnl": -14.96,
+    "margin": -0.5,
+    "actual": 96,
+    "mp": 0.15544454561463739,
+    "mid": 0.345,
+    "edge": -0.1895554543853626,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "MIN",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 87,
+  "mean": 84.84685314685315,
+  "bias": -2.1531468531468505,
+  "sd": 3.2564256907126645,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.031096916386362493,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.06313803153626098,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.1115142441253763,
+    "mid": 0.025,
+    "hit": 0
+   },
+   {
+    "mp": 0.15301518129711555,
+    "mid": 0.065,
+    "hit": 0
+   },
+   {
+    "mp": 0.18494444142749145,
+    "mid": 0.29500000000000004,
+    "hit": 0
+   },
+   {
+    "mp": 0.4562911852273932,
+    "mid": 0.5800000000000001,
+    "hit": 1
+   }
+  ],
+  "plays": [
+   {
+    "code": "MIN",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "80\u00b0 to 81\u00b0",
+    "side": "Buy YES",
+    "entry": 0.03,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 333,
+    "won": false,
+    "pnl": -9.99,
+    "margin": -5.5,
+    "actual": 87,
+    "mp": 0.1115142441253763,
+    "mid": 0.025,
+    "edge": 0.08651424412537631,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "MIN",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "82\u00b0 to 83\u00b0",
+    "side": "Buy YES",
+    "entry": 0.08,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 124,
+    "won": false,
+    "pnl": -11.16,
+    "margin": -3.5,
+    "actual": 87,
+    "mp": 0.15301518129711555,
+    "mid": 0.065,
+    "edge": 0.08801518129711555,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "MIN",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "84\u00b0 to 85\u00b0",
+    "side": "Buy NO",
+    "entry": 0.73,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 13,
+    "won": true,
+    "pnl": 3.38,
+    "margin": 1.5,
+    "actual": 87,
+    "mp": 0.18494444142749145,
+    "mid": 0.29500000000000004,
+    "edge": -0.1100555585725086,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "MIN",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "86\u00b0 or above",
+    "side": "Buy NO",
+    "entry": 0.46,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 21,
+    "won": false,
+    "pnl": -10.08,
+    "margin": -1.5,
+    "actual": 87,
+    "mp": 0.4562911852273932,
+    "mid": 0.5800000000000001,
+    "edge": -0.12370881477260687,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "HOU",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 99,
+  "mean": 95.37062937062937,
+  "bias": -3.6293706293706265,
+  "sd": 2.6139173551504924,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.19590697476974459,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.24054291254705643,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.22935792304226593,
+    "mid": 0.505,
+    "hit": 0
+   },
+   {
+    "mp": 0.1497147665226635,
+    "mid": 0.455,
+    "hit": 0
+   },
+   {
+    "mp": 0.1004629835102679,
+    "mid": 0.08,
+    "hit": 1
+   },
+   {
+    "mp": 0.08401443960800142,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "HOU",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "95\u00b0 to 96\u00b0",
+    "side": "Buy NO",
+    "entry": 0.5,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 20,
+    "won": true,
+    "pnl": 9.6,
+    "margin": 2.5,
+    "actual": 99,
+    "mp": 0.22935792304226593,
+    "mid": 0.505,
+    "edge": -0.2756420769577341,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "HOU",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "97\u00b0 to 98\u00b0",
+    "side": "Buy NO",
+    "entry": 0.55,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 18,
+    "won": true,
+    "pnl": 7.74,
+    "margin": 0.5,
+    "actual": 99,
+    "mp": 0.1497147665226635,
+    "mid": 0.455,
+    "edge": -0.3052852334773365,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "DC",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 103,
+  "mean": 103.25244755244755,
+  "bias": 0.25244755244754913,
+  "sd": 1.7910746927310321,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.08366353560898136,
+    "mid": 0.035,
+    "hit": 0
+   },
+   {
+    "mp": 0.17245253027600657,
+    "mid": 0.395,
+    "hit": 0
+   },
+   {
+    "mp": 0.27826077344739336,
+    "mid": 0.46499999999999997,
+    "hit": 1
+   },
+   {
+    "mp": 0.26293422999237787,
+    "mid": 0.10500000000000001,
+    "hit": 0
+   },
+   {
+    "mp": 0.14397249607226373,
+    "mid": 0.015,
+    "hit": 0
+   },
+   {
+    "mp": 0.05871643460297724,
+    "mid": 0.01,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "DC",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "100\u00b0 to 101\u00b0",
+    "side": "Buy NO",
+    "entry": 0.61,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 24,
+    "won": true,
+    "pnl": 8.88,
+    "margin": 1.5,
+    "actual": 103,
+    "mp": 0.17245253027600657,
+    "mid": 0.395,
+    "edge": -0.22254746972399345,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "DC",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "102\u00b0 to 103\u00b0",
+    "side": "Buy NO",
+    "entry": 0.54,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 27,
+    "won": false,
+    "pnl": -15.12,
+    "margin": -0.5,
+    "actual": 103,
+    "mp": 0.27826077344739336,
+    "mid": 0.46499999999999997,
+    "edge": -0.1867392265526066,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "DC",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "104\u00b0 to 105\u00b0",
+    "side": "Buy YES",
+    "entry": 0.11,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 90,
+    "won": false,
+    "pnl": -10.8,
+    "margin": -0.5,
+    "actual": 103,
+    "mp": 0.26293422999237787,
+    "mid": 0.10500000000000001,
+    "edge": 0.15793422999237786,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "DAL",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 99,
+  "mean": 99.5013986013986,
+  "bias": 0.5013986013986056,
+  "sd": 1.7606016936361295,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.06652138091594949,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.16422167867932913,
+    "mid": 0.045,
+    "hit": 0
+   },
+   {
+    "mp": 0.277442631033896,
+    "mid": 0.6,
+    "hit": 1
+   },
+   {
+    "mp": 0.2667751844493688,
+    "mid": 0.38,
+    "hit": 0
+   },
+   {
+    "mp": 0.15166899743431783,
+    "mid": 0.025,
+    "hit": 0
+   },
+   {
+    "mp": 0.07337012748713911,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "DAL",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "96\u00b0 to 97\u00b0",
+    "side": "Buy YES",
+    "entry": 0.05,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 199,
+    "won": false,
+    "pnl": -9.95,
+    "margin": -1.5,
+    "actual": 99,
+    "mp": 0.16422167867932913,
+    "mid": 0.045,
+    "edge": 0.11922167867932913,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "DAL",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "98\u00b0 to 99\u00b0",
+    "side": "Buy NO",
+    "entry": 0.43,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 23,
+    "won": false,
+    "pnl": -10.35,
+    "margin": -0.5,
+    "actual": 99,
+    "mp": 0.277442631033896,
+    "mid": 0.6,
+    "edge": -0.322557368966104,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "DAL",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "100\u00b0 to 101\u00b0",
+    "side": "Buy NO",
+    "entry": 0.63,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 15,
+    "won": true,
+    "pnl": 5.25,
+    "margin": 0.5,
+    "actual": 99,
+    "mp": 0.2667751844493688,
+    "mid": 0.38,
+    "edge": -0.11322481555063119,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "DAL",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "102\u00b0 to 103\u00b0",
+    "side": "Buy YES",
+    "entry": 0.03,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 333,
+    "won": false,
+    "pnl": -9.99,
+    "margin": -2.5,
+    "actual": 99,
+    "mp": 0.15166899743431783,
+    "mid": 0.025,
+    "edge": 0.12666899743431784,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "ATL",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 93,
+  "mean": 92.88391608391608,
+  "bias": -0.1160839160839231,
+  "sd": 3.140991121242994,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.5724009096155558,
+    "mid": 0.13,
+    "hit": 1
+   },
+   {
+    "mp": 0.18411729437339278,
+    "mid": 0.565,
+    "hit": 0
+   },
+   {
+    "mp": 0.127724232477039,
+    "mid": 0.27,
+    "hit": 0
+   },
+   {
+    "mp": 0.07474823016110005,
+    "mid": 0.035,
+    "hit": 0
+   },
+   {
+    "mp": 0.031580746752052254,
+    "mid": 0.015,
+    "hit": 0
+   },
+   {
+    "mp": 0.009428586620859788,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": []
+ },
+ {
+  "code": "SFO",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 69,
+  "mean": 70.45524475524476,
+  "bias": 1.4552447552447632,
+  "sd": 5.855505786609552,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.30562311773082934,
+    "mid": 0.05500000000000001,
+    "hit": 0
+   },
+   {
+    "mp": 0.07962499811962788,
+    "mid": 0.115,
+    "hit": 0
+   },
+   {
+    "mp": 0.09144053499631949,
+    "mid": 0.475,
+    "hit": 1
+   },
+   {
+    "mp": 0.12363733190144292,
+    "mid": 0.31,
+    "hit": 0
+   },
+   {
+    "mp": 0.11961097681063952,
+    "mid": 0.07500000000000001,
+    "hit": 0
+   },
+   {
+    "mp": 0.2800630404411409,
+    "mid": 0.015,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "66\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.07,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 142,
+    "won": false,
+    "pnl": -9.94,
+    "margin": -2.5,
+    "actual": 69,
+    "mp": 0.30562311773082934,
+    "mid": 0.05500000000000001,
+    "edge": 0.25062311773082935,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "69\u00b0 to 70\u00b0",
+    "side": "Buy NO",
+    "entry": 0.54,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 18,
+    "won": false,
+    "pnl": -10.08,
+    "margin": -0.5,
+    "actual": 69,
+    "mp": 0.09144053499631949,
+    "mid": 0.475,
+    "edge": -0.3835594650036805,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "71\u00b0 to 72\u00b0",
+    "side": "Buy NO",
+    "entry": 0.71,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 21,
+    "won": true,
+    "pnl": 5.88,
+    "margin": 1.5,
+    "actual": 69,
+    "mp": 0.12363733190144292,
+    "mid": 0.31,
+    "edge": -0.18636266809855706,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "SEA",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 72,
+  "mean": 72.15944055944055,
+  "bias": 0.15944055944055435,
+  "sd": 3.1741578424370425,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.44886584355649245,
+    "mid": 0.275,
+    "hit": 0
+   },
+   {
+    "mp": 0.20176657723841424,
+    "mid": 0.605,
+    "hit": 1
+   },
+   {
+    "mp": 0.14926749221963934,
+    "mid": 0.10500000000000001,
+    "hit": 0
+   },
+   {
+    "mp": 0.1073824506038736,
+    "mid": 0.035,
+    "hit": 0
+   },
+   {
+    "mp": 0.06527614184523028,
+    "mid": 0.015,
+    "hit": 0
+   },
+   {
+    "mp": 0.027441494536349694,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "SEA",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "71\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.3,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 50,
+    "won": false,
+    "pnl": -15.5,
+    "margin": -0.5,
+    "actual": 72,
+    "mp": 0.44886584355649245,
+    "mid": 0.275,
+    "edge": 0.17386584355649243,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SEA",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "72\u00b0 to 73\u00b0",
+    "side": "Buy NO",
+    "entry": 0.4,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 24,
+    "won": false,
+    "pnl": -10.08,
+    "margin": -0.5,
+    "actual": 72,
+    "mp": 0.20176657723841424,
+    "mid": 0.605,
+    "edge": -0.40323342276158575,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SEA",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "76\u00b0 to 77\u00b0",
+    "side": "Buy YES",
+    "entry": 0.04,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 249,
+    "won": false,
+    "pnl": -9.96,
+    "margin": -3.5,
+    "actual": 72,
+    "mp": 0.1073824506038736,
+    "mid": 0.035,
+    "edge": 0.07238245060387359,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
+ },
+ {
+  "code": "PHX",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 101,
+  "mean": 102.23636363636363,
+  "bias": 1.2363636363636346,
+  "sd": 2.7877490595133465,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.6234653452865162,
+    "mid": 0.05,
+    "hit": 1
+   },
+   {
+    "mp": 0.20263784631773243,
+    "mid": 0.56,
+    "hit": 0
+   },
+   {
+    "mp": 0.12065931865722818,
+    "mid": 0.355,
+    "hit": 0
+   },
+   {
+    "mp": 0.043910694694572996,
+    "mid": 0.045,
+    "hit": 0
+   },
+   {
+    "mp": 0.008503619659806231,
+    "mid": 0.015,
+    "hit": 0
+   },
+   {
+    "mp": 0.0008231753841438841,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": []
+ },
+ {
+  "code": "LV",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 104,
+  "mean": 102.02097902097903,
+  "bias": -1.979020979020973,
+  "sd": 1.5550887882754543,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.2740600892972384,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.2871394109868754,
+    "mid": 0.025,
+    "hit": 0
+   },
+   {
+    "mp": 0.26913480931364225,
+    "mid": 0.665,
+    "hit": 1
+   },
+   {
+    "mp": 0.13324899045058375,
+    "mid": 0.33,
+    "hit": 0
+   },
+   {
+    "mp": 0.03242462620252381,
+    "mid": 0.005,
+    "hit": 0
+   },
+   {
+    "mp": 0.00399207374913642,
+    "mid": 0.005,
+    "hit": 0
+   }
+  ],
+  "plays": []
+ },
+ {
+  "code": "BOS",
+  "kind": "HIGH",
+  "target": "2026-07-04",
+  "lead": 0,
+  "actual": 94,
+  "mean": 92.18881118881119,
+  "bias": -1.8111888111888135,
+  "sd": 2.5717427601706584,
+  "bias_corr": 0.0,
+  "sigma": 2.07,
+  "buckets": [
+   {
+    "mp": 0.3156654826619887,
+    "mid": 0.025,
+    "hit": 0
+   },
+   {
+    "mp": 0.2232977448013748,
+    "mid": 0.165,
+    "hit": 0
+   },
+   {
+    "mp": 0.20924131271819363,
+    "mid": 0.455,
+    "hit": 1
+   },
+   {
+    "mp": 0.15079054951974127,
+    "mid": 0.375,
+    "hit": 0
+   },
+   {
+    "mp": 0.07475168574698778,
+    "mid": 0.05,
+    "hit": 0
+   },
+   {
+    "mp": 0.026253224551713798,
+    "mid": 0.01,
+    "hit": 0
+   }
+  ],
+  "plays": [
+   {
+    "code": "BOS",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "90\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.03,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 333,
+    "won": false,
+    "pnl": -9.99,
+    "margin": -3.5,
+    "actual": 94,
+    "mp": 0.3156654826619887,
+    "mid": 0.025,
+    "edge": 0.29066548266198866,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "BOS",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy NO",
+    "entry": 0.55,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 18,
+    "won": false,
+    "pnl": -10.26,
+    "margin": -0.5,
+    "actual": 94,
+    "mp": 0.20924131271819363,
+    "mid": 0.455,
+    "edge": -0.2457586872818064,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "BOS",
+    "kind": "HIGH",
+    "target": "2026-07-04",
+    "sub": "95\u00b0 to 96\u00b0",
+    "side": "Buy NO",
+    "entry": 0.63,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 23,
+    "won": true,
+    "pnl": 8.05,
+    "margin": 0.5,
+    "actual": 94,
+    "mp": 0.15079054951974127,
+    "mid": 0.375,
+    "edge": -0.22420945048025873,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ]
  }
 ]
