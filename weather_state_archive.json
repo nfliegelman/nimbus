@@ -7652,5 +7652,2695 @@
     "model_version": "2026-07-02.v3-nimbus-calib"
    }
   ]
+ },
+ {
+  "code": "SATX",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 95,
+  "mean": 94.77258741258741,
+  "bias": -0.22741258741258719,
+  "sd": 1.8051932516840052,
+  "psd": 2.108749078464641,
+  "bias_corr": -0.54,
+  "sigma": 1.09,
+  "crps": 0.503,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 96.65,
+    "sd": 2.5
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 94.91,
+    "sd": 1.66
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 95.39,
+    "sd": 0.81
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 94.17,
+    "sd": 0.85
+   }
+  },
+  "ref": {
+   "nbm": 93.9,
+   "hrrr": 97.6
+  },
+  "buckets": [
+   {
+    "mp": 0.1213105673082094,
+    "mid": 0.035,
+    "hit": 0,
+    "rep": 91.5
+   },
+   {
+    "mp": 0.31582322823990955,
+    "mid": 0.14500000000000002,
+    "hit": 0,
+    "rep": 93.5
+   },
+   {
+    "mp": 0.37728750081556933,
+    "mid": 0.665,
+    "hit": 1,
+    "rep": 95.5
+   },
+   {
+    "mp": 0.14428806021281704,
+    "mid": 0.12,
+    "hit": 0,
+    "rep": 97.5
+   },
+   {
+    "mp": 0.036693750486960545,
+    "mid": 0.03,
+    "hit": 0,
+    "rep": 99.5
+   },
+   {
+    "mp": 0.004596892936534014,
+    "mid": 0.01,
+    "hit": 0,
+    "rep": 101.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "SATX",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "92\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.04,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 249,
+    "won": false,
+    "pnl": -10.63,
+    "margin": -2.5,
+    "actual": 95,
+    "mp": 0.11085000510571988,
+    "mid": 0.025,
+    "edge": 0.08585000510571988,
+    "lead": 0,
+    "close_mid": 0.035,
+    "clv": 0.01,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SATX",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy YES",
+    "entry": 0.18,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 55,
+    "won": false,
+    "pnl": -10.47,
+    "margin": -0.5,
+    "actual": 95,
+    "mp": 0.24863761359821213,
+    "mid": 0.16499999999999998,
+    "edge": 0.08363761359821215,
+    "lead": 0,
+    "close_mid": 0.14500000000000002,
+    "clv": -0.02,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SATX",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "95\u00b0 to 96\u00b0",
+    "side": "Buy NO",
+    "entry": 0.45,
+    "tier": "S",
+    "units": 2.0,
+    "stake": 20.0,
+    "contracts": 44,
+    "won": false,
+    "pnl": -20.57,
+    "margin": -0.5,
+    "actual": 95,
+    "mp": 0.37989810406544705,
+    "mid": 0.56,
+    "edge": -0.180101895934553,
+    "lead": 0,
+    "close_mid": 0.665,
+    "clv": -0.105,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    94.77
+   ]
+  ]
+ },
+ {
+  "code": "OKC",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 92,
+  "mean": 91.38370629370628,
+  "bias": -0.6162937062937175,
+  "sd": 2.5058872438263413,
+  "psd": 2.7326856531206762,
+  "bias_corr": -0.51,
+  "sigma": 1.09,
+  "crps": 0.694,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 95.49,
+    "sd": 2.05
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 89.74,
+    "sd": 1.11
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 91.6,
+    "sd": 0.92
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 92.38,
+    "sd": 1.05
+   }
+  },
+  "ref": {
+   "nbm": 91.4,
+   "hrrr": 95.3
+  },
+  "buckets": [
+   {
+    "mp": 0.7241433904416632,
+    "mid": 0.38,
+    "hit": 1,
+    "rep": 91.5
+   },
+   {
+    "mp": 0.13091814199224155,
+    "mid": 0.53,
+    "hit": 0,
+    "rep": 93.5
+   },
+   {
+    "mp": 0.08509729594752728,
+    "mid": 0.1,
+    "hit": 0,
+    "rep": 95.5
+   },
+   {
+    "mp": 0.04924792306314901,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 97.5
+   },
+   {
+    "mp": 0.010182725761844941,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 99.5
+   },
+   {
+    "mp": 0.00041052279357376787,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 101.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "OKC",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "92\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.48,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 20,
+    "won": true,
+    "pnl": 10.05,
+    "margin": 0.5,
+    "actual": 92,
+    "mp": 0.7150284341651706,
+    "mid": 0.45999999999999996,
+    "edge": 0.2550284341651706,
+    "lead": 0,
+    "close_mid": 0.38,
+    "clv": -0.08,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "OKC",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy NO",
+    "entry": 0.6,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 16,
+    "won": true,
+    "pnl": 6.13,
+    "margin": 0.5,
+    "actual": 92,
+    "mp": 0.14052666407733921,
+    "mid": 0.41000000000000003,
+    "edge": -0.2694733359226608,
+    "lead": 0,
+    "close_mid": 0.53,
+    "clv": -0.12,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    91.38
+   ]
+  ]
+ },
+ {
+  "code": "NOLA",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 91,
+  "mean": 91.04363636363638,
+  "bias": 0.04363636363638079,
+  "sd": 2.1392942256390333,
+  "psd": 2.400974757021096,
+  "bias_corr": 1.68,
+  "sigma": 1.09,
+  "crps": 0.561,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 91.89,
+    "sd": 1.27
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 87.99,
+    "sd": 1.35
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 89.08,
+    "sd": 1.85
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 89.51,
+    "sd": 1.9
+   }
+  },
+  "ref": {
+   "nbm": 89.0,
+   "hrrr": 88.6
+  },
+  "buckets": [
+   {
+    "mp": 0.06895926520749127,
+    "mid": 0.060000000000000005,
+    "hit": 0,
+    "rep": 86.5
+   },
+   {
+    "mp": 0.2006289592371233,
+    "mid": 0.175,
+    "hit": 0,
+    "rep": 88.5
+   },
+   {
+    "mp": 0.3181135656613593,
+    "mid": 0.515,
+    "hit": 1,
+    "rep": 90.5
+   },
+   {
+    "mp": 0.23941597396830264,
+    "mid": 0.30000000000000004,
+    "hit": 0,
+    "rep": 92.5
+   },
+   {
+    "mp": 0.14255749958297692,
+    "mid": 0.03,
+    "hit": 0,
+    "rep": 94.5
+   },
+   {
+    "mp": 0.030324736342746215,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 96.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "NOLA",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "88\u00b0 to 89\u00b0",
+    "side": "Buy YES",
+    "entry": 0.12,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 83,
+    "won": false,
+    "pnl": -10.58,
+    "margin": -1.5,
+    "actual": 91,
+    "mp": 0.20293355841969457,
+    "mid": 0.105,
+    "edge": 0.09793355841969457,
+    "lead": 0,
+    "close_mid": 0.175,
+    "clv": 0.07,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "NOLA",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "90\u00b0 to 91\u00b0",
+    "side": "Buy NO",
+    "entry": 0.51,
+    "tier": "S",
+    "units": 2.0,
+    "stake": 20.0,
+    "contracts": 39,
+    "won": false,
+    "pnl": -20.58,
+    "margin": -0.5,
+    "actual": 91,
+    "mp": 0.3107936823885877,
+    "mid": 0.505,
+    "edge": -0.19420631761141233,
+    "lead": 0,
+    "close_mid": 0.515,
+    "clv": -0.01,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "NOLA",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "94\u00b0 to 95\u00b0",
+    "side": "Buy YES",
+    "entry": 0.05,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 199,
+    "won": false,
+    "pnl": -10.62,
+    "margin": -2.5,
+    "actual": 91,
+    "mp": 0.144257824687222,
+    "mid": 0.045,
+    "edge": 0.09925782468722201,
+    "lead": 0,
+    "close_mid": 0.03,
+    "clv": -0.015,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    91.04
+   ]
+  ]
+ },
+ {
+  "code": "MIN",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 87,
+  "mean": 88.48328671328672,
+  "bias": 1.4832867132867165,
+  "sd": 2.1873200309500875,
+  "psd": 2.443863522743341,
+  "bias_corr": -0.53,
+  "sigma": 1.09,
+  "crps": 0.92,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 88.53,
+    "sd": 1.6
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 90.56,
+    "sd": 2.18
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 89.02,
+    "sd": 0.73
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 85.96,
+    "sd": 0.87
+   }
+  },
+  "ref": {
+   "nbm": 88.2,
+   "hrrr": 90.3
+  },
+  "buckets": [
+   {
+    "mp": 0.04803581741274694,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 83.5
+   },
+   {
+    "mp": 0.1615739739255306,
+    "mid": 0.03,
+    "hit": 0,
+    "rep": 85.5
+   },
+   {
+    "mp": 0.3057944650801525,
+    "mid": 0.35,
+    "hit": 1,
+    "rep": 87.5
+   },
+   {
+    "mp": 0.2890060928518013,
+    "mid": 0.505,
+    "hit": 0,
+    "rep": 89.5
+   },
+   {
+    "mp": 0.13275798633146002,
+    "mid": 0.11499999999999999,
+    "hit": 0,
+    "rep": 91.5
+   },
+   {
+    "mp": 0.06283166439830884,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 93.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "MIN",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "85\u00b0 to 86\u00b0",
+    "side": "Buy YES",
+    "entry": 0.04,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 249,
+    "won": false,
+    "pnl": -10.63,
+    "margin": -0.5,
+    "actual": 87,
+    "mp": 0.16202445899675486,
+    "mid": 0.03,
+    "edge": 0.13202445899675486,
+    "lead": 0,
+    "close_mid": 0.03,
+    "clv": 0.0,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "MIN",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "89\u00b0 to 90\u00b0",
+    "side": "Buy NO",
+    "entry": 0.44,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 22,
+    "won": true,
+    "pnl": 11.94,
+    "margin": 1.5,
+    "actual": 87,
+    "mp": 0.2850084852816558,
+    "mid": 0.575,
+    "edge": -0.28999151471834417,
+    "lead": 0,
+    "close_mid": 0.505,
+    "clv": 0.07,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    88.48
+   ]
+  ]
+ },
+ {
+  "code": "HOU",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 98,
+  "mean": 97.24517482517483,
+  "bias": -0.7548251748251715,
+  "sd": 1.85967395185242,
+  "psd": 2.1555712020711346,
+  "bias_corr": 1.62,
+  "sigma": 1.09,
+  "crps": 0.608,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 97.5,
+    "sd": 1.24
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 94.77,
+    "sd": 1.95
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 95.58,
+    "sd": 1.26
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 95.03,
+    "sd": 1.3
+   }
+  },
+  "ref": {
+   "nbm": 94.0,
+   "hrrr": 96.2
+  },
+  "buckets": [
+   {
+    "mp": 0.020501390506611063,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 91.5
+   },
+   {
+    "mp": 0.08448180354029887,
+    "mid": 0.065,
+    "hit": 0,
+    "rep": 93.5
+   },
+   {
+    "mp": 0.24601642415884772,
+    "mid": 0.5700000000000001,
+    "hit": 0,
+    "rep": 95.5
+   },
+   {
+    "mp": 0.36258880590384285,
+    "mid": 0.395,
+    "hit": 1,
+    "rep": 97.5
+   },
+   {
+    "mp": 0.22596770867729826,
+    "mid": 0.03,
+    "hit": 0,
+    "rep": 99.5
+   },
+   {
+    "mp": 0.06044386721310078,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 101.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "HOU",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy YES",
+    "entry": 0.08,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 124,
+    "won": false,
+    "pnl": -10.56,
+    "margin": -3.5,
+    "actual": 98,
+    "mp": 0.20231719511817645,
+    "mid": 0.065,
+    "edge": 0.13731719511817644,
+    "lead": 0,
+    "close_mid": 0.065,
+    "clv": 0.0,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "HOU",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "95\u00b0 to 96\u00b0",
+    "side": "Buy NO",
+    "entry": 0.49,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 20,
+    "won": true,
+    "pnl": 9.85,
+    "margin": 1.5,
+    "actual": 98,
+    "mp": 0.23150532502615587,
+    "mid": 0.515,
+    "edge": -0.2834946749738442,
+    "lead": 0,
+    "close_mid": 0.5700000000000001,
+    "clv": -0.055,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "HOU",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "97\u00b0 to 98\u00b0",
+    "side": "Buy NO",
+    "entry": 0.64,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 23,
+    "won": false,
+    "pnl": -15.1,
+    "margin": -0.5,
+    "actual": 98,
+    "mp": 0.19634523293803463,
+    "mid": 0.365,
+    "edge": -0.16865476706196536,
+    "lead": 0,
+    "close_mid": 0.395,
+    "clv": -0.03,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "HOU",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "99\u00b0 to 100\u00b0",
+    "side": "Buy YES",
+    "entry": 0.04,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 249,
+    "won": false,
+    "pnl": -10.63,
+    "margin": -0.5,
+    "actual": 98,
+    "mp": 0.12694330548816138,
+    "mid": 0.035,
+    "edge": 0.09194330548816138,
+    "lead": 0,
+    "close_mid": 0.03,
+    "clv": -0.005,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    97.25
+   ]
+  ]
+ },
+ {
+  "code": "DC",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 90,
+  "mean": 87.21482517482517,
+  "bias": -2.7851748251748347,
+  "sd": 4.423956848818192,
+  "psd": 4.556258794252735,
+  "bias_corr": -0.26,
+  "sigma": 1.09,
+  "crps": 1.724,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 92.68,
+    "sd": 2.83
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 87.82,
+    "sd": 2.89
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 86.04,
+    "sd": 2.74
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 81.7,
+    "sd": 3.07
+   }
+  },
+  "ref": {
+   "nbm": 87.1,
+   "hrrr": 88.2
+  },
+  "buckets": [
+   {
+    "mp": 0.19298350571307146,
+    "mid": 0.025,
+    "hit": 0,
+    "rep": 82.5
+   },
+   {
+    "mp": 0.15181683245439007,
+    "mid": 0.04,
+    "hit": 0,
+    "rep": 84.5
+   },
+   {
+    "mp": 0.19333831344866179,
+    "mid": 0.08499999999999999,
+    "hit": 0,
+    "rep": 86.5
+   },
+   {
+    "mp": 0.16770720083541937,
+    "mid": 0.48,
+    "hit": 0,
+    "rep": 88.5
+   },
+   {
+    "mp": 0.11842084005136799,
+    "mid": 0.275,
+    "hit": 1,
+    "rep": 90.5
+   },
+   {
+    "mp": 0.17573330749708932,
+    "mid": 0.10500000000000001,
+    "hit": 0,
+    "rep": 92.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    87.21
+   ]
+  ]
+ },
+ {
+  "code": "DAL",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 99,
+  "mean": 97.1376923076923,
+  "bias": -1.862307692307695,
+  "sd": 2.370921656177411,
+  "psd": 2.6094768632296854,
+  "bias_corr": -0.57,
+  "sigma": 1.09,
+  "crps": 1.119,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 99.4,
+    "sd": 1.85
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 97.84,
+    "sd": 2.13
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 97.22,
+    "sd": 1.51
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 95.82,
+    "sd": 3.09
+   }
+  },
+  "ref": {
+   "nbm": 96.4,
+   "hrrr": 98.5
+  },
+  "buckets": [
+   {
+    "mp": 0.13632958213994423,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 93.5
+   },
+   {
+    "mp": 0.23363548472430887,
+    "mid": 0.095,
+    "hit": 0,
+    "rep": 95.5
+   },
+   {
+    "mp": 0.3183313880569723,
+    "mid": 0.645,
+    "hit": 0,
+    "rep": 97.5
+   },
+   {
+    "mp": 0.23141718925855392,
+    "mid": 0.18,
+    "hit": 1,
+    "rep": 99.5
+   },
+   {
+    "mp": 0.07289508082028719,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 101.5
+   },
+   {
+    "mp": 0.007391274999933273,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 103.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "DAL",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "94\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.04,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 249,
+    "won": false,
+    "pnl": -10.63,
+    "margin": -4.5,
+    "actual": 99,
+    "mp": 0.23621144124342833,
+    "mid": 0.035,
+    "edge": 0.20121144124342832,
+    "lead": 0,
+    "close_mid": 0.015,
+    "clv": -0.02,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "DAL",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "97\u00b0 to 98\u00b0",
+    "side": "Buy NO",
+    "entry": 0.45,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 22,
+    "won": true,
+    "pnl": 11.71,
+    "margin": 0.5,
+    "actual": 99,
+    "mp": 0.2556365574938066,
+    "mid": 0.56,
+    "edge": -0.30436344250619346,
+    "lead": 0,
+    "close_mid": 0.645,
+    "clv": -0.085,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    97.14
+   ]
+  ]
+ },
+ {
+  "code": "BOS",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 73,
+  "mean": 73.44636363636364,
+  "bias": 0.4463636363636425,
+  "sd": 2.571890694002074,
+  "psd": 2.7933352362175343,
+  "bias_corr": 0.81,
+  "sigma": 1.09,
+  "crps": 0.681,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 75.3,
+    "sd": 2.48
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 73.33,
+    "sd": 1.56
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 70.0,
+    "sd": 1.22
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 72.03,
+    "sd": 1.38
+   }
+  },
+  "ref": {
+   "nbm": 71.7,
+   "hrrr": 72.1
+  },
+  "buckets": [
+   {
+    "mp": 0.020031275466627026,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 67.5
+   },
+   {
+    "mp": 0.1293382892849421,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 69.5
+   },
+   {
+    "mp": 0.2547242601569134,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 71.5
+   },
+   {
+    "mp": 0.2519026988812604,
+    "mid": 0.74,
+    "hit": 1,
+    "rep": 73.5
+   },
+   {
+    "mp": 0.19295946687686158,
+    "mid": 0.24,
+    "hit": 0,
+    "rep": 75.5
+   },
+   {
+    "mp": 0.15104400933339562,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 77.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "BOS",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "73\u00b0 to 74\u00b0",
+    "side": "Buy NO",
+    "entry": 0.15,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 66,
+    "won": false,
+    "pnl": -10.49,
+    "margin": -0.5,
+    "actual": 73,
+    "mp": 0.28208122615053954,
+    "mid": 0.865,
+    "edge": -0.5829187738494604,
+    "lead": 0,
+    "close_mid": 0.74,
+    "clv": 0.125,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "BOS",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "75\u00b0 to 76\u00b0",
+    "side": "Buy YES",
+    "entry": 0.11,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 90,
+    "won": false,
+    "pnl": -10.52,
+    "margin": -1.5,
+    "actual": 73,
+    "mp": 0.20309295841007788,
+    "mid": 0.1,
+    "edge": 0.10309295841007787,
+    "lead": 0,
+    "close_mid": 0.24,
+    "clv": 0.14,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    73.45
+   ]
+  ]
+ },
+ {
+  "code": "ATL",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 91,
+  "mean": 89.13846153846154,
+  "bias": -1.8615384615384585,
+  "sd": 3.249936483014031,
+  "psd": 3.427854597795188,
+  "bias_corr": 0.7,
+  "sigma": 1.09,
+  "crps": 1.195,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 92.55,
+    "sd": 1.06
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 89.05,
+    "sd": 1.78
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 84.91,
+    "sd": 1.64
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 87.6,
+    "sd": 2.67
+   }
+  },
+  "ref": {
+   "nbm": 87.5,
+   "hrrr": 87.3
+  },
+  "buckets": [
+   {
+    "mp": 0.42317167437785014,
+    "mid": 0.325,
+    "hit": 0,
+    "rep": 87.5
+   },
+   {
+    "mp": 0.20908545549856175,
+    "mid": 0.475,
+    "hit": 0,
+    "rep": 89.5
+   },
+   {
+    "mp": 0.17171569462282424,
+    "mid": 0.135,
+    "hit": 1,
+    "rep": 91.5
+   },
+   {
+    "mp": 0.14630570635990897,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 93.5
+   },
+   {
+    "mp": 0.047076754075048084,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 95.5
+   },
+   {
+    "mp": 0.0026447150658068888,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 97.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "ATL",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "88\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.3,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 33,
+    "won": false,
+    "pnl": -10.39,
+    "margin": -2.5,
+    "actual": 91,
+    "mp": 0.4081414505496706,
+    "mid": 0.295,
+    "edge": 0.11314145054967062,
+    "lead": 0,
+    "close_mid": 0.325,
+    "clv": 0.03,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "ATL",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "89\u00b0 to 90\u00b0",
+    "side": "Buy NO",
+    "entry": 0.59,
+    "tier": "S",
+    "units": 2.0,
+    "stake": 20.0,
+    "contracts": 33,
+    "won": true,
+    "pnl": 12.97,
+    "margin": 0.5,
+    "actual": 91,
+    "mp": 0.2206743674916756,
+    "mid": 0.44499999999999995,
+    "edge": -0.22432563250832435,
+    "lead": 0,
+    "close_mid": 0.475,
+    "clv": -0.03,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "ATL",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "91\u00b0 to 92\u00b0",
+    "side": "Buy NO",
+    "entry": 0.76,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 13,
+    "won": false,
+    "pnl": -10.05,
+    "margin": -0.5,
+    "actual": 91,
+    "mp": 0.17500236195927912,
+    "mid": 0.245,
+    "edge": -0.06999763804072087,
+    "lead": 0,
+    "close_mid": 0.135,
+    "clv": 0.11,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "ATL",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "93\u00b0 to 94\u00b0",
+    "side": "Buy YES",
+    "entry": 0.03,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 333,
+    "won": false,
+    "pnl": -10.67,
+    "margin": -1.5,
+    "actual": 91,
+    "mp": 0.1464599425465978,
+    "mid": 0.025,
+    "edge": 0.12145994254659781,
+    "lead": 0,
+    "close_mid": 0.015,
+    "clv": -0.01,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    89.14
+   ]
+  ]
+ },
+ {
+  "code": "SFO",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 68,
+  "mean": 67.28433566433566,
+  "bias": -0.7156643356643428,
+  "sd": 4.450558314852515,
+  "psd": 4.582092241967948,
+  "bias_corr": 0.02,
+  "sigma": 1.09,
+  "crps": 1.115,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 72.71,
+    "sd": 0.94
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 69.7,
+    "sd": 0.83
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 63.04,
+    "sd": 1.45
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 61.36,
+    "sd": 0.86
+   }
+  },
+  "ref": {
+   "nbm": 66.7,
+   "hrrr": 65.1
+  },
+  "buckets": [
+   {
+    "mp": 0.3021851183773432,
+    "mid": 0.060000000000000005,
+    "hit": 0,
+    "rep": 62.5
+   },
+   {
+    "mp": 0.0984077472819157,
+    "mid": 0.045,
+    "hit": 0,
+    "rep": 64.5
+   },
+   {
+    "mp": 0.043905233732263856,
+    "mid": 0.315,
+    "hit": 0,
+    "rep": 66.5
+   },
+   {
+    "mp": 0.13922461415428541,
+    "mid": 0.505,
+    "hit": 1,
+    "rep": 68.5
+   },
+   {
+    "mp": 0.20732240325805718,
+    "mid": 0.09,
+    "hit": 0,
+    "rep": 70.5
+   },
+   {
+    "mp": 0.20895488319613437,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 72.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "63\u00b0 or below",
+    "side": "Buy YES",
+    "entry": 0.03,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 333,
+    "won": false,
+    "pnl": -10.67,
+    "margin": -4.5,
+    "actual": 68,
+    "mp": 0.2912873930923787,
+    "mid": 0.025,
+    "edge": 0.2662873930923787,
+    "lead": 0,
+    "close_mid": 0.060000000000000005,
+    "clv": 0.035,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "64\u00b0 to 65\u00b0",
+    "side": "Buy YES",
+    "entry": 0.04,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 249,
+    "won": false,
+    "pnl": -10.63,
+    "margin": -2.5,
+    "actual": 68,
+    "mp": 0.09472373728147124,
+    "mid": 0.03,
+    "edge": 0.06472373728147124,
+    "lead": 0,
+    "close_mid": 0.045,
+    "clv": 0.015,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "66\u00b0 to 67\u00b0",
+    "side": "Buy NO",
+    "entry": 0.71,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 14,
+    "won": true,
+    "pnl": 3.85,
+    "margin": 0.5,
+    "actual": 68,
+    "mp": 0.05508326603930171,
+    "mid": 0.295,
+    "edge": -0.23991673396069826,
+    "lead": 0,
+    "close_mid": 0.315,
+    "clv": -0.02,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "68\u00b0 to 69\u00b0",
+    "side": "Buy NO",
+    "entry": 0.46,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 21,
+    "won": false,
+    "pnl": -10.03,
+    "margin": -0.5,
+    "actual": 68,
+    "mp": 0.14253894266237266,
+    "mid": 0.545,
+    "edge": -0.4024610573376274,
+    "lead": 0,
+    "close_mid": 0.505,
+    "clv": 0.04,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "SFO",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "70\u00b0 to 71\u00b0",
+    "side": "Buy YES",
+    "entry": 0.13,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 76,
+    "won": false,
+    "pnl": -10.49,
+    "margin": -1.5,
+    "actual": 68,
+    "mp": 0.2074116358489891,
+    "mid": 0.12,
+    "edge": 0.08741163584898912,
+    "lead": 0,
+    "close_mid": 0.09,
+    "clv": -0.03,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    67.28
+   ]
+  ]
+ },
+ {
+  "code": "SEA",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 85,
+  "mean": 80.91832167832169,
+  "bias": -4.081678321678311,
+  "sd": 3.185854659351094,
+  "psd": 3.367160511545162,
+  "bias_corr": 0.54,
+  "sigma": 1.09,
+  "crps": 2.55,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 84.76,
+    "sd": 1.59
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 80.19,
+    "sd": 0.45
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 80.29,
+    "sd": 0.7
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 74.53,
+    "sd": 1.12
+   }
+  },
+  "ref": {
+   "nbm": 81.3,
+   "hrrr": 82.2
+  },
+  "buckets": [
+   {
+    "mp": 0.1653678493460435,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 77.5
+   },
+   {
+    "mp": 0.24614468412172494,
+    "mid": 0.03,
+    "hit": 0,
+    "rep": 79.5
+   },
+   {
+    "mp": 0.33801947247305736,
+    "mid": 0.09,
+    "hit": 0,
+    "rep": 81.5
+   },
+   {
+    "mp": 0.10362003337613318,
+    "mid": 0.635,
+    "hit": 0,
+    "rep": 83.5
+   },
+   {
+    "mp": 0.08530270598313286,
+    "mid": 0.28500000000000003,
+    "hit": 1,
+    "rep": 85.5
+   },
+   {
+    "mp": 0.0615452546999079,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 87.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    80.92
+   ]
+  ]
+ },
+ {
+  "code": "PHX",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 113,
+  "mean": 110.8218881118881,
+  "bias": -2.1781118881119,
+  "sd": 1.489660847987388,
+  "psd": 1.8458573731538697,
+  "bias_corr": 0.91,
+  "sigma": 1.09,
+  "crps": 1.352,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 108.32,
+    "sd": 1.51
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 110.87,
+    "sd": 0.35
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 109.37,
+    "sd": 1.04
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 110.97,
+    "sd": 1.31
+   }
+  },
+  "ref": {
+   "nbm": 110.7,
+   "hrrr": 112.7
+  },
+  "buckets": [
+   {
+    "mp": 0.11029508242971468,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 107.5
+   },
+   {
+    "mp": 0.2879632666253699,
+    "mid": 0.065,
+    "hit": 0,
+    "rep": 109.5
+   },
+   {
+    "mp": 0.4247613141924358,
+    "mid": 0.625,
+    "hit": 0,
+    "rep": 111.5
+   },
+   {
+    "mp": 0.16442588703143002,
+    "mid": 0.315,
+    "hit": 1,
+    "rep": 113.5
+   },
+   {
+    "mp": 0.01235164294456583,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 115.5
+   },
+   {
+    "mp": 0.00020280677648409285,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 117.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "PHX",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "109\u00b0 to 110\u00b0",
+    "side": "Buy YES",
+    "entry": 0.1,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 99,
+    "won": false,
+    "pnl": -10.53,
+    "margin": -2.5,
+    "actual": 113,
+    "mp": 0.2581178345379398,
+    "mid": 0.095,
+    "edge": 0.1631178345379398,
+    "lead": 0,
+    "close_mid": 0.065,
+    "clv": -0.03,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "PHX",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "111\u00b0 to 112\u00b0",
+    "side": "Buy NO",
+    "entry": 0.39,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 38,
+    "won": true,
+    "pnl": 22.54,
+    "margin": 0.5,
+    "actual": 113,
+    "mp": 0.4443412870436388,
+    "mid": 0.625,
+    "edge": -0.1806587129563612,
+    "lead": 0,
+    "close_mid": 0.625,
+    "clv": 0.0,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "PHX",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "113\u00b0 to 114\u00b0",
+    "side": "Buy NO",
+    "entry": 0.7,
+    "tier": "A",
+    "units": 1.5,
+    "stake": 15.0,
+    "contracts": 21,
+    "won": false,
+    "pnl": -15.01,
+    "margin": -0.5,
+    "actual": 113,
+    "mp": 0.18490607530841938,
+    "mid": 0.305,
+    "edge": -0.12009392469158062,
+    "lead": 0,
+    "close_mid": 0.315,
+    "clv": -0.01,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    110.82
+   ]
+  ]
+ },
+ {
+  "code": "LV",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 107,
+  "mean": 105.36153846153846,
+  "bias": -1.6384615384615415,
+  "sd": 2.1053021003731023,
+  "psd": 2.3707376349641467,
+  "bias_corr": 1.1,
+  "sigma": 1.09,
+  "crps": 0.989,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T15:31",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 102.05,
+    "sd": 1.14
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 104.63,
+    "sd": 0.36
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 103.46,
+    "sd": 0.82
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 108.16,
+    "sd": 1.64
+   }
+  },
+  "ref": {
+   "nbm": 105.3,
+   "hrrr": 106.5
+  },
+  "buckets": [
+   {
+    "mp": 0.19868311139041098,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 102.5
+   },
+   {
+    "mp": 0.3682734912096215,
+    "mid": 0.07500000000000001,
+    "hit": 0,
+    "rep": 104.5
+   },
+   {
+    "mp": 0.28672196917481324,
+    "mid": 0.775,
+    "hit": 1,
+    "rep": 106.5
+   },
+   {
+    "mp": 0.08144106324300858,
+    "mid": 0.155,
+    "hit": 0,
+    "rep": 108.5
+   },
+   {
+    "mp": 0.04485652121191149,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 110.5
+   },
+   {
+    "mp": 0.02002384377023433,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 112.5
+   }
+  ],
+  "plays": [
+   {
+    "code": "LV",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "104\u00b0 to 105\u00b0",
+    "side": "Buy YES",
+    "entry": 0.15,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 66,
+    "won": false,
+    "pnl": -10.49,
+    "margin": -1.5,
+    "actual": 107,
+    "mp": 0.36529174036669687,
+    "mid": 0.135,
+    "edge": 0.23029174036669686,
+    "lead": 0,
+    "close_mid": 0.07500000000000001,
+    "clv": -0.06,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "LV",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "106\u00b0 to 107\u00b0",
+    "side": "Buy NO",
+    "entry": 0.31,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 32,
+    "won": false,
+    "pnl": -10.4,
+    "margin": -0.5,
+    "actual": 107,
+    "mp": 0.2975109370089204,
+    "mid": 0.695,
+    "edge": -0.39748906299107956,
+    "lead": 0,
+    "close_mid": 0.775,
+    "clv": -0.08,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   },
+   {
+    "code": "LV",
+    "kind": "HIGH",
+    "target": "2026-07-06",
+    "sub": "108\u00b0 to 109\u00b0",
+    "side": "Buy NO",
+    "entry": 0.83,
+    "tier": "B",
+    "units": 1.0,
+    "stake": 10.0,
+    "contracts": 12,
+    "won": true,
+    "pnl": 1.92,
+    "margin": 0.5,
+    "actual": 107,
+    "mp": 0.08226196706193062,
+    "mid": 0.175,
+    "edge": -0.09273803293806937,
+    "lead": 0,
+    "close_mid": 0.155,
+    "clv": 0.02,
+    "model_version": "2026-07-02.v3-nimbus-calib"
+   }
+  ],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    105.36
+   ]
+  ]
+ },
+ {
+  "code": "PHIL",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 81,
+  "mean": 79.56363636363636,
+  "bias": -1.4363636363636374,
+  "sd": 4.117531092940894,
+  "psd": 4.259361724640797,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 1.187,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 85.29,
+    "sd": 3.39
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 79.72,
+    "sd": 1.96
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 77.55,
+    "sd": 1.76
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 74.57,
+    "sd": 1.46
+   }
+  },
+  "ref": {
+   "nbm": 79.6,
+   "hrrr": 79.1
+  },
+  "buckets": [
+   {
+    "mp": 0.23773269834942914,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 75.5
+   },
+   {
+    "mp": 0.21379061287082973,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 77.5
+   },
+   {
+    "mp": 0.19627756219607068,
+    "mid": 0.11,
+    "hit": 0,
+    "rep": 79.5
+   },
+   {
+    "mp": 0.13699334277776742,
+    "mid": 0.55,
+    "hit": 1,
+    "rep": 81.5
+   },
+   {
+    "mp": 0.09173219743497,
+    "mid": 0.265,
+    "hit": 0,
+    "rep": 83.5
+   },
+   {
+    "mp": 0.12347358637093325,
+    "mid": 0.07500000000000001,
+    "hit": 0,
+    "rep": 85.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    79.56
+   ]
+  ]
+ },
+ {
+  "code": "NYC",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 69,
+  "mean": 73.84615384615384,
+  "bias": 4.84615384615384,
+  "sd": 3.054488139527338,
+  "psd": 3.24314628015962,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 3.209,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 77.77,
+    "sd": 3.48
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 74.09,
+    "sd": 1.49
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 71.87,
+    "sd": 0.96
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 71.22,
+    "sd": 1.12
+   }
+  },
+  "ref": {
+   "nbm": 73.7,
+   "hrrr": 70.7
+  },
+  "buckets": [
+   {
+    "mp": 0.6796825788389311,
+    "mid": 0.965,
+    "hit": 1,
+    "rep": 73.5
+   },
+   {
+    "mp": 0.16280142721315216,
+    "mid": 0.045,
+    "hit": 0,
+    "rep": 75.5
+   },
+   {
+    "mp": 0.057759539407752254,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 77.5
+   },
+   {
+    "mp": 0.04012392119998426,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 79.5
+   },
+   {
+    "mp": 0.03273676807092712,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 81.5
+   },
+   {
+    "mp": 0.026895765269252907,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 83.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    73.85
+   ]
+  ]
+ },
+ {
+  "code": "MIA",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 93,
+  "mean": 89.10699300699301,
+  "bias": -3.893006993006992,
+  "sd": 1.8663621677503646,
+  "psd": 2.1613439664268714,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 2.735,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 89.09,
+    "sd": 0.45
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 87.52,
+    "sd": 1.33
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 90.45,
+    "sd": 1.81
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 90.42,
+    "sd": 1.29
+   }
+  },
+  "ref": {
+   "nbm": 88.8,
+   "hrrr": 90.2
+  },
+  "buckets": [
+   {
+    "mp": 0.11155951672491407,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 85.5
+   },
+   {
+    "mp": 0.284430959331331,
+    "mid": 0.065,
+    "hit": 0,
+    "rep": 87.5
+   },
+   {
+    "mp": 0.34337354918937846,
+    "mid": 0.435,
+    "hit": 0,
+    "rep": 89.5
+   },
+   {
+    "mp": 0.2000981702220771,
+    "mid": 0.44,
+    "hit": 0,
+    "rep": 91.5
+   },
+   {
+    "mp": 0.054193474804115155,
+    "mid": 0.045,
+    "hit": 1,
+    "rep": 93.5
+   },
+   {
+    "mp": 0.006344329728184055,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 95.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    89.11
+   ]
+  ]
+ },
+ {
+  "code": "LAX",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 75,
+  "mean": 79.39090909090909,
+  "bias": 4.390909090909091,
+  "sd": 3.4613128414145304,
+  "psd": 3.6288822778014076,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 2.742,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 77.13,
+    "sd": 0.6
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 83.72,
+    "sd": 1.34
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 76.7,
+    "sd": 1.41
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 77.35,
+    "sd": 1.34
+   }
+  },
+  "ref": {
+   "nbm": 70.3,
+   "hrrr": 73.1
+  },
+  "buckets": [
+   {
+    "mp": 2.546966312994974e-07,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 68.5
+   },
+   {
+    "mp": 0.0001907438035512832,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 70.5
+   },
+   {
+    "mp": 0.010346493023997927,
+    "mid": 0.035,
+    "hit": 0,
+    "rep": 72.5
+   },
+   {
+    "mp": 0.10487495290776483,
+    "mid": 0.66,
+    "hit": 1,
+    "rep": 74.5
+   },
+   {
+    "mp": 0.2865846913918902,
+    "mid": 0.255,
+    "hit": 0,
+    "rep": 76.5
+   },
+   {
+    "mp": 0.5980028641761643,
+    "mid": 0.08499999999999999,
+    "hit": 0,
+    "rep": 78.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    79.39
+   ]
+  ]
+ },
+ {
+  "code": "DEN",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 97,
+  "mean": 95.14335664335664,
+  "bias": -1.8566433566433602,
+  "sd": 1.3564948372311953,
+  "psd": 1.7401661539734898,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 1.13,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 95.98,
+    "sd": 1.15
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 95.22,
+    "sd": 0.84
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 95.27,
+    "sd": 0.92
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 93.5,
+    "sd": 1.86
+   }
+  },
+  "ref": {
+   "nbm": 95.0,
+   "hrrr": 96.7
+  },
+  "buckets": [
+   {
+    "mp": 0.025815644056426456,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 90.5
+   },
+   {
+    "mp": 0.11807247450834765,
+    "mid": 0.025,
+    "hit": 0,
+    "rep": 92.5
+   },
+   {
+    "mp": 0.4278721811632615,
+    "mid": 0.25,
+    "hit": 0,
+    "rep": 94.5
+   },
+   {
+    "mp": 0.3564123402724661,
+    "mid": 0.5700000000000001,
+    "hit": 1,
+    "rep": 96.5
+   },
+   {
+    "mp": 0.06881589102020941,
+    "mid": 0.135,
+    "hit": 0,
+    "rep": 98.5
+   },
+   {
+    "mp": 0.00301146897928877,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 100.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    95.14
+   ]
+  ]
+ },
+ {
+  "code": "CHI",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 80,
+  "mean": 78.41328671328671,
+  "bias": -1.586713286713291,
+  "sd": 1.209012644738735,
+  "psd": 1.6278241843449037,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 0.953,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 78.59,
+    "sd": 0.89
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 77.47,
+    "sd": 1.22
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 78.8,
+    "sd": 0.52
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 79.71,
+    "sd": 0.72
+   }
+  },
+  "ref": {
+   "nbm": 77.8,
+   "hrrr": 74.2
+  },
+  "buckets": [
+   {
+    "mp": 0.03627838955439511,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 74.5
+   },
+   {
+    "mp": 0.253996559374694,
+    "mid": 0.26,
+    "hit": 0,
+    "rep": 76.5
+   },
+   {
+    "mp": 0.45460266452886633,
+    "mid": 0.525,
+    "hit": 0,
+    "rep": 78.5
+   },
+   {
+    "mp": 0.22771674706729375,
+    "mid": 0.165,
+    "hit": 1,
+    "rep": 80.5
+   },
+   {
+    "mp": 0.025990394658683684,
+    "mid": 0.04,
+    "hit": 0,
+    "rep": 82.5
+   },
+   {
+    "mp": 0.001415244816066701,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 84.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    78.41
+   ]
+  ]
+ },
+ {
+  "code": "AUS",
+  "kind": "HIGH",
+  "target": "2026-07-06",
+  "lead": 0,
+  "actual": 98,
+  "mean": 97.34825174825174,
+  "bias": -0.6517482517482591,
+  "sd": 2.065597431207646,
+  "psd": 2.3355497742098383,
+  "bias_corr": 0.0,
+  "sigma": 1.09,
+  "crps": 0.618,
+  "model_version": "2026-07-06.v11-audit12",
+  "cfg": "f7397722",
+  "first_logged": "2026-07-06T16:32Z",
+  "model_runs": {
+   "gfs025": "2026-07-06T06:00Z",
+   "ecmwf_ifs025": "2026-07-06T06:00Z",
+   "icon_seamless": "2026-07-06T12:00Z",
+   "gem_global": "2026-07-06T00:00Z",
+   "ncep_nbm_conus": "2026-07-06T15:00Z",
+   "ncep_hrrr_conus": "2026-07-06T14:00Z"
+  },
+  "members_by_model": {
+   "gfs025": {
+    "n": 31,
+    "mean": 100.1,
+    "sd": 2.35
+   },
+   "ecmwf_ifs025": {
+    "n": 51,
+    "mean": 96.4,
+    "sd": 1.34
+   },
+   "icon_seamless": {
+    "n": 40,
+    "mean": 96.95,
+    "sd": 0.83
+   },
+   "gem_global": {
+    "n": 21,
+    "mean": 96.36,
+    "sd": 0.8
+   }
+  },
+  "ref": {
+   "nbm": 94.6,
+   "hrrr": 97.0
+  },
+  "buckets": [
+   {
+    "mp": 0.026030786268446047,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 92.5
+   },
+   {
+    "mp": 0.17628500859109203,
+    "mid": 0.08499999999999999,
+    "hit": 0,
+    "rep": 94.5
+   },
+   {
+    "mp": 0.3952651519381691,
+    "mid": 0.585,
+    "hit": 0,
+    "rep": 96.5
+   },
+   {
+    "mp": 0.2317857035261016,
+    "mid": 0.325,
+    "hit": 1,
+    "rep": 98.5
+   },
+   {
+    "mp": 0.10203855888156739,
+    "mid": 0.015,
+    "hit": 0,
+    "rep": 100.5
+   },
+   {
+    "mp": 0.0685947907946238,
+    "mid": 0.005,
+    "hit": 0,
+    "rep": 102.5
+   }
+  ],
+  "plays": [],
+  "mean_hist": [
+   [
+    "2026-07-06T16:32Z",
+    97.35
+   ]
+  ]
  }
 ]
