@@ -2251,5 +2251,214 @@ class TestOfflineTools(unittest.TestCase):
         self.assertIsNone(bt.w_member_count_with_ai({k: mm[k] for k in bt.MODELS}, None))
 
 
+class TestSettlementProvenance(unittest.TestCase):
+    """Settlement-source guard and NWS CLI cross-check (2026-09-14).
+
+    Kalshi moved 33 of 40 temperature ladders to The Weather Company on
+    2026-09-04 while the rules text kept naming the CLI station, and nothing in
+    the runner noticed for ten days. These tests pin both guards: that they
+    alert on a real change, stay quiet on the already-verified migration and on
+    fetch failures, never block settlement, and never move CONFIG_HASH."""
+
+    # ---- settlement_source_pass ----
+    def _src_fetcher(self, mapping):
+        def f(url, tries=3):
+            ser = url.rsplit("/", 1)[-1]
+            if ser not in mapping: return None
+            v = mapping[ser]
+            if v is None: return {"series": {"settlement_sources": []}}
+            return {"series": {"settlement_sources": [{"name": v}]}}
+        return f
+
+    def _run_src(self, state, mapping, tickers):
+        saved = (kw.fget, kw.time.sleep)
+        try:
+            kw.fget = self._src_fetcher(mapping)
+            kw.time.sleep = lambda s: None
+            return kw.settlement_source_pass(state, tickers, stamp="2026-09-14T22:00Z")
+        finally:
+            kw.fget, kw.time.sleep = saved
+
+    def test_first_sighting_seeds_baseline_silently(self):
+        # A guard shipping into an existing book must not alert on all 40 series.
+        st = {}
+        al = self._run_src(st, {"KXHIGHNY": "The Weather Company"}, ["KXHIGHNY"])
+        self.assertEqual(al, [])
+        self.assertEqual(st["settlement_sources"]["KXHIGHNY"]["name"], "The Weather Company")
+        self.assertEqual(st["settlement_sources"]["KXHIGHNY"]["history"], [])
+
+    def test_unchanged_source_is_silent(self):
+        st = {"settlement_sources": {"KXHIGHNY": {"name": "The Weather Company",
+                                                 "first_seen": "x", "checked": "x", "history": []}}}
+        al = self._run_src(st, {"KXHIGHNY": "The Weather Company"}, ["KXHIGHNY"])
+        self.assertEqual(al, [])
+        self.assertEqual(st["settlement_sources"]["KXHIGHNY"]["checked"], "2026-09-14T22:00Z")
+
+    def test_unexpected_change_alerts_and_is_recorded(self):
+        st = {"settlement_sources": {"KXHIGHNY": {"name": "The Weather Company",
+                                                 "first_seen": "x", "checked": "x", "history": []}}}
+        al = self._run_src(st, {"KXHIGHNY": "AccuWeather"}, ["KXHIGHNY"])
+        self.assertEqual(len(al), 1)
+        self.assertIn("KXHIGHNY", al[0])
+        self.assertIn("AccuWeather", al[0])
+        row = st["settlement_sources"]["KXHIGHNY"]
+        self.assertEqual(row["name"], "AccuWeather")
+        self.assertEqual(row["history"][-1],
+                         {"from": "The Weather Company", "to": "AccuWeather",
+                          "at": "2026-09-14T22:00Z", "expected": False})
+
+    def test_nws_to_twc_records_but_never_alerts(self):
+        # Owner decision 2026-09-14: the already-measured NWS to TWC migration
+        # must not reach the alert strip. Expressed as a TRANSITION, not a ticker
+        # list, so a re-listed series or a newly added NWS-named city is covered.
+        for prev in ("National Weather Service", "NWS Climatological Report Houston",
+                     "NWS Climatological Report"):
+            ser = "KXLOWTCHI"
+            st = {"settlement_sources": {ser: {"name": prev, "first_seen": "x",
+                                               "checked": "x", "history": []}}}
+            al = self._run_src(st, {ser: kw.SETTLEMENT_SOURCE_TWC}, [ser])
+            self.assertEqual(al, [], prev)                        # silent on the alert strip
+            row = st["settlement_sources"][ser]
+            self.assertEqual(row["name"], kw.SETTLEMENT_SOURCE_TWC)
+            self.assertTrue(row["history"][-1]["expected"])       # evidence still kept
+
+    def test_every_other_transition_alerts(self):
+        # "Expected" is exactly one move. A third party, and a move AWAY from
+        # TWC, are both real changes that must surface.
+        for prev, now in (("National Weather Service", "AccuWeather"),
+                          ("The Weather Company", "AccuWeather"),
+                          ("The Weather Company", "National Weather Service")):
+            ser = "KXLOWTCHI"
+            st = {"settlement_sources": {ser: {"name": prev, "first_seen": "x",
+                                               "checked": "x", "history": []}}}
+            al = self._run_src(st, {ser: now}, [ser])
+            self.assertEqual(len(al), 1, (prev, now))
+            self.assertFalse(st["settlement_sources"][ser]["history"][-1]["expected"])
+
+    def test_retired_series_cannot_raise_a_phantom_alert(self):
+        # The seven NWS-named series (KXHIGHHOU, KXLOW for AUS/CHI/DEN/LAX/MIA/
+        # PHIL) have ZERO open markets: dead legacy tickers, last touched
+        # 2026-02-26 and 2026-03-16. A hand-built ticker list finds them and
+        # reads as a half-migrated book, which is wrong. The pass takes its set
+        # from the live ladder pull, so a series with no open markets is never
+        # checked and can never alert.
+        st = {"settlement_sources": {}}
+        self.assertEqual(self._run_src(st, {"KXLOWCHI": "National Weather Service"}, []), [])
+        self.assertEqual(st["settlement_sources"], {})            # not even seeded
+
+    def test_fetch_failure_is_unknown_not_changed(self):
+        base = {"name": "The Weather Company", "first_seen": "x", "checked": "x", "history": []}
+        for payload in (["KXHIGHNY"], {"KXHIGHNY": None}):
+            st = {"settlement_sources": {"KXHIGHNY": dict(base)}}
+            mapping = {} if isinstance(payload, list) else payload
+            al = self._run_src(st, mapping, ["KXHIGHNY"])
+            self.assertEqual(al, [])                              # no false alarm
+            row = st["settlement_sources"]["KXHIGHNY"]
+            self.assertEqual(row["name"], "The Weather Company")  # baseline untouched
+            self.assertEqual(row["history"], [])
+
+    # ---- cli_crosscheck_pass ----
+    def _cli_fetcher(self, rows):
+        # rows: {"YYYY-MM-DD": (high, low)}
+        def f(url, tries=3):
+            if "mesonet" not in url: return None
+            return {"results": [{"valid": d, "high": h, "low": lo} for d, (h, lo) in rows.items()]}
+        return f
+
+    def _run_cli(self, state, rows, fetcher=None):
+        saved = kw.fget
+        try:
+            kw.fget = fetcher or self._cli_fetcher(rows)
+            return kw.cli_crosscheck_pass(state, cache={})
+        finally:
+            kw.fget = saved
+
+    def _rec(self, code="NYC", kind="HIGH", days_ago=1, actual=80):
+        t = (kw.TODAY - dtm.timedelta(days=days_ago)).isoformat()
+        return {"code": code, "kind": kind, "target": t, "actual": actual}
+
+    def test_match_is_stamped_and_silent(self):
+        r = self._rec(actual=80); st = {"resolved": [r]}
+        al = self._run_cli(st, {r["target"]: (80, 61)})
+        self.assertEqual(al, [])
+        self.assertEqual(r["cli_check"]["match"], True)
+        self.assertEqual(r["cli_check"]["cli"], 80)
+        self.assertEqual(r["cli_check"]["kalshi"], 80)
+        self.assertEqual(r["cli_check"]["station"], kw.STATION_IDS["NYC"])
+
+    def test_divergence_alerts(self):
+        r = self._rec(actual=85); st = {"resolved": [r]}
+        al = self._run_cli(st, {r["target"]: (80, 61)})
+        self.assertEqual(len(al), 1)
+        self.assertIn("settlement divergence", al[0])
+        self.assertFalse(r["cli_check"]["match"])
+        self.assertEqual(r["actual"], 85)      # the settled value is NEVER edited
+
+    def test_low_reads_the_low_column(self):
+        r = self._rec(kind="LOW", actual=61); st = {"resolved": [r]}
+        self.assertEqual(self._run_cli(st, {r["target"]: (80, 61)}), [])
+        self.assertTrue(r["cli_check"]["match"])
+
+    def test_write_once_and_skips(self):
+        done = self._rec(actual=99); done["cli_check"] = {"match": True}
+        old = self._rec(days_ago=kw.CLI_CHECK_LOOKBACK_DAYS + 3, actual=99)
+        nores = self._rec(actual=None)
+        unknown_city = self._rec(code="ZZZ", actual=99)
+        st = {"resolved": [done, old, nores, unknown_city]}
+        rows = {r["target"]: (1, 1) for r in (done, old, nores, unknown_city)}
+        self.assertEqual(self._run_cli(st, rows), [])
+        self.assertEqual(done["cli_check"], {"match": True})       # not re-checked
+        for r in (old, nores, unknown_city):
+            self.assertIsNone(r.get("cli_check"))
+
+    def test_unreadable_cli_leaves_record_unstamped_for_retry(self):
+        r = self._rec(); st = {"resolved": [r]}
+        self.assertEqual(self._run_cli(st, {}, fetcher=lambda url, tries=3: None), [])
+        self.assertIsNone(r.get("cli_check"))     # retried next run, never stamped as a miss
+        # a date the CLI has not published yet is also left for retry, not failed
+        self.assertEqual(self._run_cli(st, {"1999-01-01": (1, 1)}), [])
+        self.assertIsNone(r.get("cli_check"))
+
+    def test_backfill_is_bounded(self):
+        recs = [self._rec(actual=80) for _ in range(kw.CLI_CHECK_BACKFILL + 10)]
+        st = {"resolved": recs}
+        self._run_cli(st, {recs[0]["target"]: (80, 61)})
+        self.assertEqual(sum(1 for r in recs if r.get("cli_check")), kw.CLI_CHECK_BACKFILL)
+
+    def test_archive_is_never_touched(self):
+        # The archive is the older half of the same record; this pass reads the
+        # live resolved list only.
+        r = self._rec()
+        st = {"resolved": [], "archive_probe": [r]}
+        self.assertEqual(self._run_cli(st, {r["target"]: (80, 61)}), [])
+        self.assertIsNone(r.get("cli_check"))
+
+    # ---- isolation invariants ----
+    def test_guards_are_not_behavior_knobs(self):
+        # A recording guard must not move CONFIG_HASH: era comparability depends
+        # on the fingerprint marking behavior changes only.
+        self.assertEqual(kw.CONFIG_HASH, "5a84b45a")
+        for name in ("SETTLEMENT_SOURCE_TWC", "NWS_SOURCE_PREFIXES",
+                     "CLI_CHECK_LOOKBACK_DAYS", "CLI_CHECK_BACKFILL"):
+            self.assertNotIn(name, kw._KNOB_NAMES)
+
+    def test_ladder_carries_its_series_ticker(self):
+        # settlement_source_pass reads the series set off the pull already paid
+        # for; if this field is dropped the guard silently checks nothing.
+        payload = {"events": [{"series_ticker": "KXHIGHNY", "event_ticker": "KXHIGHNY-26SEP15",
+                               "markets": [{"ticker": "KXHIGHNY-26SEP15-T70", "strike_type": "less",
+                                            "cap_strike": "70", "yes_bid_dollars": "0.10",
+                                            "yes_ask_dollars": "0.16", "open_interest_fp": "500"}]}]}
+        saved = (kw.fget, kw.time.sleep, kw.GATE_MIN_LADDERS)
+        try:
+            kw.fget = lambda url, tries=3: payload
+            kw.time.sleep = lambda s: None
+            kw.GATE_MIN_LADDERS = 1
+            out = kw.pull_weather_markets()
+        finally:
+            kw.fget, kw.time.sleep, kw.GATE_MIN_LADDERS = saved
+        self.assertEqual(out[0]["series"], "KXHIGHNY")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
