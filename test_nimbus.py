@@ -2460,5 +2460,105 @@ class TestSettlementProvenance(unittest.TestCase):
         self.assertEqual(out[0]["series"], "KXHIGHNY")
 
 
+class TestBetTimingReplay(unittest.TestCase):
+    """replay_timing.py, the FUTURE docket 7 instrument. Read-only and offline,
+    but it decides a registered gate, so its tape plumbing is pinned here: a
+    silent misread of the positional bucket rows would produce a confident
+    table built on the wrong prices."""
+
+    def setUp(self):
+        import replay_timing
+        self.rt = replay_timing
+
+    def test_board_cron_assigns_by_which_cron_could_have_fired_it(self):
+        # Crons fire LATE and never early, so a board belongs to the most recent
+        # nominal cron at or before its stamp. Measured drift reaches +7h.
+        cases = [("2026-09-14T12:17Z", "12:17"), ("2026-09-14T13:40Z", "12:17"),
+                 ("2026-09-14T19:59Z", "12:17"),                      # +7.7h drift
+                 ("2026-09-14T21:38Z", "21:38"), ("2026-09-14T23:10Z", "21:38"),
+                 ("2026-09-14T01:30Z", "21:38"),                      # past midnight
+                 ("2026-09-14T02:07Z", "02:07"), ("2026-09-14T09:00Z", "02:07")]
+        for stamp, want in cases:
+            self.assertEqual(self.rt.board_cron(stamp), want, stamp)
+        self.assertIsNone(self.rt.board_cron("garbage"))
+
+    def test_book0_fingerprint_matches_the_live_tape_hash(self):
+        # book0 stores no fp, so the tool recomputes it. If this drifts from
+        # _tape_row's hash every tape row looks re-strung and the slate silently
+        # replays nothing.
+        bks = [{"ticker": t, "mp": .5, "mid": .5, "yb": .4, "ya": .6, "oi": 9}
+               for t in ("A-T1", "A-T2", "A-T3")]
+        self.assertEqual(self.rt.book0_fp({"buckets": bks}),
+                         kw._tape_row("s", 1.0, False, 1, bks)[4])
+
+    def test_restrung_ladder_is_skipped_never_realigned(self):
+        b0 = {"buckets": [{"ticker": "A-T1", "hit": 1}, {"ticker": "A-T2", "hit": 0}]}
+        rec = {"book0": b0}
+        good = kw._tape_row("s", 1.0, False, 1,
+                            [{"ticker": "A-T1", "mp": .5, "mid": .5, "yb": .4, "ya": .6, "oi": 9},
+                             {"ticker": "A-T2", "mp": .5, "mid": .5, "yb": .4, "ya": .6, "oi": 9}])
+        fp = self.rt.book0_fp(b0)
+        self.assertIsNotNone(self.rt._price_board(rec, good, fp))
+        bad = list(good); bad[4] = "deadbeef"           # ladder re-strung
+        self.assertIsNone(self.rt._price_board(rec, bad, fp))
+        short = list(good); short[5] = good[5][:1]      # length drift, same fp
+        self.assertIsNone(self.rt._price_board(rec, short, fp))
+
+    def test_priced_board_carries_ticker_and_settled_hit_from_book0(self):
+        # The tape stores only [mp, mid, yb, ya, oi]; identity and outcome must
+        # come positionally from book0, which is the whole reason fp is checked.
+        b0 = {"buckets": [{"ticker": "A-T1", "hit": 1}, {"ticker": "A-T2", "hit": 0}]}
+        row = kw._tape_row("s", 1.0, False, 1,
+                           [{"ticker": "A-T1", "mp": .70, "mid": .60, "yb": .58, "ya": .62, "oi": 500},
+                            {"ticker": "A-T2", "mp": .30, "mid": .40, "yb": .38, "ya": .42, "oi": 500}])
+        got = self.rt._price_board({"book0": b0}, row, self.rt.book0_fp(b0))
+        self.assertEqual([e["ticker"] for e in got], ["A-T1", "A-T2"])
+        self.assertEqual([e["hit"] for e in got], [1, 0])
+        self.assertEqual(got[0]["mp"], 0.7)
+        self.assertEqual(got[0]["oi"], 500)
+        # an ungraded book0 cannot be replayed at all
+        self.assertIsNone(self.rt._price_board(
+            {"book0": {"buckets": [{"ticker": "A-T1"}, {"ticker": "A-T2"}]}}, row,
+            self.rt.book0_fp({"buckets": [{"ticker": "A-T1"}, {"ticker": "A-T2"}]})))
+
+    def test_registered_slate_is_exactly_the_seven_configs(self):
+        # The slate was fixed 2026-07-28 before any replayable tape existed.
+        # Adding a row without recording it in FUTURE.md is the failure this
+        # guards against.
+        self.assertEqual(len(self.rt.SLATE), 7)
+        names = [c["name"] for c in self.rt.SLATE]
+        self.assertTrue(names[0].startswith("champion"))
+        self.assertEqual(self.rt.CEILINGS,
+                         {"best-price-of-first-2-boards", "best-price-of-first-3-boards"})
+
+    def test_slate_pickers_select_the_boards_they_claim(self):
+        rows = [["2026-09-14T13:00Z"], ["2026-09-14T22:00Z"], ["2026-09-15T03:00Z"]]
+        by = {c["name"]: c["pick"] for c in self.rt.SLATE}
+        self.assertEqual(by["champion (first playable board)"](None, rows), [0])
+        self.assertEqual(by["freeze-at-board-2"](None, rows), [1])
+        self.assertEqual(by["freeze-at-board-3"](None, rows), [2])
+        self.assertEqual(by["freeze-only-on-12:17-board"](None, rows), [0])
+        self.assertEqual(by["freeze-only-on-21:38-board"](None, rows), [1])
+        self.assertEqual(by["best-price-of-first-2-boards"](None, rows), [0, 1])
+        self.assertEqual(by["best-price-of-first-3-boards"](None, rows), [0, 1, 2])
+        # a config whose board never fired must SKIP the record, not fall back to
+        # another board: silently substituting would make every row the champion
+        self.assertEqual(by["freeze-at-board-3"](None, rows[:2]), [])
+        self.assertEqual(by["freeze-only-on-21:38-board"](None, [rows[0]]), [])
+
+    def test_clv_sign_matches_the_live_convention(self):
+        # Mirrors resolve_pending: YES gains when the close rises, NO when it falls.
+        b0 = {"buckets": [{"ticker": "A-T1", "hit": 1, "mp": .95, "mid": .50}]}
+        rec = {"code": "NYC", "kind": "HIGH", "target": "2026-09-01", "book0": b0,
+               "buckets": [{"mid": 0.80}],
+               "tape": [kw._tape_row("2026-09-01T13:00Z", 1.0, False, 1,
+                                     [{"ticker": "A-T1", "mp": .95, "mid": .50,
+                                       "yb": .48, "ya": .52, "oi": 5000}])] * 2}
+        out = self.rt.replay([rec], self.rt.SLATE[0])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["side"], "Buy YES")
+        self.assertAlmostEqual(out[0]["clv"], 0.30, places=3)   # 0.80 close - 0.50 entry mid
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

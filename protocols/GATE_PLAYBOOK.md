@@ -98,8 +98,16 @@ semantics once it exists, per HANDOFF 7b).
 
 ## Gate 5: bet-timing replay (FUTURE docket 7)
 
-- 150+ plays with a 2+ board tape (4/150 as of 2026-07-31; slow feed). Same
-  adoption discipline as gate 4; skipped-play counts are part of the verdict.
+- **READ AND CLOSED 2026-09-14** at 178 champion plays over 45 target dates
+  (gate 150). Tool: `python3 replay_timing.py`, whole slate. VERDICT: no
+  candidate clears the adoption rule; the champion (+4.1 percent ROI) is the
+  only profitable config in the slate, and even the two hindsight CEILING rows
+  lose. The "21:38 is the information peak" prior is refuted. Entire sample
+  postdates registration, so `--since 2026-07-28` is identical. Item closed
+  with finality; re-opening needs a NEW registration.
+- Carried forward, not acted on: CLV and ROI disagreed here, with later boards
+  earning better CLV while losing money. First measured case of CLV pointing at
+  the losing rule.
 
 ## Gate 6: source-consensus shadow (FUTURE docket 8)
 
