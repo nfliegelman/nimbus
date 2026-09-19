@@ -206,10 +206,15 @@ CITIES = {
 # ASOS/ICAO station ids for each city's Kalshi settlement station, derived
 # from the rules-text CLI products verified 2026-07-04 (audit batch 1, e.g.
 # CLIDFW -> KDFW, CLINYC -> KNYC Central Park, CLIHOU -> KHOU Hobby).
-# INERT today: this is the prerequisite map for intraday observation
-# truncation (nowcasting, FUTURE section 5) via api.weather.gov
-# /stations/{id}/observations. Do not guess these; re-verify against
-# rules_secondary if Kalshi changes a settlement source.
+# Used for intraday observation truncation (nowcasting, FUTURE section 5) via
+# api.weather.gov /stations/{id}/observations. Do not guess these.
+# STILL CORRECT after the 2026-09-04 publisher change: the rules text names the
+# same CLI station ("... recorded at New York City (CLINYC) ... according to The
+# Weather Company"), so the observations these ids pull remain the settlement
+# basis. What changed is who publishes the number, not where it is measured.
+# settlement_source_pass now watches for the next change; if it alerts, re-verify
+# these ids against the live rules text before trusting the nowcast floor, since
+# TWC states some values are "derived from several observation sources".
 STATION_IDS={"ATL":"KATL","AUS":"KAUS","BOS":"KBOS","CHI":"KMDW","DAL":"KDFW",
              "DC":"KDCA","DEN":"KDEN","HOU":"KHOU","LAX":"KLAX","LV":"KLAS",
              "MIA":"KMIA","MIN":"KMSP","NOLA":"KMSY","NYC":"KNYC","OKC":"KOKC",
@@ -217,7 +222,57 @@ STATION_IDS={"ATL":"KATL","AUS":"KAUS","BOS":"KBOS","CHI":"KMDW","DAL":"KDFW",
 # Legacy Kalshi series codes that differ from our CITIES keys (NYC's original
 # high-temp series is KXHIGHNY, so the code after the prefix is "NY").
 SERIES_ALIAS={"NY":"NYC"}
-# NWS Climate Reports (the Kalshi settlement source) record the daily high/low in
+# ------------- settlement-source provenance (guards, 2026-09-14) -------------
+# On 2026-09-04 Kalshi moved 33 of the 40 temperature ladders from an NWS-named
+# settlement source to "The Weather Company" (series last_updated_ts; rulebook
+# amendment GLOBALTEMPERATURE-bulk-2026-09-02, announced 2026-08-27). The rules
+# text still names the CLI station: "the maximum temperature recorded at New
+# York City (CLINYC) ... according to The Weather Company". So the station, the
+# LST climate day, and the reported number are unchanged. TWC became the
+# PUBLISHER of record, not a new observation network.
+# Verified on the record before the guards shipped: Kalshi's expiration_value
+# matched the NWS CLI report exactly on 400 of 400 post-migration city-days,
+# against 2481 of 2483 before it, with model MAE flat across the boundary
+# (1.535 to 1.517). That is why this shipped with NO MODEL_VERSION bump: the
+# target variable did not move, and splitting eras on a non-event would corrupt
+# every before-and-after comparison in the project.
+# FUTURE section 6 named "Kalshi can change fees, bucket structure, or
+# settlement sources" as a known risk whose entire mitigation was a human
+# noticing. It fired, and it went ten days unnoticed. These two passes exist so
+# the next one is caught by the runner instead.
+SETTLEMENT_SOURCE_TWC="The Weather Company"
+# Names Kalshi has used for the NWS-published source, across both generations.
+NWS_SOURCE_PREFIXES=("NWS","National Weather Service")
+# EVERY LIVE LADDER IS ON TWC. Seven series still read an NWS name
+# (KXHIGHHOU, and KXLOW for AUS/CHI/DEN/LAX/MIA/PHIL) but all seven have ZERO
+# open markets: they are dead legacy tickers Kalshi retired and never updated,
+# last touched 2026-02-26 and 2026-03-16. Probing series tickers by hand finds
+# them and reads as a half-migrated book, which is wrong. This is exactly why
+# settlement_source_pass takes its series set from the LIVE ladder pull instead
+# of a hand-built ticker list: a series with no open markets cannot settle
+# anything, so its stale source name is noise, not risk.
+# Because a retired series could still be re-listed, and because a future city
+# could arrive NWS-named, the quiet case is expressed as the TRANSITION rather
+# than as a list of tickers: a move from an NWS name to TWC is the same
+# migration already measured value-neutral above, so it is recorded in the
+# provenance trail but does NOT alert (owner decision 2026-09-14, asked and
+# answered: "3 i dont want to see it"). Every other transition alerts, a move
+# AWAY from TWC and a move to any third party included.
+def _is_nws_source(name):
+    return bool(name) and name.strip().startswith(NWS_SOURCE_PREFIXES)
+def _expected_migration(prev,name):
+    """True only for the one transition this project has already verified."""
+    return _is_nws_source(prev) and name==SETTLEMENT_SOURCE_TWC
+# CLI cross-check: forward-only and write-once, with a bounded backfill so a
+# transient fetch outage self-heals without rewriting settled history. The full
+# historical audit (2881 records) was run once on 2026-09-14 and its result is
+# in the Decision Log; these knobs only repair gaps from here on.
+CLI_CHECK_LOOKBACK_DAYS=7
+CLI_CHECK_BACKFILL=40
+# NWS Climate Reports define the Kalshi settlement DAY: the rules text names the
+# CLI product per city (CLINYC, CLIMDW, ...) and The Weather Company publishes
+# that station's value since 2026-09-04. The window below is unchanged by the
+# publisher change and was re-verified against it. CLI records the high/low in
 # Local STANDARD Time year-round. During DST the settlement day therefore runs
 # 1:00 AM to 12:59 AM local clock time, not midnight to midnight. We shift hourly
 # forecast timestamps back to LST before picking each day's high/low so our "day"
@@ -364,6 +419,7 @@ def pull_weather_markets():
                         "sub":m.get("yes_sub_title") or "","yb":yb,"ya":ya,
                         "oi":fnum(m.get("open_interest_fp"),0) or 0})
         if bks: out.append({"code":code,"kind":kind,"date":tdate,"event_ticker":et,"buckets":bks,
+                            "series":ser,
                             "structure_ok":_ladder_contiguous(raw_strikes)})
     print(f"  found {len(out)} city/day ladders")
     if len(out)<GATE_MIN_LADDERS:
@@ -509,6 +565,133 @@ def fetch_settled_event(event_ticker):
         for m in d.get("markets",[]):
             out[m.get("ticker")]=(m.get("result"), fnum(m.get("expiration_value")))
     return out
+
+# ---------------- settlement provenance guards (2026-09-14) -----------------
+# Two evidence-only passes, both fully isolated and non-fatal in the rain-shadow
+# idiom: a failure in either can never cost a board, a settlement, or a play.
+# Neither feeds pricing, calibration, or play selection, and neither appears in
+# _KNOB_NAMES, because a recording guard is not a behavior knob and must not
+# move CONFIG_HASH.
+
+def fetch_settlement_source(series_ticker):
+    """The named settlement source for one series, or None if unreadable.
+
+    None means UNKNOWN and never CHANGED. A fetch failure that silently read as
+    a source change would cry wolf on every Kalshi hiccup, and a guard nobody
+    trusts is a guard nobody reads."""
+    d=fget(f"{KBASE}/series/{series_ticker}",tries=2)
+    if not d: return None
+    s=(d.get("series") or {}).get("settlement_sources") or []
+    if not s: return None
+    return ((s[0] or {}).get("name") or "").strip() or None
+
+
+def settlement_source_pass(state,series_tickers,stamp=None):
+    """Record every live series' named settlement source and alert on any change
+    the project has not already verified.
+
+    Costs one cheap /series call per distinct series per run (about 40). That
+    buys detection on the very next run rather than within a day, which is the
+    point: the 2026-09-04 migration went ten days unnoticed.
+
+    The series set comes from the LIVE ladder pull, never a hand-built ticker
+    list, so retired series with no open markets cannot raise phantom alerts.
+
+    Returns a list of alert strings. An NWS-to-TWC move is recorded in the
+    series' history but deliberately returns no alert."""
+    stamp=stamp or dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    base=state.setdefault("settlement_sources",{})
+    alerts=[]
+    for ser in sorted({s for s in (series_tickers or []) if s}):
+        name=fetch_settlement_source(ser); time.sleep(0.1)
+        if name is None: continue          # unknown: never overwrite a known baseline
+        row=base.get(ser)
+        if not isinstance(row,dict):
+            # First sighting. Seed the baseline silently: a guard shipping into an
+            # existing book would otherwise alert on all 40 series at once.
+            base[ser]={"name":name,"first_seen":stamp,"checked":stamp,"history":[]}
+            continue
+        prev=row.get("name")
+        row["checked"]=stamp
+        if name==prev: continue
+        expected=_expected_migration(prev,name)
+        row.setdefault("history",[]).append(
+            {"from":prev,"to":name,"at":stamp,"expected":bool(expected)})
+        row["name"]=name
+        if not expected:
+            alerts.append("settlement source: %s moved %s -> %s (verify the rules text names "
+                          "the same station and climate day before trusting the next settlement)"
+                          %(ser,prev,name))
+    return alerts
+
+
+def _cli_year(station,year,cache):
+    """NWS CLI daily highs and lows for one station-year: {date: (high, low)}.
+
+    Cached per run, so a run costs at most one call per station no matter how
+    many records it checks. Returns {} on any failure, which every caller reads
+    as UNKNOWN, never as a mismatch."""
+    key=(station,year)
+    if key in cache: return cache[key]
+    out={}
+    d=fget("https://mesonet.agron.iastate.edu/json/cli.py?station=%s&year=%d"%(station,year),tries=2)
+    for x in (d or {}).get("results",[]):
+        v=x.get("valid")
+        if v: out[v]=(x.get("high"),x.get("low"))
+    cache[key]=out
+    return out
+
+
+def cli_crosscheck_pass(state,cache=None):
+    """Compare Kalshi's settled value against the NWS CLI report for the same
+    station and date, and record the answer on the resolved record.
+
+    WHY THIS EXISTS. Since 2026-09-04 the named settlement source is The Weather
+    Company while the rules text still names the CLI station. Today the two agree
+    exactly (400 of 400 at ship time). This pass is the standing proof that they
+    KEEP agreeing, so on the day TWC publishes a derived number instead of the
+    station's own, the record says so out loud instead of the bias corrections
+    quietly absorbing a settlement change as forecast error.
+
+    EVIDENCE ONLY, by deliberate choice (owner asked, answered here): it never
+    blocks grading, never edits a settled value, and never feeds calibration. A
+    hard gate would let an IEM outage stall settlement, and stalling settlement
+    to protect against a rare divergence trades a certain harm for a speculative
+    one. Write-once per record and forward-only; the bounded backfill exists so a
+    transient outage self-heals without rewriting settled history.
+
+    ARCHIVED RECORDS ARE NEVER TOUCHED. The archive is the older half of the same
+    track record and this pass has no business rewriting it."""
+    if cache is None: cache={}
+    cutoff=(TODAY-dt.timedelta(days=CLI_CHECK_LOOKBACK_DAYS)).isoformat()
+    alerts=[]; checked=0
+    for rec in state.get("resolved",[]):
+        if checked>=CLI_CHECK_BACKFILL: break
+        if rec.get("cli_check") is not None: continue
+        if rec.get("actual") is None: continue
+        tgt=rec.get("target") or ""
+        if tgt<cutoff: continue
+        st=STATION_IDS.get(rec.get("code"))
+        if not st: continue
+        try: year=int(tgt[:4])
+        except ValueError: continue
+        vals=_cli_year(st,year,cache)
+        if not vals: continue              # unreadable: leave unstamped, retry next run
+        pair=vals.get(tgt)
+        if pair is None: continue          # CLI not published yet: retry next run
+        ref=pair[0] if rec.get("kind")=="HIGH" else pair[1]
+        if ref is None: continue
+        act=rec["actual"]
+        match=(int(ref)==int(act))
+        rec["cli_check"]={"station":st,"cli":int(ref),"kalshi":int(act),
+                          "match":match,"at":dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")}
+        checked+=1
+        if not match:
+            alerts.append("settlement divergence: %s/%s %s settled %d but NWS CLI %s reports %d"
+                          %(rec.get("code"),rec.get("kind"),tgt,act,st,int(ref)))
+    if checked: print(f"  CLI cross-check: {checked} settled records verified against NWS climate reports.")
+    return alerts
+
 
 # ----------------------- rain evidence shadow ----------------------
 def fetch_rain_markets():
@@ -1267,6 +1450,9 @@ def score(state):
             except ValueError: pass
     health={"ladders":len(ladders),"cities":len(needed),"cities_failed":fetch_failed,
             "gated":gated,"capped":dropped,"new_24h":new24,
+            # the distinct series actually live this run, for settlement_source_pass.
+            # Read from the pull we already paid for rather than probing tickers.
+            "series":sorted({l["series"] for l in ladders if l.get("series")}),
             "run_utc":dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")}
     return rows,plays,health
 
@@ -2544,6 +2730,19 @@ def main():
     # window" rather than "recent vs all time", which is the more honest
     # comparison for a drift alarm anyway.
     alerts=drift_alerts(state)
+    # Settlement provenance guards (2026-09-14). Both are evidence-only and each
+    # is isolated behind its own wrapper: a failure in one must not cost the
+    # other, and neither may cost a board, a settlement, or a play. They run
+    # AFTER resolve_pending so the cross-check sees this run's new settlements,
+    # and they are skipped on the shadow run, which returns long before here.
+    try:
+        alerts+=settlement_source_pass(state,health.get("series"))
+    except Exception as e:
+        print("Settlement-source guard skipped:",str(e)[:90])
+    try:
+        alerts+=cli_crosscheck_pass(state)
+    except Exception as e:
+        print("CLI cross-check skipped:",str(e)[:90])
     archive_pass(state)
     # Reporting reads live PLUS archive, so every pre-registered gate keeps
     # counting over the whole track record after a split.
