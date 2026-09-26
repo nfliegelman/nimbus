@@ -42,6 +42,7 @@ jobs:
           python -m py_compile test_nimbus.py
           python -m py_compile backtest_models.py
           python -m py_compile replay_selection.py
+          python -m py_compile replay_timing.py
 
       - name: Test suite
         run: python test_nimbus.py
@@ -66,7 +67,8 @@ jobs:
         run: |
           python backtest_models.py > /dev/null
           python replay_selection.py > /dev/null
-          echo "backtest_models.py and replay_selection.py both run clean"
+          python replay_timing.py > /dev/null
+          echo "backtest_models.py, replay_selection.py and replay_timing.py all run clean"
 
       - name: Sandbox double-run against live market data
         # The CLAUDE.md procedure, automated. Runs in a COPY with its .git
