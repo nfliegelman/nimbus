@@ -314,7 +314,18 @@ def fget(url, tries=3):
             with urllib.request.urlopen(req,timeout=45) as r: return json.load(r)
         except Exception as e:
             if i==tries-1: print("   fetch failed:",str(e)[:90]); return None
-            time.sleep(1.0)
+            time.sleep(_retry_wait(e,i))
+
+def _retry_wait(e,i):
+    """Pause before retry i+1. HTTP 429 is the server asking for a slower pace,
+    not a failure, so it waits for Retry-After when one is sent, else backs off
+    exponentially (2 s, 4 s, ...), capped at 30 s. Every other error keeps the
+    original flat 1 s. Added 2026-10-08 after Kalshi started rate-limiting the
+    market pull (HANDOFF v6.46)."""
+    if getattr(e,"code",None)!=429: return 1.0
+    hdr=getattr(e,"headers",None)
+    ra=fnum(hdr.get("Retry-After")) if hdr is not None else None
+    return min(max(ra or 0.0,2.0*(2**i)),30.0)
 
 def fnum(x,d=None):
     try: return float(x)
@@ -381,31 +392,88 @@ def _ladder_contiguous(strikes):
         return False
     return True
 
+WEATHER_SERIES_CATEGORY = "Climate and Weather"   # Kalshi's category for every temperature ladder
+
+def weather_series(ser):
+    """(kind, code) when a Kalshi series ticker is a Nimbus daily-temperature
+    ladder, else None. One rule, used both to choose which series to fetch and
+    to parse the events that come back.
+
+    Two ticker generations coexist on Kalshi: newer cities use KXHIGHT/KXLOWT,
+    the original cities still use legacy KXHIGH/KXLOW (no T), and legacy NYC
+    is "NY". Matching only KXHIGHT* silently dropped 7 of 20 HIGH ladders
+    (AUS, CHI, DEN, LAX, MIA, NYC, PHIL), including the most liquid ones.
+    Every other KXHIGH*/KXLOW* series (other US cities, the international
+    airport-code series added 2026-10) falls out at the CITIES check."""
+    ser=ser or ""
+    if   ser.startswith("KXHIGHT"): kind,code="HIGH",ser[7:]
+    elif ser.startswith("KXLOWT"):  kind,code="LOW",ser[6:]
+    elif ser.startswith("KXHIGH"):  kind,code="HIGH",ser[6:]
+    elif ser.startswith("KXLOW"):   kind,code="LOW",ser[5:]
+    else: return None
+    code=SERIES_ALIAS.get(code,code)
+    return (kind,code) if code in CITIES else None
+
+def list_weather_series():
+    """Every series ticker that parses to a Nimbus city/kind, from ONE category
+    listing. Retired legacy tickers stay in the list; they simply return no
+    open events. An unreadable listing returns [], which the ladder gate in
+    pull_weather_markets turns into an honest red run."""
+    d=fget(f"{KBASE}/series?category={urllib.parse.quote(WEATHER_SERIES_CATEGORY)}")
+    if not d: return []
+    return sorted({s.get("ticker") for s in (d.get("series") or [])
+                   if s.get("ticker") and weather_series(s.get("ticker"))})
+
 def pull_weather_markets():
-    evs,cur=[],None; print("Pulling Kalshi weather markets...")
-    for _ in range(60):
-        u=f"{KBASE}/events?limit=200&status=open&with_nested_markets=true"
-        if cur: u+="&cursor="+cur
-        d=fget(u)
-        if not d: break
-        evs+=d.get("events",[]); cur=d.get("cursor")
-        if not cur: break
+    """Open temperature ladders, fetched series by series.
+
+    Until 2026-10-07 this paginated EVERY open Kalshi event (all categories,
+    nested markets) and filtered locally. Kalshi's universe outgrew that: by
+    2026-10-08 the walk passed 4,400 events without reaching a temperature
+    ladder and drew HTTP 429, so fget gave up, the universe came back
+    truncated, and the ladder gate aborted two runs in a row (exit 2). Asking
+    for the ~50 matching series directly is about 50 small requests instead of
+    an unbounded walk of heavy pages. The ladder parsing below is unchanged, so
+    the same open events produce the same ladders (HANDOFF v6.46)."""
+    print("Pulling Kalshi weather markets...")
+    sers=list_weather_series()
+    def _fetch(ser):
+        got,cur=[],None
+        for _ in range(10):
+            u=f"{KBASE}/events?series_ticker={ser}&limit=200&status=open&with_nested_markets=true"
+            if cur: u+="&cursor="+cur
+            d=fget(u)
+            if not d: return None
+            got+=d.get("events",[]); cur=d.get("cursor")
+            if not cur: return got
+            time.sleep(0.15)
+        return got
+    evs,failed=[],[]
+    for ser in sers:
+        got=_fetch(ser)
+        if got is None: failed.append(ser)
+        else: evs+=got
         time.sleep(0.15)
+    if failed:
+        # One unhurried second pass: a rate-limit burst usually clears within
+        # seconds, and every series dropped here is a city/kind missing from
+        # the board until the next run.
+        time.sleep(10.0)
+        still=[]
+        for ser in failed:
+            got=_fetch(ser)
+            if got is None: still.append(ser)
+            else: evs+=got
+            time.sleep(0.15)
+        failed=still
+    if failed:
+        print(f"  WARNING: {len(failed)} weather series could not be fetched: {', '.join(failed)}")
     out=[]
     for e in evs:
         ser=e.get("series_ticker") or ""
-        # Two ticker generations coexist on Kalshi: newer cities use KXHIGHT/KXLOWT,
-        # the original cities still use legacy KXHIGH/KXLOW (no T), and legacy NYC
-        # is "NY". Matching only KXHIGHT* silently dropped 7 of 20 HIGH ladders
-        # (AUS, CHI, DEN, LAX, MIA, NYC, PHIL), including the most liquid ones.
-        # Non-weather KXHIGH* series fall out at the CITIES membership check.
-        if   ser.startswith("KXHIGHT"): kind,code="HIGH",ser[7:]
-        elif ser.startswith("KXLOWT"):  kind,code="LOW",ser[6:]
-        elif ser.startswith("KXHIGH"):  kind,code="HIGH",ser[6:]
-        elif ser.startswith("KXLOW"):   kind,code="LOW",ser[5:]
-        else: continue
-        code=SERIES_ALIAS.get(code,code)
-        if code not in CITIES: continue
+        ks=weather_series(ser)
+        if not ks: continue
+        kind,code=ks
         et=e.get("event_ticker",""); parts=et.split("-")
         tdate=parse_date_code(parts[1]) if len(parts)>1 else None
         if not tdate: continue

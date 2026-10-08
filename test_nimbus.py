@@ -1759,18 +1759,38 @@ class TestRainShadow(unittest.TestCase):
 
 
 class TestMarketParser(unittest.TestCase):
-    """The Kalshi pull is the run's front door and has already failed silently
-    once: matching only KXHIGHT dropped 7 of 20 HIGH ladders (see the comment in
-    pull_weather_markets). These tests feed canned API pages through a
-    monkeypatched fget so both ticker generations, the NY alias, the quote
-    filter, pagination, and the ladder-count abort are pinned without a
-    network."""
+    """The Kalshi pull is the run's front door and has failed twice: matching
+    only KXHIGHT once silently dropped 7 of 20 HIGH ladders (see
+    weather_series), and on 2026-10-08 walking every open Kalshi event drew
+    HTTP 429 before reaching a temperature ladder, aborting two runs. These
+    tests feed canned API responses through a monkeypatched fget, routed like
+    the real pull (one category listing, then one events query per series), so
+    both ticker generations, the NY alias, the quote filter, pagination, the
+    series filter, the retry pass, 429 backoff, and the ladder-count abort are
+    pinned without a network."""
 
     def setUp(self):
-        self._saved = kw.fget
+        self._saved = (kw.fget, kw.time.sleep)
+        self.sleeps = []
+        kw.time.sleep = self.sleeps.append
 
     def tearDown(self):
-        kw.fget = self._saved
+        kw.fget, kw.time.sleep = self._saved
+
+    def _route(self, evs, extra=None, listing=None, calls=None):
+        """Fake fget for the per-series pull: the category listing names every
+        series present in evs (plus listing), and each events query returns
+        that series' events, plus any extra[series] the API should not have
+        sent. calls, when given, records every URL."""
+        names = sorted({e.get("series_ticker") for e in evs if e.get("series_ticker")} | set(listing or []))
+        def fake(u, tries=3):
+            if calls is not None:
+                calls.append(u)
+            if "/series?" in u:
+                return {"series": [{"ticker": n} for n in names]}
+            ser = u.split("series_ticker=")[1].split("&")[0]
+            return {"events": [e for e in evs if e.get("series_ticker") == ser] + list((extra or {}).get(ser, []))}
+        return fake
 
     def _mkt(self, t, st, fl, cp, quoted=True):
         m = {"ticker": t, "strike_type": st, "floor_strike": fl, "cap_strike": cp,
@@ -1805,8 +1825,11 @@ class TestMarketParser(unittest.TestCase):
         evs.append(self._event("KXHIGHXYZ"))                      # not a Nimbus city
         evs.append(self._event("KXRAINDAL"))                      # different series family
         evs.append(self._event("KXHIGHTDAL", datecode="BADDT"))   # unparseable date
-        evs.append({"series_ticker": None, "event_ticker": ""})   # degenerate event
-        kw.fget = lambda u, tries=3: {"events": evs}
+        # junk the API should never send for a Nimbus series query, sent anyway:
+        # the parse loop must still drop it rather than trust the request filter
+        stray = [self._event("KXHIGHXYZ", datecode="26AUG04"), self._event("KXRAINDAL", datecode="26AUG04"),
+                 {"series_ticker": None, "event_ticker": ""}]
+        kw.fget = self._route(evs, extra={"KXHIGHTATL": stray})
         lads = kw.pull_weather_markets()
         self.assertEqual(len(lads), 28)
         by = {(l["code"], l["kind"], l["date"].isoformat()) for l in lads}
@@ -1826,27 +1849,122 @@ class TestMarketParser(unittest.TestCase):
 
     def test_pagination_follows_the_cursor(self):
         codes = list(kw.CITIES)
-        page1 = {"events": [self._event("KXHIGHT" + c) for c in codes], "cursor": "next"}
-        page2 = {"events": [self._event("KXLOW" + c) for c in codes]}
+        evs = [self._event("KXHIGHT" + c) for c in codes] + [self._event("KXLOW" + c) for c in codes]
+        base = self._route(evs)
         calls = []
         def fake(u, tries=3):
             calls.append(u)
-            return page2 if "cursor=next" in u else page1
+            if "series_ticker=KXHIGHTDAL" in u:      # one series spills onto a second page
+                if "cursor=next" in u:
+                    return {"events": [self._event("KXHIGHTDAL", datecode="26AUG03")]}
+                return {"events": [self._event("KXHIGHTDAL")], "cursor": "next"}
+            return base(u)
         kw.fget = fake
         lads = kw.pull_weather_markets()
+        self.assertEqual(len(lads), 41)
+        dal = [u for u in calls if "series_ticker=KXHIGHTDAL" in u]
+        self.assertEqual(len(dal), 2)
+        self.assertIn("cursor=next", dal[1])
+
+    def test_series_discovery_keeps_only_nimbus_cities(self):
+        calls = []
+        listing = ["KXHIGHNY", "KXLOWNY", "KXHIGHTDAL", "KXLOWTNYC",      # Nimbus, both generations
+                   "KXHIGHTEGLL", "KXLOWTRJTT", "KXHIGHTEWR",              # cities Nimbus does not trade
+                   "KXHIGHTEMPDEN", "KXHIGHNYD", "KXHIGHUS", "KXRAINNYC"]  # look-alikes, other families
+        def fake(u, tries=3):
+            calls.append(u)
+            return {"series": [{"ticker": t} for t in listing] + [{"ticker": None}, {}]}
+        kw.fget = fake
+        self.assertEqual(kw.list_weather_series(), ["KXHIGHNY", "KXHIGHTDAL", "KXLOWNY", "KXLOWTNYC"])
+        self.assertEqual(len(calls), 1)
+        self.assertIn("/series?category=Climate%20and%20Weather", calls[0])
+        self.assertEqual(kw.weather_series("KXLOWNY"), ("LOW", "NYC"))     # legacy NY alias
+        self.assertIsNone(kw.weather_series("KXHIGHTEWR"))
+        self.assertIsNone(kw.weather_series(None))
+        kw.fget = lambda u, tries=3: None
+        self.assertEqual(kw.list_weather_series(), [])                     # unreadable listing
+
+    def test_pull_never_walks_the_whole_universe(self):
+        # the 2026-10-08 failure: paginating every open Kalshi event drew 429s
+        # before reaching a temperature ladder. Now: one listing plus one query
+        # per Nimbus series, and every events query is filtered to a series.
+        codes = list(kw.CITIES)
+        evs = [self._event("KXHIGHT" + c) for c in codes] + [self._event("KXLOWT" + c) for c in codes]
+        calls = []
+        kw.fget = self._route(evs, listing=["KXHIGHHOU", "KXHIGHTEGLL"], calls=calls)
+        lads = kw.pull_weather_markets()
         self.assertEqual(len(lads), 40)
-        self.assertEqual(len(calls), 2)
-        self.assertIn("cursor=next", calls[1])
+        ev_calls = [u for u in calls if "/events?" in u]
+        self.assertTrue(ev_calls and all("series_ticker=" in u for u in ev_calls))
+        self.assertEqual(len(calls), 1 + 41)              # listing + 40 live + 1 retired series
+        self.assertFalse(any("KXHIGHTEGLL" in u for u in calls))   # a non-Nimbus city is never fetched
+
+    def test_failed_series_gets_one_slow_retry_then_is_reported(self):
+        import io, contextlib
+        codes = list(kw.CITIES)
+        evs = [self._event("KXHIGHT" + c) for c in codes] + [self._event("KXLOWT" + c) for c in codes]
+        base = self._route(evs)
+        hits = {"KXHIGHTDAL": 0, "KXLOWTDAL": 0}
+        def fake(u, tries=3):
+            for ser in hits:
+                if f"series_ticker={ser}&" in u:
+                    hits[ser] += 1
+                    if ser == "KXLOWTDAL" or hits[ser] == 1:
+                        return None            # DAL HIGH recovers on the second pass, DAL LOW never does
+            return base(u)
+        kw.fget = fake
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            lads = kw.pull_weather_markets()
+        by = {(l["code"], l["kind"]) for l in lads}
+        self.assertIn(("DAL", "HIGH"), by)
+        self.assertNotIn(("DAL", "LOW"), by)
+        self.assertEqual(len(lads), 39)
+        self.assertEqual(hits, {"KXHIGHTDAL": 2, "KXLOWTDAL": 2})   # exactly one second pass each
+        self.assertIn(10.0, self.sleeps)                            # and it paused before retrying
+        self.assertIn("could not be fetched: KXLOWTDAL", buf.getvalue())
+
+    def test_fget_backs_off_on_429_and_honors_retry_after(self):
+        import urllib.error, email.message
+        def err(code, retry_after=None):
+            h = email.message.Message()
+            if retry_after is not None:
+                h["Retry-After"] = retry_after
+            return urllib.error.HTTPError("u", code, "x", h, None)
+        self.assertEqual(kw._retry_wait(err(429, "7"), 0), 7.0)
+        self.assertEqual(kw._retry_wait(err(429), 0), 2.0)
+        self.assertEqual(kw._retry_wait(err(429), 1), 4.0)
+        self.assertEqual(kw._retry_wait(err(429, "600"), 0), 30.0)    # capped
+        self.assertEqual(kw._retry_wait(err(500), 2), 1.0)            # non-429 keeps the flat 1 s
+        self.assertEqual(kw._retry_wait(OSError("reset"), 0), 1.0)
+        kw.fget = self._saved[0]                                       # the real fget, network mocked below
+        seq = [err(429), err(429)]
+        class Resp:
+            def __enter__(s): return s
+            def __exit__(s, *a): return False
+            def read(s, *a): return b'{"ok": 1}'
+        def fake_open(req, timeout=None):
+            if seq:
+                raise seq.pop(0)
+            return Resp()
+        saved_open = kw.urllib.request.urlopen
+        try:
+            kw.urllib.request.urlopen = fake_open
+            self.assertEqual(kw.fget("https://example.invalid/x"), {"ok": 1})
+        finally:
+            kw.urllib.request.urlopen = saved_open
+        self.assertEqual(self.sleeps, [2.0, 4.0])
 
     def test_truncated_universe_aborts_instead_of_publishing(self):
         # a thin or empty pull must never publish as a quiet day
-        kw.fget = lambda u, tries=3: {"events": [self._event("KXHIGHTDAL")]}
+        kw.fget = self._route([self._event("KXHIGHTDAL")])
         with self.assertRaises(SystemExit) as cm:
             kw.pull_weather_markets()
         self.assertEqual(cm.exception.code, 2)
-        kw.fget = lambda u, tries=3: None            # total API failure
-        with self.assertRaises(SystemExit):
+        kw.fget = lambda u, tries=3: None            # total API failure, listing included
+        with self.assertRaises(SystemExit) as cm:
             kw.pull_weather_markets()
+        self.assertEqual(cm.exception.code, 2)
 
     def test_settlement_parser_maps_results_and_values(self):
         captured = {}
@@ -2451,7 +2569,7 @@ class TestSettlementProvenance(unittest.TestCase):
                                             "yes_ask_dollars": "0.16", "open_interest_fp": "500"}]}]}
         saved = (kw.fget, kw.time.sleep, kw.GATE_MIN_LADDERS)
         try:
-            kw.fget = lambda url, tries=3: payload
+            kw.fget = lambda url, tries=3: ({"series": [{"ticker": "KXHIGHNY"}]} if "/series?" in url else payload)
             kw.time.sleep = lambda s: None
             kw.GATE_MIN_LADDERS = 1
             out = kw.pull_weather_markets()
