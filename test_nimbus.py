@@ -1759,18 +1759,38 @@ class TestRainShadow(unittest.TestCase):
 
 
 class TestMarketParser(unittest.TestCase):
-    """The Kalshi pull is the run's front door and has already failed silently
-    once: matching only KXHIGHT dropped 7 of 20 HIGH ladders (see the comment in
-    pull_weather_markets). These tests feed canned API pages through a
-    monkeypatched fget so both ticker generations, the NY alias, the quote
-    filter, pagination, and the ladder-count abort are pinned without a
-    network."""
+    """The Kalshi pull is the run's front door and has failed twice: matching
+    only KXHIGHT once silently dropped 7 of 20 HIGH ladders (see
+    weather_series), and on 2026-10-08 walking every open Kalshi event drew
+    HTTP 429 before reaching a temperature ladder, aborting two runs. These
+    tests feed canned API responses through a monkeypatched fget, routed like
+    the real pull (one category listing, then one events query per series), so
+    both ticker generations, the NY alias, the quote filter, pagination, the
+    series filter, the retry pass, 429 backoff, and the ladder-count abort are
+    pinned without a network."""
 
     def setUp(self):
-        self._saved = kw.fget
+        self._saved = (kw.fget, kw.time.sleep)
+        self.sleeps = []
+        kw.time.sleep = self.sleeps.append
 
     def tearDown(self):
-        kw.fget = self._saved
+        kw.fget, kw.time.sleep = self._saved
+
+    def _route(self, evs, extra=None, listing=None, calls=None):
+        """Fake fget for the per-series pull: the category listing names every
+        series present in evs (plus listing), and each events query returns
+        that series' events, plus any extra[series] the API should not have
+        sent. calls, when given, records every URL."""
+        names = sorted({e.get("series_ticker") for e in evs if e.get("series_ticker")} | set(listing or []))
+        def fake(u, tries=3):
+            if calls is not None:
+                calls.append(u)
+            if "/series?" in u:
+                return {"series": [{"ticker": n} for n in names]}
+            ser = u.split("series_ticker=")[1].split("&")[0]
+            return {"events": [e for e in evs if e.get("series_ticker") == ser] + list((extra or {}).get(ser, []))}
+        return fake
 
     def _mkt(self, t, st, fl, cp, quoted=True):
         m = {"ticker": t, "strike_type": st, "floor_strike": fl, "cap_strike": cp,
@@ -1805,8 +1825,11 @@ class TestMarketParser(unittest.TestCase):
         evs.append(self._event("KXHIGHXYZ"))                      # not a Nimbus city
         evs.append(self._event("KXRAINDAL"))                      # different series family
         evs.append(self._event("KXHIGHTDAL", datecode="BADDT"))   # unparseable date
-        evs.append({"series_ticker": None, "event_ticker": ""})   # degenerate event
-        kw.fget = lambda u, tries=3: {"events": evs}
+        # junk the API should never send for a Nimbus series query, sent anyway:
+        # the parse loop must still drop it rather than trust the request filter
+        stray = [self._event("KXHIGHXYZ", datecode="26AUG04"), self._event("KXRAINDAL", datecode="26AUG04"),
+                 {"series_ticker": None, "event_ticker": ""}]
+        kw.fget = self._route(evs, extra={"KXHIGHTATL": stray})
         lads = kw.pull_weather_markets()
         self.assertEqual(len(lads), 28)
         by = {(l["code"], l["kind"], l["date"].isoformat()) for l in lads}
@@ -1826,27 +1849,122 @@ class TestMarketParser(unittest.TestCase):
 
     def test_pagination_follows_the_cursor(self):
         codes = list(kw.CITIES)
-        page1 = {"events": [self._event("KXHIGHT" + c) for c in codes], "cursor": "next"}
-        page2 = {"events": [self._event("KXLOW" + c) for c in codes]}
+        evs = [self._event("KXHIGHT" + c) for c in codes] + [self._event("KXLOW" + c) for c in codes]
+        base = self._route(evs)
         calls = []
         def fake(u, tries=3):
             calls.append(u)
-            return page2 if "cursor=next" in u else page1
+            if "series_ticker=KXHIGHTDAL" in u:      # one series spills onto a second page
+                if "cursor=next" in u:
+                    return {"events": [self._event("KXHIGHTDAL", datecode="26AUG03")]}
+                return {"events": [self._event("KXHIGHTDAL")], "cursor": "next"}
+            return base(u)
         kw.fget = fake
         lads = kw.pull_weather_markets()
+        self.assertEqual(len(lads), 41)
+        dal = [u for u in calls if "series_ticker=KXHIGHTDAL" in u]
+        self.assertEqual(len(dal), 2)
+        self.assertIn("cursor=next", dal[1])
+
+    def test_series_discovery_keeps_only_nimbus_cities(self):
+        calls = []
+        listing = ["KXHIGHNY", "KXLOWNY", "KXHIGHTDAL", "KXLOWTNYC",      # Nimbus, both generations
+                   "KXHIGHTEGLL", "KXLOWTRJTT", "KXHIGHTEWR",              # cities Nimbus does not trade
+                   "KXHIGHTEMPDEN", "KXHIGHNYD", "KXHIGHUS", "KXRAINNYC"]  # look-alikes, other families
+        def fake(u, tries=3):
+            calls.append(u)
+            return {"series": [{"ticker": t} for t in listing] + [{"ticker": None}, {}]}
+        kw.fget = fake
+        self.assertEqual(kw.list_weather_series(), ["KXHIGHNY", "KXHIGHTDAL", "KXLOWNY", "KXLOWTNYC"])
+        self.assertEqual(len(calls), 1)
+        self.assertIn("/series?category=Climate%20and%20Weather", calls[0])
+        self.assertEqual(kw.weather_series("KXLOWNY"), ("LOW", "NYC"))     # legacy NY alias
+        self.assertIsNone(kw.weather_series("KXHIGHTEWR"))
+        self.assertIsNone(kw.weather_series(None))
+        kw.fget = lambda u, tries=3: None
+        self.assertEqual(kw.list_weather_series(), [])                     # unreadable listing
+
+    def test_pull_never_walks_the_whole_universe(self):
+        # the 2026-10-08 failure: paginating every open Kalshi event drew 429s
+        # before reaching a temperature ladder. Now: one listing plus one query
+        # per Nimbus series, and every events query is filtered to a series.
+        codes = list(kw.CITIES)
+        evs = [self._event("KXHIGHT" + c) for c in codes] + [self._event("KXLOWT" + c) for c in codes]
+        calls = []
+        kw.fget = self._route(evs, listing=["KXHIGHHOU", "KXHIGHTEGLL"], calls=calls)
+        lads = kw.pull_weather_markets()
         self.assertEqual(len(lads), 40)
-        self.assertEqual(len(calls), 2)
-        self.assertIn("cursor=next", calls[1])
+        ev_calls = [u for u in calls if "/events?" in u]
+        self.assertTrue(ev_calls and all("series_ticker=" in u for u in ev_calls))
+        self.assertEqual(len(calls), 1 + 41)              # listing + 40 live + 1 retired series
+        self.assertFalse(any("KXHIGHTEGLL" in u for u in calls))   # a non-Nimbus city is never fetched
+
+    def test_failed_series_gets_one_slow_retry_then_is_reported(self):
+        import io, contextlib
+        codes = list(kw.CITIES)
+        evs = [self._event("KXHIGHT" + c) for c in codes] + [self._event("KXLOWT" + c) for c in codes]
+        base = self._route(evs)
+        hits = {"KXHIGHTDAL": 0, "KXLOWTDAL": 0}
+        def fake(u, tries=3):
+            for ser in hits:
+                if f"series_ticker={ser}&" in u:
+                    hits[ser] += 1
+                    if ser == "KXLOWTDAL" or hits[ser] == 1:
+                        return None            # DAL HIGH recovers on the second pass, DAL LOW never does
+            return base(u)
+        kw.fget = fake
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            lads = kw.pull_weather_markets()
+        by = {(l["code"], l["kind"]) for l in lads}
+        self.assertIn(("DAL", "HIGH"), by)
+        self.assertNotIn(("DAL", "LOW"), by)
+        self.assertEqual(len(lads), 39)
+        self.assertEqual(hits, {"KXHIGHTDAL": 2, "KXLOWTDAL": 2})   # exactly one second pass each
+        self.assertIn(10.0, self.sleeps)                            # and it paused before retrying
+        self.assertIn("could not be fetched: KXLOWTDAL", buf.getvalue())
+
+    def test_fget_backs_off_on_429_and_honors_retry_after(self):
+        import urllib.error, email.message
+        def err(code, retry_after=None):
+            h = email.message.Message()
+            if retry_after is not None:
+                h["Retry-After"] = retry_after
+            return urllib.error.HTTPError("u", code, "x", h, None)
+        self.assertEqual(kw._retry_wait(err(429, "7"), 0), 7.0)
+        self.assertEqual(kw._retry_wait(err(429), 0), 2.0)
+        self.assertEqual(kw._retry_wait(err(429), 1), 4.0)
+        self.assertEqual(kw._retry_wait(err(429, "600"), 0), 30.0)    # capped
+        self.assertEqual(kw._retry_wait(err(500), 2), 1.0)            # non-429 keeps the flat 1 s
+        self.assertEqual(kw._retry_wait(OSError("reset"), 0), 1.0)
+        kw.fget = self._saved[0]                                       # the real fget, network mocked below
+        seq = [err(429), err(429)]
+        class Resp:
+            def __enter__(s): return s
+            def __exit__(s, *a): return False
+            def read(s, *a): return b'{"ok": 1}'
+        def fake_open(req, timeout=None):
+            if seq:
+                raise seq.pop(0)
+            return Resp()
+        saved_open = kw.urllib.request.urlopen
+        try:
+            kw.urllib.request.urlopen = fake_open
+            self.assertEqual(kw.fget("https://example.invalid/x"), {"ok": 1})
+        finally:
+            kw.urllib.request.urlopen = saved_open
+        self.assertEqual(self.sleeps, [2.0, 4.0])
 
     def test_truncated_universe_aborts_instead_of_publishing(self):
         # a thin or empty pull must never publish as a quiet day
-        kw.fget = lambda u, tries=3: {"events": [self._event("KXHIGHTDAL")]}
+        kw.fget = self._route([self._event("KXHIGHTDAL")])
         with self.assertRaises(SystemExit) as cm:
             kw.pull_weather_markets()
         self.assertEqual(cm.exception.code, 2)
-        kw.fget = lambda u, tries=3: None            # total API failure
-        with self.assertRaises(SystemExit):
+        kw.fget = lambda u, tries=3: None            # total API failure, listing included
+        with self.assertRaises(SystemExit) as cm:
             kw.pull_weather_markets()
+        self.assertEqual(cm.exception.code, 2)
 
     def test_settlement_parser_maps_results_and_values(self):
         captured = {}
@@ -2249,6 +2367,315 @@ class TestOfflineTools(unittest.TestCase):
         # the AI-aware row scores only records carrying both AI providers
         self.assertEqual(set(bt.w_member_count_with_ai(mm, None)), set(bt.MODELS + bt.AI_MODELS))
         self.assertIsNone(bt.w_member_count_with_ai({k: mm[k] for k in bt.MODELS}, None))
+
+
+class TestSettlementProvenance(unittest.TestCase):
+    """Settlement-source guard and NWS CLI cross-check (2026-09-14).
+
+    Kalshi moved 33 of 40 temperature ladders to The Weather Company on
+    2026-09-04 while the rules text kept naming the CLI station, and nothing in
+    the runner noticed for ten days. These tests pin both guards: that they
+    alert on a real change, stay quiet on the already-verified migration and on
+    fetch failures, never block settlement, and never move CONFIG_HASH."""
+
+    # ---- settlement_source_pass ----
+    def _src_fetcher(self, mapping):
+        def f(url, tries=3):
+            ser = url.rsplit("/", 1)[-1]
+            if ser not in mapping: return None
+            v = mapping[ser]
+            if v is None: return {"series": {"settlement_sources": []}}
+            return {"series": {"settlement_sources": [{"name": v}]}}
+        return f
+
+    def _run_src(self, state, mapping, tickers):
+        saved = (kw.fget, kw.time.sleep)
+        try:
+            kw.fget = self._src_fetcher(mapping)
+            kw.time.sleep = lambda s: None
+            return kw.settlement_source_pass(state, tickers, stamp="2026-09-14T22:00Z")
+        finally:
+            kw.fget, kw.time.sleep = saved
+
+    def test_first_sighting_seeds_baseline_silently(self):
+        # A guard shipping into an existing book must not alert on all 40 series.
+        st = {}
+        al = self._run_src(st, {"KXHIGHNY": "The Weather Company"}, ["KXHIGHNY"])
+        self.assertEqual(al, [])
+        self.assertEqual(st["settlement_sources"]["KXHIGHNY"]["name"], "The Weather Company")
+        self.assertEqual(st["settlement_sources"]["KXHIGHNY"]["history"], [])
+
+    def test_unchanged_source_is_silent(self):
+        st = {"settlement_sources": {"KXHIGHNY": {"name": "The Weather Company",
+                                                 "first_seen": "x", "checked": "x", "history": []}}}
+        al = self._run_src(st, {"KXHIGHNY": "The Weather Company"}, ["KXHIGHNY"])
+        self.assertEqual(al, [])
+        self.assertEqual(st["settlement_sources"]["KXHIGHNY"]["checked"], "2026-09-14T22:00Z")
+
+    def test_unexpected_change_alerts_and_is_recorded(self):
+        st = {"settlement_sources": {"KXHIGHNY": {"name": "The Weather Company",
+                                                 "first_seen": "x", "checked": "x", "history": []}}}
+        al = self._run_src(st, {"KXHIGHNY": "AccuWeather"}, ["KXHIGHNY"])
+        self.assertEqual(len(al), 1)
+        self.assertIn("KXHIGHNY", al[0])
+        self.assertIn("AccuWeather", al[0])
+        row = st["settlement_sources"]["KXHIGHNY"]
+        self.assertEqual(row["name"], "AccuWeather")
+        self.assertEqual(row["history"][-1],
+                         {"from": "The Weather Company", "to": "AccuWeather",
+                          "at": "2026-09-14T22:00Z", "expected": False})
+
+    def test_nws_to_twc_records_but_never_alerts(self):
+        # Owner decision 2026-09-14: the already-measured NWS to TWC migration
+        # must not reach the alert strip. Expressed as a TRANSITION, not a ticker
+        # list, so a re-listed series or a newly added NWS-named city is covered.
+        for prev in ("National Weather Service", "NWS Climatological Report Houston",
+                     "NWS Climatological Report"):
+            ser = "KXLOWTCHI"
+            st = {"settlement_sources": {ser: {"name": prev, "first_seen": "x",
+                                               "checked": "x", "history": []}}}
+            al = self._run_src(st, {ser: kw.SETTLEMENT_SOURCE_TWC}, [ser])
+            self.assertEqual(al, [], prev)                        # silent on the alert strip
+            row = st["settlement_sources"][ser]
+            self.assertEqual(row["name"], kw.SETTLEMENT_SOURCE_TWC)
+            self.assertTrue(row["history"][-1]["expected"])       # evidence still kept
+
+    def test_every_other_transition_alerts(self):
+        # "Expected" is exactly one move. A third party, and a move AWAY from
+        # TWC, are both real changes that must surface.
+        for prev, now in (("National Weather Service", "AccuWeather"),
+                          ("The Weather Company", "AccuWeather"),
+                          ("The Weather Company", "National Weather Service")):
+            ser = "KXLOWTCHI"
+            st = {"settlement_sources": {ser: {"name": prev, "first_seen": "x",
+                                               "checked": "x", "history": []}}}
+            al = self._run_src(st, {ser: now}, [ser])
+            self.assertEqual(len(al), 1, (prev, now))
+            self.assertFalse(st["settlement_sources"][ser]["history"][-1]["expected"])
+
+    def test_retired_series_cannot_raise_a_phantom_alert(self):
+        # The seven NWS-named series (KXHIGHHOU, KXLOW for AUS/CHI/DEN/LAX/MIA/
+        # PHIL) have ZERO open markets: dead legacy tickers, last touched
+        # 2026-02-26 and 2026-03-16. A hand-built ticker list finds them and
+        # reads as a half-migrated book, which is wrong. The pass takes its set
+        # from the live ladder pull, so a series with no open markets is never
+        # checked and can never alert.
+        st = {"settlement_sources": {}}
+        self.assertEqual(self._run_src(st, {"KXLOWCHI": "National Weather Service"}, []), [])
+        self.assertEqual(st["settlement_sources"], {})            # not even seeded
+
+    def test_fetch_failure_is_unknown_not_changed(self):
+        base = {"name": "The Weather Company", "first_seen": "x", "checked": "x", "history": []}
+        for payload in (["KXHIGHNY"], {"KXHIGHNY": None}):
+            st = {"settlement_sources": {"KXHIGHNY": dict(base)}}
+            mapping = {} if isinstance(payload, list) else payload
+            al = self._run_src(st, mapping, ["KXHIGHNY"])
+            self.assertEqual(al, [])                              # no false alarm
+            row = st["settlement_sources"]["KXHIGHNY"]
+            self.assertEqual(row["name"], "The Weather Company")  # baseline untouched
+            self.assertEqual(row["history"], [])
+
+    # ---- cli_crosscheck_pass ----
+    def _cli_fetcher(self, rows):
+        # rows: {"YYYY-MM-DD": (high, low)}
+        def f(url, tries=3):
+            if "mesonet" not in url: return None
+            return {"results": [{"valid": d, "high": h, "low": lo} for d, (h, lo) in rows.items()]}
+        return f
+
+    def _run_cli(self, state, rows, fetcher=None):
+        saved = kw.fget
+        try:
+            kw.fget = fetcher or self._cli_fetcher(rows)
+            return kw.cli_crosscheck_pass(state, cache={})
+        finally:
+            kw.fget = saved
+
+    def _rec(self, code="NYC", kind="HIGH", days_ago=1, actual=80):
+        t = (kw.TODAY - dtm.timedelta(days=days_ago)).isoformat()
+        return {"code": code, "kind": kind, "target": t, "actual": actual}
+
+    def test_match_is_stamped_and_silent(self):
+        r = self._rec(actual=80); st = {"resolved": [r]}
+        al = self._run_cli(st, {r["target"]: (80, 61)})
+        self.assertEqual(al, [])
+        self.assertEqual(r["cli_check"]["match"], True)
+        self.assertEqual(r["cli_check"]["cli"], 80)
+        self.assertEqual(r["cli_check"]["kalshi"], 80)
+        self.assertEqual(r["cli_check"]["station"], kw.STATION_IDS["NYC"])
+
+    def test_divergence_alerts(self):
+        r = self._rec(actual=85); st = {"resolved": [r]}
+        al = self._run_cli(st, {r["target"]: (80, 61)})
+        self.assertEqual(len(al), 1)
+        self.assertIn("settlement divergence", al[0])
+        self.assertFalse(r["cli_check"]["match"])
+        self.assertEqual(r["actual"], 85)      # the settled value is NEVER edited
+
+    def test_low_reads_the_low_column(self):
+        r = self._rec(kind="LOW", actual=61); st = {"resolved": [r]}
+        self.assertEqual(self._run_cli(st, {r["target"]: (80, 61)}), [])
+        self.assertTrue(r["cli_check"]["match"])
+
+    def test_write_once_and_skips(self):
+        done = self._rec(actual=99); done["cli_check"] = {"match": True}
+        old = self._rec(days_ago=kw.CLI_CHECK_LOOKBACK_DAYS + 3, actual=99)
+        nores = self._rec(actual=None)
+        unknown_city = self._rec(code="ZZZ", actual=99)
+        st = {"resolved": [done, old, nores, unknown_city]}
+        rows = {r["target"]: (1, 1) for r in (done, old, nores, unknown_city)}
+        self.assertEqual(self._run_cli(st, rows), [])
+        self.assertEqual(done["cli_check"], {"match": True})       # not re-checked
+        for r in (old, nores, unknown_city):
+            self.assertIsNone(r.get("cli_check"))
+
+    def test_unreadable_cli_leaves_record_unstamped_for_retry(self):
+        r = self._rec(); st = {"resolved": [r]}
+        self.assertEqual(self._run_cli(st, {}, fetcher=lambda url, tries=3: None), [])
+        self.assertIsNone(r.get("cli_check"))     # retried next run, never stamped as a miss
+        # a date the CLI has not published yet is also left for retry, not failed
+        self.assertEqual(self._run_cli(st, {"1999-01-01": (1, 1)}), [])
+        self.assertIsNone(r.get("cli_check"))
+
+    def test_backfill_is_bounded(self):
+        recs = [self._rec(actual=80) for _ in range(kw.CLI_CHECK_BACKFILL + 10)]
+        st = {"resolved": recs}
+        self._run_cli(st, {recs[0]["target"]: (80, 61)})
+        self.assertEqual(sum(1 for r in recs if r.get("cli_check")), kw.CLI_CHECK_BACKFILL)
+
+    def test_archive_is_never_touched(self):
+        # The archive is the older half of the same record; this pass reads the
+        # live resolved list only.
+        r = self._rec()
+        st = {"resolved": [], "archive_probe": [r]}
+        self.assertEqual(self._run_cli(st, {r["target"]: (80, 61)}), [])
+        self.assertIsNone(r.get("cli_check"))
+
+    # ---- isolation invariants ----
+    def test_guards_are_not_behavior_knobs(self):
+        # A recording guard must not move CONFIG_HASH: era comparability depends
+        # on the fingerprint marking behavior changes only.
+        self.assertEqual(kw.CONFIG_HASH, "5a84b45a")
+        for name in ("SETTLEMENT_SOURCE_TWC", "NWS_SOURCE_PREFIXES",
+                     "CLI_CHECK_LOOKBACK_DAYS", "CLI_CHECK_BACKFILL"):
+            self.assertNotIn(name, kw._KNOB_NAMES)
+
+    def test_ladder_carries_its_series_ticker(self):
+        # settlement_source_pass reads the series set off the pull already paid
+        # for; if this field is dropped the guard silently checks nothing.
+        payload = {"events": [{"series_ticker": "KXHIGHNY", "event_ticker": "KXHIGHNY-26SEP15",
+                               "markets": [{"ticker": "KXHIGHNY-26SEP15-T70", "strike_type": "less",
+                                            "cap_strike": "70", "yes_bid_dollars": "0.10",
+                                            "yes_ask_dollars": "0.16", "open_interest_fp": "500"}]}]}
+        saved = (kw.fget, kw.time.sleep, kw.GATE_MIN_LADDERS)
+        try:
+            kw.fget = lambda url, tries=3: ({"series": [{"ticker": "KXHIGHNY"}]} if "/series?" in url else payload)
+            kw.time.sleep = lambda s: None
+            kw.GATE_MIN_LADDERS = 1
+            out = kw.pull_weather_markets()
+        finally:
+            kw.fget, kw.time.sleep, kw.GATE_MIN_LADDERS = saved
+        self.assertEqual(out[0]["series"], "KXHIGHNY")
+
+
+class TestBetTimingReplay(unittest.TestCase):
+    """replay_timing.py, the FUTURE docket 7 instrument. Read-only and offline,
+    but it decides a registered gate, so its tape plumbing is pinned here: a
+    silent misread of the positional bucket rows would produce a confident
+    table built on the wrong prices."""
+
+    def setUp(self):
+        import replay_timing
+        self.rt = replay_timing
+
+    def test_board_cron_assigns_by_which_cron_could_have_fired_it(self):
+        # Crons fire LATE and never early, so a board belongs to the most recent
+        # nominal cron at or before its stamp. Measured drift reaches +7h.
+        cases = [("2026-09-14T12:17Z", "12:17"), ("2026-09-14T13:40Z", "12:17"),
+                 ("2026-09-14T19:59Z", "12:17"),                      # +7.7h drift
+                 ("2026-09-14T21:38Z", "21:38"), ("2026-09-14T23:10Z", "21:38"),
+                 ("2026-09-14T01:30Z", "21:38"),                      # past midnight
+                 ("2026-09-14T02:07Z", "02:07"), ("2026-09-14T09:00Z", "02:07")]
+        for stamp, want in cases:
+            self.assertEqual(self.rt.board_cron(stamp), want, stamp)
+        self.assertIsNone(self.rt.board_cron("garbage"))
+
+    def test_book0_fingerprint_matches_the_live_tape_hash(self):
+        # book0 stores no fp, so the tool recomputes it. If this drifts from
+        # _tape_row's hash every tape row looks re-strung and the slate silently
+        # replays nothing.
+        bks = [{"ticker": t, "mp": .5, "mid": .5, "yb": .4, "ya": .6, "oi": 9}
+               for t in ("A-T1", "A-T2", "A-T3")]
+        self.assertEqual(self.rt.book0_fp({"buckets": bks}),
+                         kw._tape_row("s", 1.0, False, 1, bks)[4])
+
+    def test_restrung_ladder_is_skipped_never_realigned(self):
+        b0 = {"buckets": [{"ticker": "A-T1", "hit": 1}, {"ticker": "A-T2", "hit": 0}]}
+        rec = {"book0": b0}
+        good = kw._tape_row("s", 1.0, False, 1,
+                            [{"ticker": "A-T1", "mp": .5, "mid": .5, "yb": .4, "ya": .6, "oi": 9},
+                             {"ticker": "A-T2", "mp": .5, "mid": .5, "yb": .4, "ya": .6, "oi": 9}])
+        fp = self.rt.book0_fp(b0)
+        self.assertIsNotNone(self.rt._price_board(rec, good, fp))
+        bad = list(good); bad[4] = "deadbeef"           # ladder re-strung
+        self.assertIsNone(self.rt._price_board(rec, bad, fp))
+        short = list(good); short[5] = good[5][:1]      # length drift, same fp
+        self.assertIsNone(self.rt._price_board(rec, short, fp))
+
+    def test_priced_board_carries_ticker_and_settled_hit_from_book0(self):
+        # The tape stores only [mp, mid, yb, ya, oi]; identity and outcome must
+        # come positionally from book0, which is the whole reason fp is checked.
+        b0 = {"buckets": [{"ticker": "A-T1", "hit": 1}, {"ticker": "A-T2", "hit": 0}]}
+        row = kw._tape_row("s", 1.0, False, 1,
+                           [{"ticker": "A-T1", "mp": .70, "mid": .60, "yb": .58, "ya": .62, "oi": 500},
+                            {"ticker": "A-T2", "mp": .30, "mid": .40, "yb": .38, "ya": .42, "oi": 500}])
+        got = self.rt._price_board({"book0": b0}, row, self.rt.book0_fp(b0))
+        self.assertEqual([e["ticker"] for e in got], ["A-T1", "A-T2"])
+        self.assertEqual([e["hit"] for e in got], [1, 0])
+        self.assertEqual(got[0]["mp"], 0.7)
+        self.assertEqual(got[0]["oi"], 500)
+        # an ungraded book0 cannot be replayed at all
+        self.assertIsNone(self.rt._price_board(
+            {"book0": {"buckets": [{"ticker": "A-T1"}, {"ticker": "A-T2"}]}}, row,
+            self.rt.book0_fp({"buckets": [{"ticker": "A-T1"}, {"ticker": "A-T2"}]})))
+
+    def test_registered_slate_is_exactly_the_seven_configs(self):
+        # The slate was fixed 2026-07-28 before any replayable tape existed.
+        # Adding a row without recording it in FUTURE.md is the failure this
+        # guards against.
+        self.assertEqual(len(self.rt.SLATE), 7)
+        names = [c["name"] for c in self.rt.SLATE]
+        self.assertTrue(names[0].startswith("champion"))
+        self.assertEqual(self.rt.CEILINGS,
+                         {"best-price-of-first-2-boards", "best-price-of-first-3-boards"})
+
+    def test_slate_pickers_select_the_boards_they_claim(self):
+        rows = [["2026-09-14T13:00Z"], ["2026-09-14T22:00Z"], ["2026-09-15T03:00Z"]]
+        by = {c["name"]: c["pick"] for c in self.rt.SLATE}
+        self.assertEqual(by["champion (first playable board)"](None, rows), [0])
+        self.assertEqual(by["freeze-at-board-2"](None, rows), [1])
+        self.assertEqual(by["freeze-at-board-3"](None, rows), [2])
+        self.assertEqual(by["freeze-only-on-12:17-board"](None, rows), [0])
+        self.assertEqual(by["freeze-only-on-21:38-board"](None, rows), [1])
+        self.assertEqual(by["best-price-of-first-2-boards"](None, rows), [0, 1])
+        self.assertEqual(by["best-price-of-first-3-boards"](None, rows), [0, 1, 2])
+        # a config whose board never fired must SKIP the record, not fall back to
+        # another board: silently substituting would make every row the champion
+        self.assertEqual(by["freeze-at-board-3"](None, rows[:2]), [])
+        self.assertEqual(by["freeze-only-on-21:38-board"](None, [rows[0]]), [])
+
+    def test_clv_sign_matches_the_live_convention(self):
+        # Mirrors resolve_pending: YES gains when the close rises, NO when it falls.
+        b0 = {"buckets": [{"ticker": "A-T1", "hit": 1, "mp": .95, "mid": .50}]}
+        rec = {"code": "NYC", "kind": "HIGH", "target": "2026-09-01", "book0": b0,
+               "buckets": [{"mid": 0.80}],
+               "tape": [kw._tape_row("2026-09-01T13:00Z", 1.0, False, 1,
+                                     [{"ticker": "A-T1", "mp": .95, "mid": .50,
+                                       "yb": .48, "ya": .52, "oi": 5000}])] * 2}
+        out = self.rt.replay([rec], self.rt.SLATE[0])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["side"], "Buy YES")
+        self.assertAlmostEqual(out[0]["clv"], 0.30, places=3)   # 0.80 close - 0.50 entry mid
 
 
 if __name__ == "__main__":
