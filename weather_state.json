@@ -2245,7 +2245,56 @@
    ],
    "plays_lead": 1,
    "plays_logged_at": "2026-10-14T17:39Z",
-   "plays_model_version": "2026-07-25.v15-nowcast-live"
+   "plays_model_version": "2026-07-25.v15-nowcast-live",
+   "nowcast": {
+    "asof": "2026-10-15T19:52Z",
+    "obs_max": 87.8,
+    "n_obs": 60,
+    "mean_u": 88.71,
+    "psd_u": 3.706,
+    "mean_t": 89.75,
+    "psd_t": 2.872,
+    "model_version": "2026-07-25.v15-nowcast-live",
+    "cfg": "5a84b45a",
+    "buckets": [
+     {
+      "ticker": "KXHIGHLAX-26OCT15-T83",
+      "rep": 81.5,
+      "mp_u": 0.035420388345216235,
+      "mp_t": 0.002374249643089671
+     },
+     {
+      "ticker": "KXHIGHLAX-26OCT15-B83.5",
+      "rep": 83.5,
+      "mp_u": 0.11005537573125043,
+      "mp_t": 0.024194159361349707
+     },
+     {
+      "ticker": "KXHIGHLAX-26OCT15-B85.5",
+      "rep": 85.5,
+      "mp_u": 0.1788629272316028,
+      "mp_t": 0.10776398638134486
+     },
+     {
+      "ticker": "KXHIGHLAX-26OCT15-B87.5",
+      "rep": 87.5,
+      "mp_u": 0.1599511182150622,
+      "mp_t": 0.21749183495650273
+     },
+     {
+      "ticker": "KXHIGHLAX-26OCT15-B89.5",
+      "rep": 89.5,
+      "mp_u": 0.15445632145971563,
+      "mp_t": 0.24747064475539224
+     },
+     {
+      "ticker": "KXHIGHLAX-26OCT15-T90",
+      "rep": 91.5,
+      "mp_u": 0.3612538690171531,
+      "mp_t": 0.4007051249023205
+     }
+    ]
+   }
   },
   "MIA|HIGH|2026-10-15": {
    "code": "MIA",
